@@ -41,6 +41,7 @@ export class Game {
     this.shots = [];
     this.item = null;
     this.coins = [];
+    this.lock = null;              // the dirt gun's target: the closest bacteria
     this.score = 0;
     this.earned = 0;               // coins (K) picked up this game
     this.lives = g.lives;
@@ -174,6 +175,7 @@ export class Game {
     if (this.freeze > 0) this.freeze = Math.max(0, this.freeze - dt);
     if (this.treeHurt > 0) this.treeHurt = Math.max(0, this.treeHurt - dt);
 
+    this.lock = this.gear.lockOn ? this.lockTarget(this.klay) : null;
     this.klay.update(dt, input, this);
     this.updateShots(dt);
     this.updateBacteria(dt);
@@ -315,7 +317,7 @@ export class Game {
     if (this.rng() >= COINS.dropChance) return;
     const spot = { x: at.x, y: at.y };
     keepOnSoil(spot, 24);
-    this.dropCoin(spot, COINS.dropValue, COINS.dropLifetime);
+    this.dropCoin(spot, COINS.dropValue);
   }
 
   addScore(points, at) {
@@ -372,7 +374,7 @@ export class Game {
     this.coinTimer -= dt;
     if (this.coinTimer <= 0) {
       this.coinTimer += COINS.every;
-      this.dropCoin(randomSpotOnSoil(this.rng), COINS.value, COINS.lifetime);
+      this.dropCoin(randomSpotOnSoil(this.rng), COINS.value);
     }
     for (const c of this.coins) {
       c.update(dt);
@@ -385,8 +387,8 @@ export class Game {
     this.coins = this.coins.filter((c) => !c.taken && !c.gone);
   }
 
-  dropCoin(at, value, lifetime) {
-    this.coins.push(new Coin(at.x, at.y, value, lifetime));
+  dropCoin(at, value) {
+    this.coins.push(new Coin(at.x, at.y, value, COINS.lifetime));
     this.emit('coinAppears', { value, x: at.x, y: at.y });
   }
 

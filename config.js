@@ -53,7 +53,7 @@ export const POISON = {
 
 export const TREE = {
   lives: 3,
-  maxLives: 6,
+  maxLives: 7,               // water drops grow a sprout up to this (corn and mushroom differ)
   radius: 16,
   growPerWater: 0.12,
 };
@@ -85,18 +85,17 @@ export const SCORE = {
   smash: 300,                // a rolling dirtball smashes a bacteria
 };
 
-// Coins, counted in K. A 1K coin turns up somewhere on the soil every 9
-// seconds and lasts 3. A killed bacteria (its dirtball breaks, or a rolling
-// dirtball smashes it) drops a 5K coin 15% of the time.
+// Coins, counted in K. A 1K coin turns up somewhere on the soil every 27
+// seconds. A killed bacteria (its dirtball breaks, or a rolling dirtball
+// smashes it) drops a 5K coin 5% of the time. Every coin lasts 15 seconds.
 export const COINS = {
-  every: 9,
+  every: 27,
   value: 1,
-  lifetime: 3,
-  dropChance: 0.15,
+  lifetime: 15,
+  dropChance: 0.05,
   dropValue: 5,
-  dropLifetime: 5,           // not in the brief: a little longer, it lands far away
   pickupRadius: 22,
-  blinkFrom: 1,
+  blinkFrom: 3,              // blinks for its last 3 seconds, like items
 };
 
 // Tools. Bought once, kept forever; Klayman wears one per game.
@@ -108,6 +107,8 @@ export const TOOLS = {
   gun: { price: 99, fireRate: 1.2, range: 1.2 },      // shots lock on to a bacteria
 };
 
+// The dirt gun locks on to the bacteria closest to Klayman (within reach of
+// a shot), marks it, and keeps him facing it, walking or standing.
 export const GUN = {
   lockTurn: 30,              // radians/second: a locked shot never misses
 };
@@ -116,7 +117,7 @@ export const GUN = {
 export const SPROUTS = {
   sprout: { price: 0 },
   sunflower: { price: 149, itemEvery: 20 },
-  corn: { price: 199, lives: 6 },
+  corn: { price: 199, lives: 6, maxLives: 6 },
   rose: { price: 249, healEvery: 30 },
   mushroom: {
     price: 299,

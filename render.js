@@ -178,6 +178,7 @@ export class Renderer {
     things.push({ y: game.klay.y, draw: () => this.drawKlayman(game) });
     things.sort((a, b) => a.y - b.y);
     for (const t of things) t.draw();
+    if (game.lock?.alive && !game.over) this.drawLock(game.lock);
 
     if (game.frozen) this.drawFrost(game.freeze);
     this.drawRings(dt);
@@ -435,6 +436,30 @@ export class Renderer {
       ctx.fillRect(mx - 4 + out[0] * 3, my - 4 + out[1] * 3, 8, 8);
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(mx - 2 + out[0] * 3, my - 2 + out[1] * 3, 4, 4);
+    }
+    ctx.restore();
+  }
+
+  /** The dirt gun's lock: four corner brackets round the closest bacteria. */
+  drawLock(b) {
+    const { ctx } = this;
+    const pulse = this.calm ? 0 : Math.round(Math.sin(this.time * 9) * 2);
+    const r = 19 + pulse;
+    const arm = 7;
+    const x = Math.round(b.x);
+    const y = Math.round(b.y - 12);
+    ctx.save();
+    for (const [w, color] of [[6, '#2b1a0c'], [3, '#ff5a4a']]) {
+      ctx.lineWidth = w;
+      ctx.strokeStyle = color;
+      ctx.lineCap = 'square';
+      ctx.beginPath();
+      for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+        ctx.moveTo(x + sx * r, y + sy * (r - arm));
+        ctx.lineTo(x + sx * r, y + sy * r);
+        ctx.lineTo(x + sx * (r - arm), y + sy * r);
+      }
+      ctx.stroke();
     }
     ctx.restore();
   }

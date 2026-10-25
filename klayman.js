@@ -22,6 +22,7 @@ export class Klayman {
     this.slow = 0;
     this.t = 0;
     this.tapBuffer = 0;          // a tap during the cooldown still counts
+    this.heading = { x: 0, y: 1 }; // the way he last walked: up, down, left or right
   }
 
   get poisoned() { return this.stun > 0 || this.slow > 0; }
@@ -88,26 +89,27 @@ export class Klayman {
       const speed = KLAYMAN.speed * slowFactor * boost * gear.speed;
       this.x += dx * speed * dt;
       this.y += dy * speed * dt;
-      if (Math.abs(dx) > Math.abs(dy)) {
-        this.facing = 'side';
-        this.flip = dx < 0;
-      } else if (dy < 0) {
-        this.facing = 'back';
-        this.flip = false;
-      } else {
-        this.facing = 'front';
-        this.flip = false;
-      }
+      this.heading = Math.abs(dx) > Math.abs(dy) ? { x: Math.sign(dx), y: 0 } : { x: 0, y: Math.sign(dy) };
+      this.faceToward({ x: this.x + dx, y: this.y + dy });
     }
     keepOnSoil(this, 14);
     game.pushOutOfObstacles(this, KLAYMAN.radius, !gear.passSprout);
+
+    // The dirt gun keeps him facing the closest bacteria, walking or not.
+    const target = game.lock;
+    if (target) this.faceToward(target);
 
     // Up close, the button pushes a dirtball. Auto throw never pushes: it
     // waits while a dirtball is right in front, so pushing stays your call.
     const wantsAction = this.tapBuffer > 0 || input.held;
     if ((wantsAction || input.auto) && this.cooldown <= 0) {
-      const dir = this.facingDir();
-      const ball = game.dirtballInFront(this, dir);
+      // A dirtball where he's facing, or (aiming the gun elsewhere) where he walked.
+      let dir = this.facingDir();
+      let ball = game.dirtballInFront(this, dir);
+      if (!ball && target) {
+        ball = game.dirtballInFront(this, this.heading);
+        if (ball) dir = this.heading;
+      }
       if (ball && !wantsAction) return;
       this.cooldown = (KLAYMAN.attackCooldown / boost / gear.fireRate) / slowFactor;
       this.tapBuffer = 0;
@@ -117,10 +119,6 @@ export class Klayman {
         game.emit('push', { x: ball.x, y: ball.y });
         return;
       }
-      // The dirt gun picks the nearest bacteria. Standing still, he turns
-      // to it; walking, he keeps walking and the shot finds its own way.
-      const target = gear.lockOn ? game.lockTarget(this) : null;
-      if (target && !this.moving) this.faceToward(target);
       const hand = this.facingDir();
       const from = { x: this.x + hand.x * 12, y: this.y + hand.y * 12 + (hand.y < 0 ? -2 : 0) };
       let aim = hand;

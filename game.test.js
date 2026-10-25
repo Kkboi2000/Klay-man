@@ -204,7 +204,7 @@ test('auto throw waits while a dirtball is right in front', () => {
 test('red plus never shows up when the sprout is full', () => {
   assert.equal(itemChoices(3, 3).includes('plus'), false);
   assert.equal(itemChoices(2, 3).includes('plus'), true);
-  assert.equal(itemChoices(6, 6).includes('water'), false);
+  assert.equal(itemChoices(TREE.maxLives, TREE.maxLives).includes('water'), false);
 });
 
 test('items do what they say', () => {
@@ -218,7 +218,7 @@ test('items do what they say', () => {
   assert.equal(game.lives, 4);
   assert.ok(game.treeScale > 1);
   for (let i = 0; i < 5; i++) game.useItem({ type: 'water', x: 0, y: 0 });
-  assert.equal(game.maxLives, TREE.maxLives, 'capped at 6');
+  assert.equal(game.maxLives, TREE.maxLives, 'capped at 7');
 
   game.useItem({ type: 'bag', x: 0, y: 0 });
   assert.equal(game.boostFactor, ITEMS.bagBoost);

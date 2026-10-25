@@ -32,7 +32,7 @@ function memory() {
 
 // ------------------------------------------------------------------ coins
 
-test('a 1K coin turns up on the soil every 9 seconds and lasts 3', () => {
+test('a 1K coin turns up on the soil every 27 seconds and lasts 15', () => {
   const game = quietGame();
   game.coinTimer = COINS.every;
   run(game, COINS.every - 0.1);
@@ -45,12 +45,14 @@ test('a 1K coin turns up on the soil every 9 seconds and lasts 3', () => {
   run(game, COINS.lifetime - 0.3);
   assert.equal(game.coins.length, 1, 'still there');
   run(game, 0.4);
-  assert.equal(game.coins.length, 0, 'gone after 3 seconds');
+  assert.equal(game.coins.length, 0, 'gone after 15 seconds');
+  assert.equal(COINS.every, 27);
+  assert.equal(COINS.lifetime, 15);
 });
 
 test('walking onto a coin picks it up', () => {
   const game = quietGame();
-  game.dropCoin({ x: game.klay.x + 60, y: game.klay.y }, 1, 3);
+  game.dropCoin({ x: game.klay.x + 60, y: game.klay.y }, 1);
   game.drainEvents();
   run(game, 1, right);
   assert.equal(game.coins.length, 0);
@@ -58,17 +60,19 @@ test('walking onto a coin picks it up', () => {
   assert.ok(game.drainEvents().some((e) => e.type === 'coin' && e.value === 1));
 });
 
-test('a kill drops a 5K coin 15% of the time', () => {
+test('a kill drops a 5K coin 5% of the time, and it lasts 15 seconds too', () => {
   const kill = (roll) => {
     const game = quietGame(undefined, () => roll);
     const ball = game.addDirtball(TREE_SPOT.x - 150, TREE_SPOT.y - 40);
     game.breakDirtball(ball);
     return game.coins;
   };
-  assert.equal(kill(0.5).length, 0, 'an 0.5 roll: no coin');
-  const coins = kill(0.1);
-  assert.equal(coins.length, 1, 'an 0.1 roll: a coin');
+  assert.equal(COINS.dropChance, 0.05);
+  assert.equal(kill(0.06).length, 0, 'a 0.06 roll: no coin');
+  const coins = kill(0.04);
+  assert.equal(coins.length, 1, 'a 0.04 roll: a coin');
   assert.equal(coins[0].value, COINS.dropValue);
+  assert.equal(coins[0].life, COINS.lifetime);
 });
 
 test('a smash is two kills: the bacteria hit and the one inside the ball', () => {
@@ -140,14 +144,41 @@ test('dirt gun: locks on to a bacteria behind Klayman and hits it', () => {
   assert.ok(game.drainEvents().some((e) => e.type === 'hit'));
 });
 
-test('dirt gun: a walking Klayman still hits a bacteria from any angle', () => {
+test('dirt gun: locks on to the closest bacteria and faces it, walking or standing', () => {
   const game = quietGame({ tool: 'gun' });
   const k = game.klay;
-  const b = game.addBacteria(k.x + 40, k.y - 140);  // above, while walking right
+  const far = game.addBacteria(k.x + 200, k.y);
+  const near = game.addBacteria(k.x + 40, k.y - 140);  // closer, and above him
+  game.update(STEP);
+  assert.equal(game.lock, near, 'the closest one');
+  assert.equal(k.facing, 'back', 'standing, he faces it');
   game.update(STEP, { ...right, pressed: true });
-  assert.equal(k.facing, 'side', 'keeps facing the way he walks');
+  assert.equal(game.lock, near);
+  assert.equal(k.facing, 'back', 'walking right, he still faces it');
   run(game, 0.6, right);
-  assert.ok(b.dirt >= 1 || !b.alive);
+  assert.ok(near.dirt >= 1 || !near.alive, 'the shot landed');
+  assert.equal(far.dirt, 0, 'and not on the other one');
+});
+
+test('dirt gun: no lock without a bacteria in reach; he faces where he walks', () => {
+  const game = quietGame({ tool: 'gun' });
+  const k = game.klay;
+  game.addBacteria(k.x + game.shotRange + 60, k.y);
+  run(game, 0.2, { ...NO_INPUT, y: 1 });
+  assert.equal(game.lock, null);
+  assert.equal(k.facing, 'front');
+});
+
+test('dirt gun: walking up to a dirtball and tapping still pushes it', () => {
+  const game = quietGame({ tool: 'gun' });
+  const k = game.klay;
+  game.addBacteria(k.x, k.y - 150);                  // locked, above him
+  const ball = game.addDirtball(k.x + 60, k.y);
+  run(game, 0.3, right);                               // walk right, up to the ball
+  assert.equal(k.facing, 'back', 'aiming at the bacteria');
+  game.update(STEP, { ...right, pressed: true });
+  assert.equal(ball.state, 'rolling');
+  assert.ok(ball.vx > 0, 'rolled the way he walked');
 });
 
 test('dirt gun: 20% faster and 20% farther than bare hands', () => {
@@ -223,8 +254,8 @@ test('mushroom: grows 1 heart every 80 seconds, up to 9', () => {
   assert.equal(game.maxLives, 9, 'stops at 9');
 });
 
-test('water drops grow a mushroom to 9 hearts, other sprouts to 6', () => {
-  for (const [sprout, cap] of [['sprout', 6], ['mushroom', 9]]) {
+test('water drops grow a mushroom to 9 hearts, corn stays at 6, the rest stop at 7', () => {
+  for (const [sprout, cap] of [['sprout', 7], ['sunflower', 7], ['rose', 7], ['corn', 6], ['mushroom', 9]]) {
     const game = quietGame({ sprout });
     for (let i = 0; i < 10; i++) game.useItem({ type: 'water', x: 0, y: 0 });
     assert.equal(game.maxLives, cap, sprout);

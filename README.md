@@ -24,7 +24,7 @@ Every file sits in one folder, with no subfolders, so uploading is simple.
 ### Updating
 
 Upload the changed files the same way. Also open `sw.js` and bump `VERSION`
-(`klayman-v10` → `klayman-v11`): phones keep an offline copy, and this is how
+(`klayman-v11` → `klayman-v12`): phones keep an offline copy, and this is how
 they know to fetch the new one.
 
 ## Pages
@@ -37,10 +37,10 @@ they know to fetch the new one.
 
 ## Coins and the shop
 
-Coins are counted in K. A 1K coin appears somewhere on the soil every 9
-seconds and disappears after 3 (arrows at the screen edge point to it). Each
-bacteria you kill has a 15% chance to drop a 5K coin. Coins are saved the
-moment you pick them up.
+Coins are counted in K. A 1K coin appears somewhere on the soil every 27
+seconds. Each bacteria you kill has a 5% chance to drop a 5K coin. Every coin
+lasts 15 seconds and blinks for its last 3; arrows at the screen edge point to
+coins you can’t see. Coins are saved the moment you pick them up.
 
 On the setup page, tap something you don’t own, then tap again to buy it.
 You keep it for good. Klayman wears one tool per game.
@@ -50,13 +50,13 @@ You keep it for good. Klayman wears one tool per game.
 | Shoes | 29K | 10% faster; walks through the sprout |
 | Gloves | 29K | Throws 10% faster and 10% farther, with a gust at the arm |
 | Lab coat | 49K | Bacteria can’t get into Klayman |
-| Dirt gun | 99K | Shots lock on from any angle; 20% faster and farther; gun sound |
+| Dirt gun | 99K | Locks on to the closest bacteria (red brackets) and keeps Klayman facing it; shots hit from any angle; 20% faster and farther; gun sound |
 
 | Sprout | Price | What it does |
 | --- | --- | --- |
-| Sprout | free | 3 hearts, up to 6 with water drops |
+| Sprout | free | 3 hearts, up to 7 with water drops (so can sunflower and rose) |
 | Sunflower | 149K | Special items every 20 seconds instead of 60 |
-| Corn | 199K | Starts with 6 hearts |
+| Corn | 199K | Starts with 6 hearts, and stays at 6 |
 | Rose | 249K | Heals 1 heart every 30 seconds |
 | Mushroom | 299K | Every 40 s, spores push crawling bacteria back and slow them for 4 s; every 80 s it grows 1 heart, up to 9 |
 
