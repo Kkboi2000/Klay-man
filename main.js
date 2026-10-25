@@ -177,29 +177,68 @@ function dressThrowButton(sheet) {
   $('throw').style.setProperty('--ball', `url(${c.toDataURL()})`);
 }
 
+// ---------------------------------------------------------------- install
+// Chrome and Edge offer one-tap install through `beforeinstallprompt`. On a
+// repeat visit they make that offer as soon as the page loads, often before
+// the sprites and sounds finish decoding, so this runs before anything slow.
+// Where there is no offer (iPhone, LINE and other in-app browsers, an offer
+// the player already dismissed), a line of text says how to install by hand.
+
+const isInstalled = () => navigator.standalone === true
+  || ['standalone', 'fullscreen', 'minimal-ui'].some((m) => matchMedia(`(display-mode: ${m})`).matches);
+
+function writeInstallTip(tip) {
+  const ua = navigator.userAgent;
+  if (/\bLine\//.test(ua)) {
+    // LINE's own browser can't install apps; this asks LINE to hand the page
+    // to the phone's real browser.
+    const out = new URL(location.href);
+    out.searchParams.set('openExternalBrowser', '1');
+    const link = Object.assign(document.createElement('a'), { href: out, textContent: 'Open in your browser' });
+    tip.replaceChildren('LINE can’t install apps. ', link, ' to install.');
+  } else if (/FBAN|FBAV|Instagram|MicroMessenger|KAKAOTALK/.test(ua)) {
+    tip.textContent = 'This in-app browser can’t install apps. Open the page in Safari or Chrome to install.';
+  } else if (/iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+    tip.textContent = 'To install: tap Share, then Add to Home Screen.';
+  } else {
+    tip.textContent = 'To install: open the browser menu, then Install app or Add to Home screen.';
+  }
+}
+
 function setUpInstall() {
-  if (isPreview) return;
-  const standalone = matchMedia('(display-mode: standalone)').matches
-    || matchMedia('(display-mode: fullscreen)').matches
-    || navigator.standalone === true;
-  if (standalone) return;
-  const installBtn = $('install');
-  let prompt = null;
+  if (isPreview || isInstalled()) return;
+  const button = $('install');
+  const tip = $('install-tip');
+  let offer = null;
+
+  const refresh = () => {
+    button.hidden = !offer;
+    tip.hidden = Boolean(offer);
+  };
+  const installed = () => {
+    offer = null;
+    button.hidden = true;
+    tip.hidden = true;
+  };
+
   addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    prompt = e;
-    installBtn.hidden = false;
+    e.preventDefault();          // our button replaces Chrome's own banner
+    offer = e;
+    refresh();
   });
-  installBtn.addEventListener('click', async () => {
-    if (!prompt) return;
-    prompt.prompt();
-    await prompt.userChoice.catch(() => {});
-    prompt = null;
-    installBtn.hidden = true;
+  addEventListener('appinstalled', installed);
+  button.addEventListener('click', async () => {
+    if (!offer) return;
+    const asked = offer;
+    offer = null;                // an offer can only be used once
+    asked.prompt();
+    const { outcome } = await asked.userChoice.catch(() => ({}));
+    if (outcome === 'accepted') installed();
+    else refresh();              // dismissed: the menu route still works
   });
-  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent)
-    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  if (ios) $('ios-tip').hidden = false;
+
+  writeInstallTip(tip);
+  refresh();
 }
 
 function registerServiceWorker() {
@@ -209,6 +248,7 @@ function registerServiceWorker() {
 }
 
 async function boot() {
+  setUpInstall();                // first: the install offer can arrive before assets load
   ui = createUI();
   best = loadBest();
   ui.setBest(best);
@@ -261,7 +301,6 @@ async function boot() {
   }
 
   layout();
-  setUpInstall();
   app.classList.remove('is-loading');
   mode = 'title';
   ui.show('title');

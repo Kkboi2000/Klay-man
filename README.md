@@ -18,11 +18,13 @@ Every file sits in one folder, with no subfolders, so uploading is simple.
 5. Open that link on your phone:
    - **iPhone (Safari):** Share → Add to Home Screen.
    - **Android (Chrome):** tap **Install** on the title screen, or menu → Install app.
+   - **Opened from LINE?** LINE’s own browser can’t install apps. Tap
+     **Open in your browser** on the title screen first.
 
 ### Updating
 
 Upload the changed files the same way. Also open `sw.js` and bump `VERSION`
-(`klayman-v7` → `klayman-v8`): phones keep an offline copy, and this is how
+(`klayman-v9` → `klayman-v10`): phones keep an offline copy, and this is how
 they know to fetch the new one.
 
 ## Controls

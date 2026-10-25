@@ -423,6 +423,7 @@ body {
 .keys { display: none; color: rgba(255, 244, 227, 0.65); font-size: 0.95rem; }
 [data-layout="desk"] .keys { display: block; }
 .tip { color: rgba(255, 244, 227, 0.7); font-size: 0.95rem; }
+.tip a { color: var(--gold); text-underline-offset: 3px; }
 .sig { margin-top: 0.4rem !important; color: var(--gold); font-size: 0.95rem; }
 
 .loading { display: none; color: rgba(255, 244, 227, 0.75); }
