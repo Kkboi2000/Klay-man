@@ -1,11 +1,11 @@
 // Run with:  npm test   (or: node --test)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Game, NO_INPUT } from '../js/game.js';
-import { BACTERIA, DIRTBALL, ITEMS, POISON, SCORE, TREE } from '../js/config.js';
-import { Bacteria } from '../js/bacteria.js';
-import { itemChoices } from '../js/items.js';
-import { SOIL, TREE_SPOT, dist, insideSoil } from '../js/world.js';
+import { Game, NO_INPUT } from './game.js';
+import { BACTERIA, DIRTBALL, ITEMS, POISON, SCORE, TREE } from './config.js';
+import { Bacteria } from './bacteria.js';
+import { itemChoices } from './items.js';
+import { SOIL, TREE_SPOT, dist, insideSoil } from './world.js';
 
 const STEP = 1 / 60;
 

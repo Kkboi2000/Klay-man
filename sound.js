@@ -32,7 +32,7 @@ export class Sound {
     if (!this.ctx) return;
     await Promise.all(names.map(async (name) => {
       try {
-        const bytes = await fetchBytes(`assets/${name}.mp3`);
+        const bytes = await fetchBytes(`${name}.mp3`);
         this.buffers[name] = await new Promise((ok, fail) => this.ctx.decodeAudioData(bytes, ok, fail));
       } catch { /* a missing sound should never stop the game */ }
     }));

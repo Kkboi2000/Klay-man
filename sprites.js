@@ -191,10 +191,10 @@ export function iconArt(name) {
 
 export async function loadSprites() {
   const [bg, klay, bac, tree] = await Promise.all([
-    loadImage('assets/bg.png'),
-    loadImage('assets/klay.png'),
-    loadImage('assets/bacteiras.png'),
-    loadImage('assets/tree.png'),
+    loadImage('bg.png'),
+    loadImage('klay.png'),
+    loadImage('bacteiras.png'),
+    loadImage('tree.png'),
   ]);
   return {
     bg,

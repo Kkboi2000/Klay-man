@@ -1,6 +1,6 @@
 @font-face {
   font-family: 'Pixelify Sans';
-  src: url('assets/fonts/pixelify-sans.woff2') format('woff2');
+  src: url('pixelify-sans.woff2') format('woff2');
   font-weight: 400 700;
   font-display: swap;
 }
@@ -342,7 +342,7 @@ body {
 .title-art {
   width: 6rem;
   height: 6rem;
-  background: url('assets/klayman.png') center / contain no-repeat;
+  background: url('klayman.png') center / contain no-repeat;
   image-rendering: pixelated;
 }
 
