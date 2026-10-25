@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Klayman</title>
+  <meta name="description" content="Throw dirt, roll dirtballs, and keep the bacteria away from the sprout.">
+  <meta name="theme-color" content="#636363">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/favicon-48.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Klayman">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app" class="is-loading" data-layout="desk">
+    <div id="frame">
+
+      <div id="stage">
+        <canvas id="screen" aria-label="The flowerpot where the game is played"></canvas>
+        <div class="hud">
+          <p class="hud-score"><span class="sr-only">Score </span><span id="score">0</span></p>
+          <div class="hud-right">
+            <div id="hearts" class="hearts" role="img"></div>
+            <p id="level" class="hud-level">Level 1</p>
+            <button id="pause" class="hud-pause" type="button" aria-label="Pause">
+              <svg viewBox="0 0 8 8" aria-hidden="true"><rect x="1" y="1" width="2" height="6"/><rect x="5" y="1" width="2" height="6"/></svg>
+            </button>
+          </div>
+        </div>
+        <div id="effects" class="effects" aria-live="polite"></div>
+        <div id="banner" class="banner" hidden aria-live="polite">
+          <p id="banner-title" class="banner-title"></p>
+          <p id="banner-sub" class="banner-sub"></p>
+        </div>
+      </div>
+
+      <div id="stick-zone" class="pad pad-stick">
+        <div id="stick-base" class="stick-base"><div id="stick-knob" class="stick-knob"></div></div>
+        <span class="pad-label" aria-hidden="true">Move</span>
+      </div>
+
+      <div id="throw-zone" class="pad pad-throw">
+        <button id="throw" class="throw" type="button" tabindex="-1" aria-label="Throw dirt"></button>
+        <button id="auto" class="auto-toggle" type="button" aria-pressed="false">Auto throw: off</button>
+      </div>
+    </div>
+
+    <section id="title" class="screen" aria-labelledby="title-name">
+      <div class="screen-body">
+        <div class="title-art" aria-hidden="true"></div>
+        <h1 id="title-name" class="title-name">Klayman</h1>
+        <p class="lede">Keep the bacteria out of the sprout.</p>
+        <ul class="howto">
+          <li>Hit a bacteria with dirt four times to turn it into a dirtball.</li>
+          <li>Stand next to a dirtball and throw to roll it into other bacteria.</li>
+          <li>From level 3, special items appear near the sprout. Walk over one to use it.</li>
+          <li>From level 7, dirt thrown at a dirtball from afar breaks it.</li>
+        </ul>
+        <p id="loading" class="loading">Loading the pot…</p>
+        <button id="start" class="btn" type="button" data-autofocus>Start</button>
+        <p id="best" class="best"></p>
+        <p class="keys">Arrow keys or WASD to move. Space to throw. P to pause.</p>
+        <div class="screen-row">
+          <button class="btn-quiet" type="button" data-sound aria-pressed="true">Sound on</button>
+          <button id="install" class="btn-quiet" type="button" hidden>Install</button>
+        </div>
+        <p id="ios-tip" class="tip" hidden>To install: tap Share, then Add to Home Screen.</p>
+        <p class="sig">★ Krit’s vibe code ★</p>
+      </div>
+    </section>
+
+    <section id="paused" class="screen" hidden aria-labelledby="paused-name">
+      <div class="screen-body">
+        <h2 id="paused-name" class="screen-name">Paused</h2>
+        <button id="resume" class="btn" type="button" data-autofocus>Resume</button>
+        <div class="screen-row">
+          <button class="btn-quiet" type="button" data-sound aria-pressed="true">Sound on</button>
+          <button id="restart" class="btn-quiet" type="button">Restart</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="over" class="screen" hidden aria-labelledby="over-name">
+      <div class="screen-body">
+        <h2 id="over-name" class="screen-name">The sprout is gone</h2>
+        <p class="final">Score <span id="final-score">0</span></p>
+        <p id="final-best" class="final-best"></p>
+        <p id="final-level" class="final-level"></p>
+        <button id="again" class="btn" type="button" data-autofocus>Play again</button>
+      </div>
+    </section>
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
