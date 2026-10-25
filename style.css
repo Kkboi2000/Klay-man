@@ -5,6 +5,23 @@
   font-display: swap;
 }
 
+/* Numbers come from the game's own digits (make-digits.py): Pixelify's 2 and
+   5 read as 8 and S at small sizes. Only 0-9 are taken from these files. */
+@font-face {
+  font-family: 'Klay Digits';
+  src: url('klay-digits.woff2') format('woff2');
+  font-weight: 100 549;
+  font-display: swap;
+  unicode-range: U+0030-0039;
+}
+@font-face {
+  font-family: 'Klay Digits';
+  src: url('klay-digits-bold.woff2') format('woff2');
+  font-weight: 550 900;
+  font-display: swap;
+  unicode-range: U+0030-0039;
+}
+
 /* Colours are taken from the game's own art: the gray around the pot,
    the clay rim, the soil, the sprout. */
 :root {
@@ -51,7 +68,7 @@ body {
   overscroll-behavior: none;
   background: var(--ground);
   color: var(--chalk);
-  font-family: 'Pixelify Sans', ui-rounded, system-ui, sans-serif;
+  font-family: 'Klay Digits', 'Pixelify Sans', ui-rounded, system-ui, sans-serif;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;

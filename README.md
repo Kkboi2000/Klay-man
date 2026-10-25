@@ -24,7 +24,7 @@ Every file sits in one folder, with no subfolders, so uploading is simple.
 ### Updating
 
 Upload the changed files the same way. Also open `sw.js` and bump `VERSION`
-(`klayman-v11` → `klayman-v12`): phones keep an offline copy, and this is how
+(`klayman-v12` → `klayman-v13`): phones keep an offline copy, and this is how
 they know to fetch the new one.
 
 ## Pages
@@ -94,10 +94,13 @@ arrows at the screen edge point to bacteria, items and the sprout off-screen.
 | `render.js`, `sprites.js` | Drawing and sprite-sheet frames; shoes, gloves and coat are painted onto Klayman’s frames when the game loads |
 | `input.js`, `sound.js`, `ui.js`, `main.js` | Controls, sound, screens, start-up |
 | `sw.js`, `manifest.webmanifest` | Offline play and home-screen install |
+| `klay-digits.woff2`, `klay-digits-bold.woff2` | The numbers 0–9, drawn for this game so 2 and 5 never read as 8 and S |
+| `make-digits.py` | Builds those two files: edit a digit’s pixels there and run it (`pip install fonttools brotli`) |
 | `game.test.js`, `gear.test.js` | Rule checks: run `npm test` (needs Node 18+) |
 
 The sound effects were trimmed to remove the silence at the start of each
 file, so they play the moment something happens. The gun, coin and shop
 sounds are made in code (`sound.js`), so there are no new sound files.
 
-Font: Pixelify Sans, SIL Open Font License (`OFL.txt`).
+Font: Pixelify Sans, SIL Open Font License (`OFL.txt`). The digits are the
+game’s own (Klay Digits), on Pixelify’s pixel grid.

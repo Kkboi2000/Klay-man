@@ -6,7 +6,7 @@ import { BREAK_TIME, ABSORB_TIME } from './bacteria.js';
 import { DIRTBALL_BREAK_TIME } from './dirtball.js';
 import { ITEM_INFO } from './items.js';
 
-const FONT = '"Pixelify Sans", ui-rounded, system-ui, sans-serif';
+const FONT = '"Klay Digits", "Pixelify Sans", ui-rounded, system-ui, sans-serif';
 const DIRT = ['#4a2f17', '#6b4423', '#8a5a2b'];
 const GERM = ['#3e7a4a', '#5aa266', '#2c5a35'];
 const SPARK = ['#ffe9a8', '#ffd25a', '#ffffff'];

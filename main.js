@@ -307,6 +307,8 @@ async function boot() {
     loadSprites(),
     sound.load(['throw', 'hit', 'break']),
     document.fonts?.load('600 16px "Pixelify Sans"').catch(() => {}),
+    document.fonts?.load('400 16px "Klay Digits"', '0').catch(() => {}),
+    document.fonts?.load('700 16px "Klay Digits"', '0').catch(() => {}),
   ]);
   renderer = new Renderer(canvas, sprites);
   layout();
