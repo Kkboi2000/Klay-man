@@ -24,8 +24,10 @@ export const KLAYMAN = {
 export const SHOT = {
   speed: 350 * FEEL,         // dirtshot.gd speed
   range: 150 * FEEL,         // dirtshot.gd max_range
-  radius: 5,
+  radius: 8,                 // a little forgiving when it lands
   height: 20,                // drawn at hand height
+  magnetRange: 62,           // bacteria this close pull a passing shot in...
+  magnetTurn: 8,             // ...turning it at most this fast (radians/second)
 };
 
 export const BACTERIA = {

@@ -158,7 +158,7 @@ export class Game {
 
   updateShots(dt) {
     for (const s of this.shots) {
-      s.update(dt);
+      s.update(dt, this.bacteria);
       if (s.dead) continue;
       for (const b of this.bacteria) {
         if (!b.alive) continue;

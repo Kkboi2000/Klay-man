@@ -1,22 +1,56 @@
-// Ported from dirtshot.gd: flies straight, gone after max_range.
+// Ported from dirtshot.gd: flies forward, gone after max_range.
+// Each bacteria has a little magnetism: a shot that passes close by bends
+// toward it, so throws don't have to be exact.
 import { SHOT } from './config.js';
 import { insideSoil } from './world.js';
+
+const AHEAD = Math.cos((75 * Math.PI) / 180); // only pulled by bacteria in front
 
 export class DirtShot {
   constructor(x, y, dir) {
     this.x = x;
     this.y = y;
-    this.startX = x;
-    this.startY = y;
     this.vx = dir.x * SHOT.speed;
     this.vy = dir.y * SHOT.speed;
+    this.travelled = 0;
     this.dead = false;
   }
 
-  update(dt) {
+  update(dt, bacteria = []) {
+    this.bendToward(this.nearestAhead(bacteria), dt);
     this.x += this.vx * dt;
     this.y += this.vy * dt;
-    const travelled = Math.hypot(this.x - this.startX, this.y - this.startY);
-    if (travelled > SHOT.range || !insideSoil(this.x, this.y, -6)) this.dead = true;
+    this.travelled += SHOT.speed * dt;
+    if (this.travelled > SHOT.range || !insideSoil(this.x, this.y, -6)) this.dead = true;
+  }
+
+  /** The closest bacteria inside the magnet range, and not behind the shot. */
+  nearestAhead(bacteria) {
+    let best = null;
+    let bestD = SHOT.magnetRange;
+    for (const b of bacteria) {
+      if (!b.alive) continue;
+      const dx = b.x - this.x;
+      const dy = b.y - this.y;
+      const d = Math.hypot(dx, dy);
+      if (d >= bestD || d < 0.001) continue;
+      const facing = (dx * this.vx + dy * this.vy) / (d * SHOT.speed);
+      if (facing < AHEAD) continue;
+      best = b;
+      bestD = d;
+    }
+    return best;
+  }
+
+  /** Turns the shot toward the target, but only so fast: a nudge, not a lock-on. */
+  bendToward(target, dt) {
+    if (!target) return;
+    const now = Math.atan2(this.vy, this.vx);
+    let turn = Math.atan2(target.y - this.y, target.x - this.x) - now;
+    turn = Math.atan2(Math.sin(turn), Math.cos(turn)); // shortest way round
+    const max = SHOT.magnetTurn * dt;
+    const a = now + Math.max(-max, Math.min(max, turn));
+    this.vx = Math.cos(a) * SHOT.speed;
+    this.vy = Math.sin(a) * SHOT.speed;
   }
 }
