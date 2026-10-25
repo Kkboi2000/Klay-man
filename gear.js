@@ -49,21 +49,52 @@ export function gearFor({ tool = null, sprout = 'sprout' } = {}) {
 }
 
 // ------------------------------------------------------------------ wallet
+// Admin mode keeps its own save (ADMIN_SAVE), so testing never touches the
+// player's real coins or purchases.
 
-const KEY = 'klayman.wallet';
+export const SAVE = 'klayman.wallet';
+export const ADMIN_SAVE = 'klayman.wallet.admin';
+const ADMIN_START = 9999;
+const ALL_IDS = [...TOOL_IDS, ...SPROUT_IDS];
 
 function safeStorage() {
   try { return globalThis.localStorage ?? null; } catch { return null; }
 }
 
 export class Wallet {
-  constructor(storage = safeStorage()) {
+  constructor(storage = safeStorage(), key = SAVE) {
     this.storage = storage;
+    this.open(key);
+  }
+
+  /** Switches to another save: the player's, or admin's. */
+  open(key) {
+    this.key = key;
     this.coins = 0;
     this.owned = new Set(['sprout']);
     this.tool = null;
     this.sprout = 'sprout';
-    this.load();
+    const found = this.load();
+    // A first visit to admin starts with everything and plenty of coins.
+    if (!found && key === ADMIN_SAVE) {
+      this.coins = ADMIN_START;
+      this.unlockAll();
+    }
+  }
+
+  get isAdmin() { return this.key === ADMIN_SAVE; }
+
+  /** Admin: own everything (to try it), or nothing but the free sprout (to try buying). */
+  unlockAll() {
+    for (const id of ALL_IDS) this.owned.add(id);
+    this.save();
+  }
+
+  lockAll() {
+    this.owned = new Set(['sprout']);
+    this.tool = null;
+    this.sprout = 'sprout';
+    this.save();
   }
 
   get loadout() { return { tool: this.tool, sprout: this.sprout }; }
@@ -96,20 +127,22 @@ export class Wallet {
     return true;
   }
 
+  /** Returns false when there is no save yet. */
   load() {
     try {
-      const saved = JSON.parse(this.storage?.getItem(KEY));
-      if (!saved) return;
+      const saved = JSON.parse(this.storage?.getItem(this.key));
+      if (!saved) return false;
       if (Number.isInteger(saved.coins) && saved.coins >= 0) this.coins = saved.coins;
       for (const id of saved.owned ?? []) if (kindOf(id)) this.owned.add(id);
       if (this.owns(saved.tool) && kindOf(saved.tool) === 'tool') this.tool = saved.tool;
       if (this.owns(saved.sprout) && kindOf(saved.sprout) === 'sprout') this.sprout = saved.sprout;
-    } catch { /* nothing saved yet */ }
+      return true;
+    } catch { return false; /* nothing saved, or a broken save */ }
   }
 
   save() {
     try {
-      this.storage?.setItem(KEY, JSON.stringify({
+      this.storage?.setItem(this.key, JSON.stringify({
         coins: this.coins, owned: [...this.owned], tool: this.tool, sprout: this.sprout,
       }));
     } catch { /* private mode: it lasts until the page closes */ }

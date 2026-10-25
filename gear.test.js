@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game, NO_INPUT } from './game.js';
 import { COINS, KLAYMAN, SHOT, SPROUTS, TOOLS, TREE, ITEMS } from './config.js';
-import { Wallet, gearFor, formatK } from './gear.js';
+import { Wallet, gearFor, formatK, SAVE, ADMIN_SAVE, TOOL_IDS, SPROUT_IDS } from './gear.js';
 import { SOIL, TREE_SPOT, dist, insideSoil } from './world.js';
 
 const STEP = 1 / 60;
@@ -313,4 +313,51 @@ test('prices match the brief', () => {
     { shoes: 29, gloves: 29, coat: 49, gun: 99, sprout: 0, sunflower: 149, corn: 199, rose: 249, mushroom: 299 },
   );
   assert.equal(formatK(1250), '1,250K');
+});
+
+// ------------------------------------------------------------------ admin
+
+test('admin mode is its own save: everything unlocked, the real save untouched', () => {
+  const storage = memory();
+  const w = new Wallet(storage);
+  w.add(40);
+  w.buy('shoes');
+
+  w.open(ADMIN_SAVE);
+  assert.equal(w.isAdmin, true);
+  assert.equal(w.coins, 9999);
+  for (const id of [...TOOL_IDS, ...SPROUT_IDS]) assert.equal(w.owns(id), true, id);
+  w.equip('gun');
+  w.add(500);
+
+  w.open(SAVE);
+  assert.equal(w.isAdmin, false);
+  assert.equal(w.coins, 11, 'real coins as they were');
+  assert.equal(w.tool, 'shoes');
+  assert.equal(w.owns('gun'), false, 'nothing leaks across');
+
+  w.open(ADMIN_SAVE);
+  assert.equal(w.coins, 10499, 'admin save remembered too');
+  assert.equal(w.tool, 'gun');
+});
+
+test('admin: lock all to try buying, unlock all to try everything', () => {
+  const w = new Wallet(memory(), ADMIN_SAVE);
+  w.equip('coat');
+  w.equip('rose');
+  w.lockAll();
+  assert.equal(w.owns('coat'), false);
+  assert.deepEqual(w.loadout, { tool: null, sprout: 'sprout' });
+  assert.equal(w.buy('mushroom'), true, 'buying works again');
+  w.unlockAll();
+  assert.equal(w.owns('gun'), true);
+});
+
+test('admin: a game can start at a later level', () => {
+  const game = new Game({ rng: () => 0.5 });
+  game.reset(undefined, 7);
+  assert.equal(game.level, 7);
+  assert.equal(game.skillUnlocked, true);
+  assert.equal(game.itemsUnlocked, true);
+  assert.equal(game.levelSize(7), game.toSpawn);
 });

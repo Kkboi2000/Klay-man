@@ -76,13 +76,14 @@ class Showcase {
 
 // --------------------------------------------------------------- the page
 
-export function createSetup({ wallet, sprites, input, sound, onChange }) {
+export function createSetup({ wallet, sprites, input, sound, onChange, admin }) {
   const el = {
     purse: $('purse'),
     news: $('shop-news'),
     tools: $('tools'),
     sprouts: $('sprouts'),
     auto: $('setup-auto'),
+    admin: $('admin'),
   };
   const showcase = new Showcase($('showcase'), sprites);
   const rows = new Map();
@@ -157,8 +158,36 @@ export function createSetup({ wallet, sprites, input, sound, onChange }) {
     }
     el.auto.setAttribute('aria-checked', String(input.auto));
     el.auto.textContent = input.auto ? 'On' : 'Off';
+    el.admin.hidden = !wallet.isAdmin;
+    for (const b of el.admin.querySelectorAll('[data-level]')) {
+      b.setAttribute('aria-pressed', String(Number(b.dataset.level) === admin?.level));
+    }
     showcase.show(wallet.loadout);
   }
+
+  // Admin mode: coins, everything or nothing owned, and where a game starts.
+  el.admin.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b || !admin) return;
+    armed = null;
+    if (b.dataset.level) {
+      admin.setLevel(Number(b.dataset.level));
+      say(`Games start at level ${b.dataset.level}.`);
+    } else if (b.dataset.admin === 'coins') {
+      wallet.add(1000);
+      say(`Added 1,000K.`);
+    } else if (b.dataset.admin === 'unlock') {
+      wallet.unlockAll();
+      say('Everything is unlocked.');
+    } else if (b.dataset.admin === 'lock') {
+      wallet.lockAll();
+      say('Everything is locked again, so you can try buying.');
+    } else if (b.dataset.admin === 'leave') {
+      admin.leave();
+      say('Back to your own save.');
+    }
+    render();
+  });
 
   el.auto.addEventListener('click', () => {
     input.setAuto(!input.auto);

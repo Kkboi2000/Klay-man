@@ -24,7 +24,7 @@ Every file sits in one folder, with no subfolders, so uploading is simple.
 ### Updating
 
 Upload the changed files the same way. Also open `sw.js` and bump `VERSION`
-(`klayman-v12` → `klayman-v13`): phones keep an offline copy, and this is how
+(`klayman-v13` → `klayman-v14`): phones keep an offline copy, and this is how
 they know to fetch the new one.
 
 ## Pages
@@ -61,6 +61,20 @@ You keep it for good. Klayman wears one tool per game.
 | Mushroom | 299K | Every 40 s, spores push crawling bacteria back and slow them for 4 s; every 80 s it grows 1 heart, up to 9 |
 
 All these numbers are in `config.js` (`COINS`, `TOOLS`, `SPROUTS`).
+
+## Admin mode (for testing)
+
+Tap Klayman’s face on the title page **5 times** (or open the game with
+`?admin` on the end of the link). Admin mode uses its own save: everything is
+unlocked and you start with 9,999K. The setup page then shows an admin panel:
+
+- **+1,000K**, **Unlock all**, and **Lock all** (to try buying again).
+- **Start at level** 1, 3, 7 or 10: level 3 brings special items, level 7 the
+  dirtball-breaking skill.
+- **Leave admin mode** goes back to your own save, exactly as you left it.
+  Coins, purchases and best score in admin mode never touch it.
+
+Admin mode stays on (even after closing the app) until you leave it.
 
 ## Controls
 

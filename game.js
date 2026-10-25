@@ -31,7 +31,8 @@ export class Game {
     this.reset(loadout);
   }
 
-  reset(loadout = this.gear) {
+  /** A new game. `level` lets admin mode start further in. */
+  reset(loadout = this.gear, level = 1) {
     this.gear = gearFor(loadout);
     const g = this.gear;
     this.klay = new Klayman(TREE_SPOT.x, TREE_SPOT.y + 62);
@@ -57,7 +58,8 @@ export class Game {
     this.growTimer = g.growEvery;
     this.over = false;
     this.events.length = 0;
-    this.startLevel(1);
+    this.startLevel(level);
+    if (level >= ITEMS.unlockLevel) this.itemTimer = this.itemEvery;
   }
 
   // ---------------------------------------------------------------- state

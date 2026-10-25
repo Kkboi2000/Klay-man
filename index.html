@@ -56,6 +56,7 @@
       <div class="screen-body">
         <canvas id="face" class="face" role="img" aria-label="Klayman’s face"></canvas>
         <h1 id="title-name" class="title-name">Klayman</h1>
+        <p id="admin-note" class="admin-note" aria-live="polite"></p>
         <p id="loading" class="loading">Loading the pot…</p>
         <button id="play" class="btn" type="button" data-autofocus>Play</button>
         <div class="screen-row">
@@ -73,6 +74,23 @@
           <h2 id="setup-name" class="screen-name">Setup</h2>
           <p class="purse"><span class="coin-icon" aria-hidden="true"></span><span class="sr-only">Your coins: </span><span id="purse">0K</span></p>
         </header>
+        <section id="admin" class="admin" hidden aria-labelledby="admin-name">
+          <h3 id="admin-name" class="admin-name">Admin mode <span class="shelf-note">a separate save; your real coins are safe</span></h3>
+          <div class="admin-row">
+            <button class="admin-btn" type="button" data-admin="coins">+1,000K</button>
+            <button class="admin-btn" type="button" data-admin="unlock">Unlock all</button>
+            <button class="admin-btn" type="button" data-admin="lock">Lock all</button>
+          </div>
+          <div class="admin-row" role="group" aria-labelledby="admin-level">
+            <span id="admin-level" class="admin-label">Start at level</span>
+            <button class="admin-btn" type="button" data-level="1">1</button>
+            <button class="admin-btn" type="button" data-level="3">3</button>
+            <button class="admin-btn" type="button" data-level="7">7</button>
+            <button class="admin-btn" type="button" data-level="10">10</button>
+          </div>
+          <button class="admin-btn admin-leave" type="button" data-admin="leave">Leave admin mode</button>
+        </section>
+
         <canvas id="showcase" class="showcase" aria-hidden="true"></canvas>
         <p id="shop-news" class="shop-news" aria-live="polite"></p>
 

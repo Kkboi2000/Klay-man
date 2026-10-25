@@ -644,6 +644,39 @@ body {
 }
 .gear[data-state="confirm"] .gear-tag { color: var(--ink); background: var(--gold); }
 
+/* Admin mode: a testing tool, so it looks like one (dashed, not part of the pot). */
+.admin {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.7rem 0.75rem 0.8rem;
+  border: 2px dashed var(--gold);
+  background: rgba(255, 210, 90, 0.06);
+}
+.admin[hidden] { display: none; }
+.admin-name { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--gold); }
+.admin-name .shelf-note { display: block; margin: 0.1rem 0 0; }
+.admin-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.admin-label { flex-basis: 100%; font-weight: 600; }
+.admin-btn {
+  min-width: 2.75rem;
+  min-height: 2.5rem;
+  padding: 0.3em 0.8em;
+  border: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--chalk);
+  background: rgba(36, 25, 13, 0.7);
+  box-shadow: 0 -2px var(--ink), 0 2px var(--ink), -2px 0 var(--ink), 2px 0 var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.admin-btn[aria-pressed="true"] { color: var(--ink); background: var(--gold); }
+.admin-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+.admin-leave { justify-self: start; color: rgba(255, 244, 227, 0.75); }
+
+.admin-note { color: var(--gold); font-size: 0.95rem; }
+.admin-note:empty { display: none; }
+
 .setting {
   display: flex;
   justify-content: space-between;

@@ -7,11 +7,12 @@ import { Renderer } from './render.js';
 import { createInput } from './input.js';
 import { Sound } from './sound.js';
 import { createUI } from './ui.js';
-import { Wallet } from './gear.js';
+import { Wallet, SAVE, ADMIN_SAVE } from './gear.js';
 import { createSetup, createFace } from './setup.js';
 
 const STEP = 1 / 60;
 const BEST_KEY = 'klayman.best';
+const ADMIN_KEY = 'klayman.admin';
 const $ = (id) => document.getElementById(id);
 
 const app = $('app');
@@ -23,20 +24,57 @@ let mode = 'loading';            // loading | title | setup | playing | paused |
 let touch = matchMedia('(pointer: coarse)').matches;
 let game, renderer, input, sound, ui, best, wallet, setup, face;
 let overDelay = 0;
+let adminLevel = 1;              // admin mode can start a game further in
 const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ------------------------------------------------------------- best score
 
+// Admin mode has its own best score, like its own wallet.
+const bestKey = () => (wallet?.isAdmin ? `${BEST_KEY}.admin` : BEST_KEY);
+
 function loadBest() {
   try {
-    const saved = JSON.parse(localStorage.getItem(BEST_KEY));
+    const saved = JSON.parse(localStorage.getItem(bestKey()));
     if (saved && typeof saved.score === 'number') return saved;
   } catch { /* nothing saved yet */ }
   return { score: 0, level: 0 };
 }
 
 function saveBest(b) {
-  try { localStorage.setItem(BEST_KEY, JSON.stringify(b)); } catch { /* private mode */ }
+  try { localStorage.setItem(bestKey(), JSON.stringify(b)); } catch { /* private mode */ }
+}
+
+// ------------------------------------------------------------ admin mode
+// For trying everything: a separate save with everything unlocked. Turned on
+// by tapping Klayman's face five times on the title (or opening ?admin), and
+// it stays on until "Leave admin mode" on the setup page.
+
+function adminSaved() {
+  try { return localStorage.getItem(ADMIN_KEY) === '1'; } catch { return false; }
+}
+
+function setAdmin(on) {
+  try { localStorage.setItem(ADMIN_KEY, on ? '1' : '0'); } catch { /* private mode */ }
+  wallet.open(on ? ADMIN_SAVE : SAVE);
+  adminLevel = 1;
+  best = loadBest();
+  ui.setBest(best);
+  ui.setCoins(wallet.coins);
+  $('admin-note').textContent = on ? 'Admin mode: everything unlocked.' : '';
+}
+
+function listenForAdminTaps() {
+  let taps = 0;
+  let timer = 0;
+  $('face').addEventListener('click', () => {
+    taps += 1;
+    clearTimeout(timer);
+    timer = setTimeout(() => { taps = 0; }, 1500);
+    if (taps < 5) return;
+    taps = 0;
+    setAdmin(!wallet.isAdmin);
+    if (!wallet.isAdmin) $('admin-note').textContent = 'Admin mode off. Back to your own save.';
+  });
 }
 
 // ----------------------------------------------------------------- layout
@@ -81,7 +119,7 @@ function showSetup() {
 function start() {
   sound.unlock();
   document.activeElement?.blur();   // Space throws, rather than pressing a button
-  game.reset(wallet.loadout);
+  game.reset(wallet.loadout, wallet.isAdmin ? adminLevel : 1);
   ui.setCoins(wallet.coins);
   renderer.particles = [];
   renderer.popups = [];
@@ -296,10 +334,14 @@ function registerServiceWorker() {
 async function boot() {
   setUpInstall();                // first: the install offer can arrive before assets load
   ui = createUI();
+  if (new URLSearchParams(location.search).has('admin')) {
+    try { localStorage.setItem(ADMIN_KEY, '1'); } catch { /* private mode */ }
+  }
+  wallet = new Wallet(undefined, adminSaved() ? ADMIN_SAVE : SAVE);
   best = loadBest();
   ui.setBest(best);
-  wallet = new Wallet();
   ui.setCoins(wallet.coins);
+  if (wallet.isAdmin) $('admin-note').textContent = 'Admin mode: everything unlocked.';
   sound = new Sound();
   ui.setSound(sound.muted);
 
@@ -327,7 +369,15 @@ async function boot() {
     onPause: togglePause,
   });
 
-  setup = createSetup({ wallet, sprites, input, sound });
+  setup = createSetup({
+    wallet, sprites, input, sound,
+    admin: {
+      get level() { return adminLevel; },
+      setLevel(n) { adminLevel = n; },
+      leave() { setAdmin(false); },
+    },
+  });
+  listenForAdminTaps();
 
   $('play').addEventListener('click', showSetup);
   $('start').addEventListener('click', start);
