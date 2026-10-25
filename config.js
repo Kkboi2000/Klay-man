@@ -84,3 +84,49 @@ export const SCORE = {
   dirtball: 100,             // a dirtball breaks
   smash: 300,                // a rolling dirtball smashes a bacteria
 };
+
+// Coins, counted in K. A 1K coin turns up somewhere on the soil every 9
+// seconds and lasts 3. A killed bacteria (its dirtball breaks, or a rolling
+// dirtball smashes it) drops a 5K coin 15% of the time.
+export const COINS = {
+  every: 9,
+  value: 1,
+  lifetime: 3,
+  dropChance: 0.15,
+  dropValue: 5,
+  dropLifetime: 5,           // not in the brief: a little longer, it lands far away
+  pickupRadius: 22,
+  blinkFrom: 1,
+};
+
+// Tools. Bought once, kept forever; Klayman wears one per game.
+// Numbers are multipliers on his own: 1.1 means 10% more.
+export const TOOLS = {
+  shoes: { price: 29, speed: 1.1 },                    // and he walks through the sprout
+  gloves: { price: 29, fireRate: 1.1, range: 1.1 },
+  coat: { price: 49 },                                 // bacteria can't get into him
+  gun: { price: 99, fireRate: 1.2, range: 1.2 },      // shots lock on to a bacteria
+};
+
+export const GUN = {
+  lockTurn: 30,              // radians/second: a locked shot never misses
+};
+
+// Sprouts. The plain sprout is free; the others are bought once.
+export const SPROUTS = {
+  sprout: { price: 0 },
+  sunflower: { price: 149, itemEvery: 20 },
+  corn: { price: 199, lives: 6 },
+  rose: { price: 249, healEvery: 30 },
+  mushroom: {
+    price: 299,
+    pulseEvery: 40,          // spores push crawling bacteria away...
+    push: 120,               // ...this far (not in the brief)...
+    slowTime: 4,             // ...and slow them down for 4 seconds...
+    slowFactor: 0.5,         // ...to half speed (not in the brief)
+    growEvery: 80,           // +1 heart, and a bigger mushroom...
+    maxLives: 9,             // ...up to 9
+  },
+};
+
+export const KNOCK_TIME = 0.35; // how long a spore push takes

@@ -124,11 +124,34 @@ body {
 
 .hud p { margin: 0; }
 
+.hud-left { display: grid; gap: 0.15em; }
+
 .hud-score {
   font-size: clamp(16px, calc(var(--u, 1) * 28px), 32px);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+
+/* The coin, drawn once in code (ui.js), used wherever coins are counted. */
+.coin-icon {
+  display: inline-block;
+  flex: none;
+  width: 1em;
+  height: 1em;
+  background: var(--coin) center / contain no-repeat;
+  image-rendering: pixelated;
+}
+
+.hud-coins {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  font-size: clamp(13px, calc(var(--u, 1) * 17px), 20px);
+  font-weight: 700;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+.hud-coins .coin-icon { width: 1.15em; height: 1.15em; }
 
 .hud-right {
   display: flex;
@@ -139,6 +162,10 @@ body {
 }
 
 .hearts { display: flex; gap: 0.18em; }
+/* Six to nine hearts sit in two even rows, so the bar fits a narrow phone. */
+.hearts.is-many { display: grid; grid-template-columns: repeat(var(--cols, 5), auto); gap: 0.1em 0.12em; }
+.hearts.is-many .heart { height: 0.85em; }
+.hud-level { white-space: nowrap; }
 .heart {
   height: 1.2em;
   width: auto;
@@ -339,11 +366,13 @@ body {
 }
 .screen-body p { margin: 0; }
 
-.title-art {
-  width: 6rem;
-  height: 6rem;
-  background: url('klayman.png') center / contain no-repeat;
+/* Title: just Klayman's face, big. */
+.face {
+  width: clamp(6rem, min(38vw, 30vh), 11.5rem);
+  height: auto;
+  aspect-ratio: 18 / 17;
   image-rendering: pixelated;
+  filter: drop-shadow(0 0.45rem 0 rgba(0, 0, 0, 0.35));
 }
 
 .title-name,
@@ -428,14 +457,234 @@ body {
 
 .loading { display: none; color: rgba(255, 244, 227, 0.75); }
 .is-loading .loading { display: block; }
-.is-loading #start { display: none; }
+.is-loading #play { display: none; }
 
 .final { font-size: 1.3rem; font-weight: 600; }
 #final-score { display: block; font-size: 3rem; font-weight: 700; line-height: 1.1; text-shadow: var(--outline); }
 .final-best { color: rgba(255, 244, 227, 0.8); font-size: 1.1rem; }
 .final-best.is-new { color: var(--gold); font-weight: 700; }
 .final-level { color: rgba(255, 244, 227, 0.75); }
+.final-coins {
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  color: var(--gold);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.final-coins .coin-icon { width: 1.2em; height: 1.2em; }
+
+/* ------------------------------------------------------------- setup */
+
+/* Title and setup are pages of their own, not a veil over the game. */
+#title { background: rgb(30, 21, 11); }
+.screen-setup { place-items: start center; background: rgb(30, 21, 11); }
+
+/* The score bar only belongs to a game in progress. */
+[data-mode="title"] .hud,
+[data-mode="setup"] .hud { visibility: hidden; }
+
+.setup {
+  width: min(27rem, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.setup-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.purse {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--gold);
+  text-shadow: var(--outline);
+  font-variant-numeric: tabular-nums;
+}
+.purse .coin-icon { width: 1.25em; height: 1.25em; }
+
+/* A window into the pot: Klayman dressed for the game, beside his sprout. */
+.showcase {
+  display: block;
+  width: 100%;
+  height: 11rem;
+  background: var(--soil);
+  box-shadow: 0 -3px var(--ink), 0 3px var(--ink), -3px 0 var(--ink), 3px 0 var(--ink),
+    0 6px 0 3px rgba(0, 0, 0, 0.25);
+}
+
+.shop-news {
+  min-height: 1.3em;
+  margin: -0.35rem 0 -0.2rem !important;
+  color: var(--gold);
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+.shelf { display: grid; gap: 0.5rem; }
+.shelf-name {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--clay-light);
+}
+.shelf-note {
+  margin-left: 0.3em;
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: rgba(255, 244, 227, 0.6);
+}
+.shelf-list { display: grid; gap: 0.5rem; }
+
+.gear {
+  display: grid;
+  grid-template-columns: 2.75rem 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 3.6rem;
+  margin: 0;
+  padding: 0.4rem 0.6rem 0.4rem 0.55rem;
+  border: 0;
+  font: inherit;
+  color: var(--chalk);
+  text-align: left;
+  background: rgba(255, 244, 227, 0.06);
+  box-shadow: 0 -2px var(--ink), 0 2px var(--ink), -2px 0 var(--ink), 2px 0 var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.gear:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+
+.gear-pic {
+  width: 2.75rem;
+  height: 2.75rem;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.gear-text { display: grid; gap: 0.1rem; min-width: 0; }
+.gear-name { font-size: 1.05rem; font-weight: 700; }
+.gear-says { font-size: 0.88rem; line-height: 1.25; color: rgba(255, 244, 227, 0.72); }
+
+.gear-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3em;
+  min-width: 3.5rem;
+  min-height: 1.9rem;
+  padding: 0.15em 0.5em;
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 244, 227, 0.6);
+}
+
+/* Wearing it. */
+.gear[data-state="on"] {
+  background: rgba(255, 210, 90, 0.13);
+  box-shadow: 0 -2px var(--gold), 0 2px var(--gold), -2px 0 var(--gold), 2px 0 var(--gold),
+    0 -4px var(--ink), 0 4px var(--ink), -4px 0 var(--ink), 4px 0 var(--ink);
+}
+.gear[data-state="on"] .gear-tag { color: var(--ink); background: var(--gold); }
+
+/* For sale: the price, in coins. */
+.gear[data-state="for-sale"] .gear-tag,
+.gear[data-state="short"] .gear-tag { color: var(--gold); }
+.gear[data-state="for-sale"] .gear-tag::before,
+.gear[data-state="short"] .gear-tag::before,
+.gear[data-state="confirm"] .gear-tag::before {
+  content: '';
+  width: 1em;
+  height: 1em;
+  background: var(--coin) center / contain no-repeat;
+  image-rendering: pixelated;
+}
+
+/* Not enough coins yet. */
+.gear[data-state="short"] .gear-pic,
+.gear[data-state="short"] .gear-text { opacity: 0.55; }
+.gear[data-state="short"] .gear-tag { opacity: 0.6; }
+.gear[data-state="short"] .gear-tag::before { filter: grayscale(1); }
+.gear.is-short { animation: nudge 280ms steps(6); }
+@keyframes nudge {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+/* Tapped once: tap again to buy. */
+.gear[data-state="confirm"] {
+  box-shadow: 0 -2px var(--gold), 0 2px var(--gold), -2px 0 var(--gold), 2px 0 var(--gold);
+}
+.gear[data-state="confirm"] .gear-tag { color: var(--ink); background: var(--gold); }
+
+.setting {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.55rem 0.6rem 0.55rem 0.75rem;
+  background: rgba(255, 244, 227, 0.06);
+  box-shadow: 0 -2px var(--ink), 0 2px var(--ink), -2px 0 var(--ink), 2px 0 var(--ink);
+}
+.setting-name { font-weight: 700; }
+.setting-name .shelf-note { display: block; margin: 0.1rem 0 0; }
+
+.switch {
+  flex: none;
+  min-width: 4.4rem;
+  min-height: 2.6rem;
+  border: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--chalk);
+  background: rgba(36, 25, 13, 0.7);
+  box-shadow: 0 -2px var(--ink), 0 2px var(--ink), -2px 0 var(--ink), 2px 0 var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.switch[aria-checked="true"] {
+  color: var(--ink);
+  background: var(--gold);
+  box-shadow: 0 -2px var(--ink), 0 2px var(--ink), -2px 0 var(--ink), 2px 0 var(--ink),
+    inset 0 -0.2rem 0 #c99a2e;
+}
+.switch:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+
+.howto-box summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: rgba(255, 244, 227, 0.8);
+  padding: 0.2rem 0;
+}
+.howto-box summary:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+.howto-box[open] summary { margin-bottom: 0.6rem; }
+.howto-box .keys { margin-top: 0.6rem; }
+
+/* Start stays in reach while the shop scrolls under it. */
+.setup-go {
+  --below: calc(1.5rem + env(safe-area-inset-bottom, 0px));   /* the page's bottom padding */
+  position: sticky;
+  bottom: calc(-1 * var(--below));
+  display: grid;
+  justify-items: center;
+  gap: 0.2rem;
+  margin: 0 -1.5rem calc(-1 * var(--below));
+  padding: 1.2rem 1.5rem var(--below);
+  background: linear-gradient(rgba(30, 21, 11, 0), rgb(30, 21, 11) 1.1rem);
+}
+.setup-go .btn { width: 100%; margin: 0.3rem 0 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .banner.is-in { animation: none; }
+  .gear.is-short { animation: none; }
 }

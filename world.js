@@ -56,6 +56,16 @@ export function randomSpotNear(center, minR, maxR, rng, avoid = null) {
   return { x: center.x, y: center.y + minR };
 }
 
+/** A random spot anywhere on the soil, evenly spread, `inset` px from the edge. */
+export function randomSpotOnSoil(rng, inset = 30) {
+  const a = rng() * Math.PI * 2;
+  const r = Math.sqrt(rng());
+  return {
+    x: SOIL.cx + Math.cos(a) * r * (SOIL.rx - inset),
+    y: SOIL.cy + Math.sin(a) * r * (SOIL.ry - inset * RATIO),
+  };
+}
+
 export function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }

@@ -1,12 +1,13 @@
 // The rules of Klayman. No drawing, no sound, no DOM: the game only changes
 // numbers and announces what happened through events, so it can be tested.
-import { BACTERIA, DIRTBALL, ITEMS, KLAYMAN, LEVELS, SCORE, SHOT, TREE } from './config.js';
-import { TREE_SPOT, dist, insideSoil, keepOnSoil, randomSpotNear, rimPoint } from './world.js';
+import { BACTERIA, COINS, DIRTBALL, ITEMS, KLAYMAN, LEVELS, SCORE, SHOT, SPROUTS, TREE } from './config.js';
+import { TREE_SPOT, dist, insideSoil, keepOnSoil, randomSpotNear, randomSpotOnSoil, rimPoint } from './world.js';
 import { Klayman } from './klayman.js';
 import { Bacteria } from './bacteria.js';
 import { Dirtball } from './dirtball.js';
 import { DirtShot } from './dirtshot.js';
-import { Item, pickItem } from './items.js';
+import { Coin, Item, pickItem } from './items.js';
+import { gearFor } from './gear.js';
 
 export const NO_INPUT = Object.freeze({ x: 0, y: 0, pressed: false, held: false, auto: false });
 
@@ -23,26 +24,36 @@ function separate(a, b, minD, share = 1) {
 }
 
 export class Game {
-  constructor({ rng = Math.random } = {}) {
+  /** `loadout` is { tool, sprout }: what the player picked on the setup page. */
+  constructor({ rng = Math.random, loadout } = {}) {
     this.rng = rng;
     this.events = [];
-    this.reset();
+    this.reset(loadout);
   }
 
-  reset() {
+  reset(loadout = this.gear) {
+    this.gear = gearFor(loadout);
+    const g = this.gear;
     this.klay = new Klayman(TREE_SPOT.x, TREE_SPOT.y + 62);
     this.tree = { x: TREE_SPOT.x, y: TREE_SPOT.y };
     this.bacteria = [];
     this.dirtballs = [];
     this.shots = [];
     this.item = null;
+    this.coins = [];
     this.score = 0;
-    this.lives = TREE.lives;
-    this.maxLives = TREE.lives;
+    this.earned = 0;               // coins (K) picked up this game
+    this.lives = g.lives;
+    this.maxLives = g.lives;
     this.treeHurt = 0;
     this.boost = 0;
     this.freeze = 0;
-    this.itemTimer = ITEMS.every;
+    this.itemEvery = g.itemEvery ?? ITEMS.every;
+    this.itemTimer = this.itemEvery;
+    this.coinTimer = COINS.every;
+    this.healTimer = g.healEvery;
+    this.pulseTimer = g.pulseEvery;
+    this.growTimer = g.growEvery;
     this.over = false;
     this.events.length = 0;
     this.startLevel(1);
@@ -55,8 +66,8 @@ export class Game {
   get itemsUnlocked() { return this.level >= ITEMS.unlockLevel; }
   /** Level 7 skill: dirt thrown from a distance breaks a dirtball. */
   get skillUnlocked() { return this.level >= KLAYMAN.skillLevel; }
-  /** How much bigger the sprout has grown from water drops. */
-  get treeScale() { return 1 + TREE.growPerWater * (this.maxLives - TREE.lives); }
+  /** How much bigger the sprout has grown (water drops, a mushroom growing). */
+  get treeScale() { return 1 + TREE.growPerWater * (this.maxLives - this.gear.lives); }
 
   levelSize(n) { return LEVELS.firstCount + LEVELS.extraPerLevel * (n - 1); }
 
@@ -84,7 +95,7 @@ export class Game {
     this.phaseT = LEVELS.bannerTime;
     const unlocksItems = n === ITEMS.unlockLevel;
     const unlocksSkill = n === KLAYMAN.skillLevel;
-    if (unlocksItems) this.itemTimer = ITEMS.every;
+    if (unlocksItems) this.itemTimer = this.itemEvery;
     this.emit('level', { level: n, unlocksItems, unlocksSkill });
   }
 
@@ -127,16 +138,32 @@ export class Game {
     return best;
   }
 
-  spawnShot(x, y, dir) {
-    this.shots.push(new DirtShot(x, y, dir));
-    this.emit('throw', { x, y });
+  get shotRange() { return SHOT.range * this.gear.range; }
+
+  spawnShot(x, y, dir, target = null) {
+    const shot = new DirtShot(x, y, dir, { range: this.shotRange, target });
+    shot.gun = this.gear.lockOn;
+    this.shots.push(shot);
+    this.emit('throw', { x, y, gun: this.gear.lockOn });
   }
 
-  pushOutOfObstacles(p, r) {
+  /** The dirt gun's pick: the nearest bacteria a shot can reach. */
+  lockTarget(from) {
+    let best = null;
+    let bestD = this.shotRange;
+    for (const b of this.bacteria) {
+      if (!b.alive) continue;
+      const d = dist(b, from);
+      if (d < bestD) { best = b; bestD = d; }
+    }
+    return best;
+  }
+
+  pushOutOfObstacles(p, r, sproutBlocks = true) {
     for (const b of this.dirtballs) {
       if (b.solid) separate(p, b, r + DIRTBALL.radius);
     }
-    separate(p, this.tree, r + TREE.radius * 0.6);
+    if (sproutBlocks) separate(p, this.tree, r + TREE.radius * 0.6);
   }
 
   // -------------------------------------------------------------- update
@@ -153,6 +180,8 @@ export class Game {
     if (this.over) return;
     this.updateDirtballs(dt);
     this.updateItems(dt);
+    this.updateCoins(dt);
+    this.updateSprout(dt);
     this.updateFlow(dt);
   }
 
@@ -200,8 +229,9 @@ export class Game {
         continue;
       }
       // A healthy Klayman swallows the bacteria and turns green.
-      // While he's green, bacteria crawl straight past him.
-      if (!this.klay.poisoned && dist(b, this.klay) < BACTERIA.radius + KLAYMAN.radius - 4) {
+      // While he's green, or in his lab coat, bacteria crawl straight past him.
+      if (!this.gear.immune && !this.klay.poisoned
+        && dist(b, this.klay) < BACTERIA.radius + KLAYMAN.radius - 4) {
         b.absorbInto(this.klay);
         this.klay.poison();
         this.emit('poison', { x: this.klay.x, y: this.klay.y });
@@ -257,6 +287,7 @@ export class Game {
         victim.breakApart();
         this.addScore(SCORE.smash, victim);
         this.emit('smash', { x: victim.x, y: victim.y });
+        this.killed(victim);
         this.breakDirtball(d);
         continue;
       }
@@ -271,10 +302,20 @@ export class Game {
     this.dirtballs = this.dirtballs.filter((d) => !d.dead);
   }
 
+  /** A dirtball breaking kills the bacteria inside it. */
   breakDirtball(d) {
     if (!d.breakApart()) return;
     this.addScore(SCORE.dirtball, d);
     this.emit('break', { x: d.x, y: d.y });
+    this.killed(d);
+  }
+
+  /** Every kill has a chance to drop a 5K coin where it happened. */
+  killed(at) {
+    if (this.rng() >= COINS.dropChance) return;
+    const spot = { x: at.x, y: at.y };
+    keepOnSoil(spot, 24);
+    this.dropCoin(spot, COINS.dropValue, COINS.dropLifetime);
   }
 
   addScore(points, at) {
@@ -295,11 +336,11 @@ export class Game {
     }
     this.itemTimer -= dt;
     if (this.itemTimer <= 0) {
-      this.itemTimer += ITEMS.every;
+      this.itemTimer += this.itemEvery;
       if (!this.item) {
         const { min, max } = ITEMS.nearSprout;
         const spot = randomSpotNear(this.tree, min, max, this.rng, this.klay);
-        const type = pickItem(this.lives, this.maxLives, this.rng);
+        const type = pickItem(this.lives, this.maxLives, this.rng, this.gear.maxLives);
         this.item = new Item(type, spot.x, spot.y);
         this.emit('itemAppears', { type, x: spot.x, y: spot.y });
       }
@@ -315,7 +356,7 @@ export class Game {
         this.boost = ITEMS.bagTime;
         break;
       case 'water':
-        this.maxLives = Math.min(TREE.maxLives, this.maxLives + 1);
+        this.maxLives = Math.min(this.gear.maxLives, this.maxLives + 1);
         this.lives = Math.min(this.maxLives, this.lives + 1);
         break;
       case 'sandclock':
@@ -323,6 +364,74 @@ export class Game {
         break;
     }
     this.emit('pickup', { item: item.type, x: item.x, y: item.y });
+  }
+
+  // ---------------------------------------------------------------- coins
+
+  updateCoins(dt) {
+    this.coinTimer -= dt;
+    if (this.coinTimer <= 0) {
+      this.coinTimer += COINS.every;
+      this.dropCoin(randomSpotOnSoil(this.rng), COINS.value, COINS.lifetime);
+    }
+    for (const c of this.coins) {
+      c.update(dt);
+      if (!c.gone && dist(c, this.klay) < COINS.pickupRadius) {
+        c.taken = true;
+        this.earned += c.value;
+        this.emit('coin', { value: c.value, x: c.x, y: c.y });
+      }
+    }
+    this.coins = this.coins.filter((c) => !c.taken && !c.gone);
+  }
+
+  dropCoin(at, value, lifetime) {
+    this.coins.push(new Coin(at.x, at.y, value, lifetime));
+    this.emit('coinAppears', { value, x: at.x, y: at.y });
+  }
+
+  // --------------------------------------------------------- sprout powers
+
+  updateSprout(dt) {
+    const g = this.gear;
+    if (g.healEvery) {
+      this.healTimer -= dt;
+      if (this.healTimer <= 0) {
+        this.healTimer += g.healEvery;
+        if (this.lives < this.maxLives) {
+          this.lives += 1;
+          this.emit('heal', { x: this.tree.x, y: this.tree.y });
+        }
+      }
+    }
+    if (g.pulseEvery) {
+      this.pulseTimer -= dt;
+      if (this.pulseTimer <= 0) {
+        this.pulseTimer += g.pulseEvery;
+        this.releaseSpores();
+      }
+    }
+    if (g.growEvery) {
+      this.growTimer -= dt;
+      if (this.growTimer <= 0) {
+        this.growTimer += g.growEvery;
+        if (this.maxLives < g.maxLives) {
+          this.maxLives += 1;
+          this.lives += 1;
+          this.emit('grow', { x: this.tree.x, y: this.tree.y });
+        }
+      }
+    }
+  }
+
+  /** Mushroom: pushes every crawling bacteria away and slows it down.
+   *  Dirty ones and dirtballs stay where they are. */
+  releaseSpores() {
+    const m = SPROUTS.mushroom;
+    for (const b of this.bacteria) {
+      if (b.crawling) b.knockBack(b.x - this.tree.x, b.y - this.tree.y, m.push, m.slowTime, m.slowFactor);
+    }
+    this.emit('spores', { x: this.tree.x, y: this.tree.y });
   }
 
   updateFlow(dt) {

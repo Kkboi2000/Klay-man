@@ -1,5 +1,5 @@
-// Special items appear in the top part of the pot from level 3.
-import { ITEMS, TREE } from './config.js';
+// Things to walk over: special items near the sprout from level 3, and coins.
+import { COINS, ITEMS, TREE } from './config.js';
 
 export const ITEM_INFO = {
   plus: { name: 'Red plus', says: '+1 heart' },
@@ -26,15 +26,35 @@ export class Item {
   }
 }
 
-/** Which items make sense right now. A full sprout never gets a red plus. */
-export function itemChoices(lives, maxLives) {
+/** Which items make sense right now. A full sprout never gets a red plus,
+ *  and water only comes while the sprout can still grow. */
+export function itemChoices(lives, maxLives, cap = TREE.maxLives) {
   const choices = ['bag', 'sandclock'];
   if (lives < maxLives) choices.push('plus');
-  if (maxLives < TREE.maxLives) choices.push('water');
+  if (maxLives < cap) choices.push('water');
   return choices;
 }
 
-export function pickItem(lives, maxLives, rng) {
-  const choices = itemChoices(lives, maxLives);
+export function pickItem(lives, maxLives, rng, cap) {
+  const choices = itemChoices(lives, maxLives, cap);
   return choices[Math.floor(rng() * choices.length)];
+}
+
+/** A coin worth `value` K, gone after `lifetime` seconds. */
+export class Coin {
+  constructor(x, y, value, lifetime) {
+    this.x = x;
+    this.y = y;
+    this.value = value;
+    this.life = lifetime;
+    this.t = 0;
+  }
+
+  get blinking() { return this.life < COINS.blinkFrom; }
+  get gone() { return this.life <= 0; }
+
+  update(dt) {
+    this.t += dt;
+    this.life -= dt;
+  }
 }

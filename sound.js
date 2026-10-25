@@ -1,5 +1,6 @@
 // Web Audio: quick, overlapping sound effects. Phones keep audio locked until
-// the first tap, so unlock() is called from the Start button.
+// the first tap, so unlock() is called from the Start button. The gun, coin
+// and shop sounds are made here in code rather than loaded from files.
 import { assetUrl } from './sprites.js';
 
 const MUTE_KEY = 'klayman.muted';
@@ -17,6 +18,39 @@ async function fetchBytes(path) {
   const res = await fetch(url);
   return res.arrayBuffer();
 }
+
+/** A mono buffer filled by `wave(t)` for `seconds`. */
+function synth(ctx, seconds, wave) {
+  const rate = ctx.sampleRate;
+  const buffer = ctx.createBuffer(1, Math.ceil(seconds * rate), rate);
+  const out = buffer.getChannelData(0);
+  for (let i = 0; i < out.length; i++) out[i] = Math.max(-1, Math.min(1, wave(i / rate)));
+  return buffer;
+}
+
+const square = (f, t) => (Math.sin(2 * Math.PI * f * t) >= 0 ? 1 : -1);
+
+const SYNTHS = {
+  // A dry pop: noise that dies fast, over a thump that drops in pitch.
+  gun: [0.16, (t) => {
+    const noise = (Math.random() * 2 - 1) * Math.exp(-t * 38);
+    const thump = Math.sin(2 * Math.PI * (150 - 520 * t) * t) * Math.exp(-t * 22);
+    return 0.55 * noise + 0.6 * thump;
+  }],
+  // The classic two-note coin.
+  coin: [0.28, (t) => {
+    const f = t < 0.07 ? 988 : 1319;
+    const env = t < 0.07 ? 1 : Math.exp(-(t - 0.07) * 14);
+    return 0.28 * square(f, t) * env;
+  }],
+  // Three rising notes: bought it.
+  buy: [0.42, (t) => {
+    const notes = [659, 831, 988];
+    const n = Math.min(2, Math.floor(t / 0.09));
+    const env = n < 2 ? 1 : Math.exp(-(t - 0.18) * 9);
+    return 0.25 * square(notes[n], t) * env;
+  }],
+};
 
 export class Sound {
   constructor() {
@@ -36,6 +70,14 @@ export class Sound {
         this.buffers[name] = await new Promise((ok, fail) => this.ctx.decodeAudioData(bytes, ok, fail));
       } catch { /* a missing sound should never stop the game */ }
     }));
+  }
+
+  /** Builds the sounds that are made in code. */
+  makeSynths() {
+    if (!this.ctx) return;
+    for (const [name, [seconds, wave]] of Object.entries(SYNTHS)) {
+      try { this.buffers[name] = synth(this.ctx, seconds, wave); } catch { /* skip it */ }
+    }
   }
 
   unlock() {

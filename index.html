@@ -22,7 +22,10 @@
       <div id="stage">
         <canvas id="screen" aria-label="The flowerpot where the game is played"></canvas>
         <div class="hud">
-          <p class="hud-score"><span class="sr-only">Score </span><span id="score">0</span></p>
+          <div class="hud-left">
+            <p class="hud-score"><span class="sr-only">Score </span><span id="score">0</span></p>
+            <p class="hud-coins"><span class="coin-icon" aria-hidden="true"></span><span class="sr-only">Coins </span><span id="coins">0K</span></p>
+          </div>
           <div class="hud-right">
             <div id="hearts" class="hearts" role="img"></div>
             <p id="level" class="hud-level">Level 1</p>
@@ -51,25 +54,59 @@
 
     <section id="title" class="screen" aria-labelledby="title-name">
       <div class="screen-body">
-        <div class="title-art" aria-hidden="true"></div>
+        <canvas id="face" class="face" role="img" aria-label="Klayman’s face"></canvas>
         <h1 id="title-name" class="title-name">Klayman</h1>
-        <p class="lede">Keep the bacteria out of the sprout.</p>
-        <ul class="howto">
-          <li>Hit a bacteria with dirt four times to turn it into a dirtball.</li>
-          <li>Stand next to a dirtball and throw to roll it into other bacteria.</li>
-          <li>From level 3, special items appear near the sprout. Walk over one to use it.</li>
-          <li>From level 7, dirt thrown at a dirtball from afar breaks it.</li>
-        </ul>
         <p id="loading" class="loading">Loading the pot…</p>
-        <button id="start" class="btn" type="button" data-autofocus>Start</button>
-        <p id="best" class="best"></p>
-        <p class="keys">Arrow keys or WASD to move. Space to throw. P to pause.</p>
+        <button id="play" class="btn" type="button" data-autofocus>Play</button>
         <div class="screen-row">
           <button class="btn-quiet" type="button" data-sound aria-pressed="true">Sound on</button>
           <button id="install" class="btn-quiet" type="button" hidden>Install</button>
         </div>
         <p id="install-tip" class="tip" hidden></p>
         <p class="sig">★ Krit’s vibe code ★</p>
+      </div>
+    </section>
+
+    <section id="setup" class="screen screen-setup" hidden aria-labelledby="setup-name">
+      <div class="setup">
+        <header class="setup-head">
+          <h2 id="setup-name" class="screen-name">Setup</h2>
+          <p class="purse"><span class="coin-icon" aria-hidden="true"></span><span class="sr-only">Your coins: </span><span id="purse">0K</span></p>
+        </header>
+        <canvas id="showcase" class="showcase" aria-hidden="true"></canvas>
+        <p id="shop-news" class="shop-news" aria-live="polite"></p>
+
+        <section class="shelf" aria-labelledby="tools-name">
+          <h3 id="tools-name" class="shelf-name">Tool <span class="shelf-note">one per game</span></h3>
+          <div id="tools" class="shelf-list" role="group" aria-labelledby="tools-name"></div>
+        </section>
+
+        <section class="shelf" aria-labelledby="sprouts-name">
+          <h3 id="sprouts-name" class="shelf-name">Sprout</h3>
+          <div id="sprouts" class="shelf-list" role="group" aria-labelledby="sprouts-name"></div>
+        </section>
+
+        <div class="setting">
+          <span id="auto-name" class="setting-name">Auto throw <span class="shelf-note">keeps Klayman throwing</span></span>
+          <button id="setup-auto" class="switch" type="button" role="switch" aria-checked="false" aria-labelledby="auto-name">Off</button>
+        </div>
+
+        <details class="howto-box">
+          <summary>How to play</summary>
+          <ul class="howto">
+            <li>Hit a bacteria with dirt four times to turn it into a dirtball.</li>
+            <li>Stand next to a dirtball and throw to roll it into other bacteria.</li>
+            <li>Walk over coins to pick them up. Spend them here.</li>
+            <li>From level 3, special items appear near the sprout.</li>
+            <li>From level 7, dirt thrown at a dirtball from afar breaks it.</li>
+          </ul>
+          <p class="keys">Arrow keys or WASD to move. Space to throw. P to pause.</p>
+        </details>
+
+        <div class="setup-go">
+          <p id="best" class="best"></p>
+          <button id="start" class="btn" type="button" data-autofocus>Start</button>
+        </div>
       </div>
     </section>
 
@@ -80,6 +117,7 @@
         <div class="screen-row">
           <button class="btn-quiet" type="button" data-sound aria-pressed="true">Sound on</button>
           <button id="restart" class="btn-quiet" type="button">Restart</button>
+          <button class="btn-quiet" type="button" data-to-setup>Setup</button>
         </div>
       </div>
     </section>
@@ -90,7 +128,9 @@
         <p class="final">Score <span id="final-score">0</span></p>
         <p id="final-best" class="final-best"></p>
         <p id="final-level" class="final-level"></p>
+        <p class="final-coins"><span class="coin-icon" aria-hidden="true"></span><span id="final-coins">+0K</span></p>
         <button id="again" class="btn" type="button" data-autofocus>Play again</button>
+        <button class="btn-quiet" type="button" data-to-setup>Setup</button>
       </div>
     </section>
   </div>

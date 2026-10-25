@@ -24,6 +24,8 @@ export function createInput({ stickZone, stickBase, stickKnob, throwZone, throwB
   // ------------------------------------------------------------ keyboard
   addEventListener('keydown', (e) => {
     if (e.code === 'Escape' || e.code === 'KeyP') { onPause?.(); return; }
+    // On a focused button or link, Enter and Space press it rather than throw.
+    if (e.target instanceof Element && e.target.closest('button, a, summary, input')) return;
     if (MOVE_KEYS[e.code]) { keys.add(e.code); e.preventDefault(); }
     if (ACTION_KEYS.has(e.code)) {
       if (!e.repeat) { pressed = true; actionKeys++; }
@@ -107,17 +109,19 @@ export function createInput({ stickZone, stickBase, stickKnob, throwZone, throwB
   }
 
   // ------------------------------------------------------- auto throw
+  // Set on the setup page, and switchable mid-game under the throw button.
   function showAuto() {
     autoButton.setAttribute('aria-pressed', String(auto));
     autoButton.textContent = auto ? 'Auto throw: on' : 'Auto throw: off';
   }
-  // The switch sits inside the throw area; don't let a tap on it throw.
-  autoButton.addEventListener('pointerdown', (e) => e.stopPropagation());
-  autoButton.addEventListener('click', () => {
-    auto = !auto;
+  function setAuto(on) {
+    auto = Boolean(on);
     try { localStorage.setItem(AUTO_KEY, auto ? '1' : '0'); } catch { /* private mode */ }
     showAuto();
-  });
+  }
+  // The switch sits inside the throw area; don't let a tap on it throw.
+  autoButton.addEventListener('pointerdown', (e) => e.stopPropagation());
+  autoButton.addEventListener('click', () => setAuto(!auto));
   showAuto();
 
   // No long-press menus or double-tap zoom on the controls.
@@ -126,6 +130,8 @@ export function createInput({ stickZone, stickBase, stickKnob, throwZone, throwB
   }
 
   return {
+    get auto() { return auto; },
+    setAuto,
     read() {
       let x = stick.x;
       let y = stick.y;

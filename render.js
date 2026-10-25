@@ -1,5 +1,5 @@
 // Draws a Game onto the canvas. Reads the game; never changes it.
-import { SPRITE_SCALE as S, SHOT, POT_SCALE } from './config.js';
+import { SPRITE_SCALE as S, SHOT, POT_SCALE, COINS, KLAYMAN } from './config.js';
 import { SOIL, WORLD, CAMERA_BOUNDS as BOUNDS, TREE_SPOT } from './world.js';
 import { KLAY, BAC, TREE_ART } from './sprites.js';
 import { BREAK_TIME, ABSORB_TIME } from './bacteria.js';
@@ -10,6 +10,9 @@ const FONT = '"Pixelify Sans", ui-rounded, system-ui, sans-serif';
 const DIRT = ['#4a2f17', '#6b4423', '#8a5a2b'];
 const GERM = ['#3e7a4a', '#5aa266', '#2c5a35'];
 const SPARK = ['#ffe9a8', '#ffd25a', '#ffffff'];
+const SPORE = ['#b06ed6', '#d9a6f0', '#7a3fa0'];
+const PETAL = ['#ff8593', '#d8263d', '#ffffff'];
+const GOLD = '#ffd25a';
 
 // The camera shows about this much of the world (in world units), so
 // Klayman stays the same size whatever the screen.
@@ -18,12 +21,17 @@ const ZOOM = { min: 0.7, max: 1.7 };
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 export class Renderer {
-  constructor(canvas, sprites) {
+  /** `zoom` fixes the zoom (the setup page's close-up); `markers` draws the
+   *  arrows to things off-screen. */
+  constructor(canvas, sprites, { zoom = null, markers = true } = {}) {
     this.canvas = canvas;
+    this.fixedZoom = zoom;
+    this.markers = markers;
     this.ctx = canvas.getContext('2d');
     this.sprites = sprites;
     this.particles = [];
     this.popups = [];
+    this.rings = [];
     this.shake = 0;
     this.time = 0;
     this.cam = { x: 0, y: 0, w: 1, h: 1 };
@@ -40,7 +48,7 @@ export class Renderer {
     this.cssH = cssH;
     this.dpr = dpr;
     // Fit by area rather than width, so a tall phone gets a closer view.
-    this.zoom = clamp(Math.sqrt((cssW * cssH) / (SEE.w * SEE.h)), ZOOM.min, ZOOM.max);
+    this.zoom = this.fixedZoom ?? clamp(Math.sqrt((cssW * cssH) / (SEE.w * SEE.h)), ZOOM.min, ZOOM.max);
     this.cam.w = cssW / this.zoom;
     this.cam.h = cssH / this.zoom;
     this.snapCamera = true;
@@ -86,6 +94,23 @@ export class Renderer {
           this.burst(e.x, e.y - 18, 10, SPARK, 80);
           this.popup(ITEM_INFO[e.type].name, e.x, e.y - 48, 1.6);
           break;
+        case 'coinAppears': this.burst(e.x, e.y - 12, e.value > 1 ? 10 : 5, SPARK, 60); break;
+        case 'coin':
+          this.burst(e.x, e.y - 14, 8, SPARK, 90);
+          this.popup(`+${e.value}K`, e.x, e.y - 36, 0.9, GOLD);
+          break;
+        case 'heal':
+          this.burst(TREE_SPOT.x, TREE_SPOT.y - 40, 12, PETAL, 70, -50);
+          this.popup('+1 heart', TREE_SPOT.x, TREE_SPOT.y - 76, 1.4);
+          break;
+        case 'grow':
+          this.burst(TREE_SPOT.x, TREE_SPOT.y - 40, 14, SPORE, 90, -40);
+          this.popup('+1 heart', TREE_SPOT.x, TREE_SPOT.y - 80, 1.4);
+          break;
+        case 'spores':
+          this.rings.push({ x: e.x, y: e.y - 6, t: 0, max: 0.7 });
+          this.burst(e.x, e.y - 30, 18, SPORE, 160, -20);
+          break;
       }
     }
   }
@@ -107,17 +132,18 @@ export class Renderer {
     }
   }
 
-  popup(text, x, y, max = 0.9) {
-    this.popups.push({ text, x, y, life: 0, max });
+  popup(text, x, y, max = 0.9, color = '#fff4e3') {
+    this.popups.push({ text, x, y, life: 0, max, color });
   }
 
   // ---------------------------------------------------------------- draw
 
-  draw(game, dt) {
+  /** Draws the pot, with the camera on `focus` (Klayman, unless told otherwise). */
+  draw(game, dt, focus = game.klay) {
     this.time += dt;
     const { ctx } = this;
     const s = this.zoom * this.dpr;
-    this.follow(game.klay, dt);
+    this.follow(focus, dt);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#636363';    // the gray around the pot in bg.png
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -145,6 +171,7 @@ export class Renderer {
     const things = [];
     things.push({ y: TREE_SPOT.y, draw: () => this.drawTree(game) });
     for (const b of game.bacteria) things.push({ y: b.y, draw: () => this.drawBacteria(b, game.frozen) });
+    for (const c of game.coins) things.push({ y: c.y, draw: () => this.drawCoin(c) });
     for (const d of game.dirtballs) things.push({ y: d.y, draw: () => this.drawDirtball(d, game.frozen) });
     if (game.item) things.push({ y: game.item.y, draw: () => this.drawItem(game.item) });
     for (const shot of game.shots) things.push({ y: shot.y, draw: () => this.drawShot(shot) });
@@ -153,11 +180,12 @@ export class Renderer {
     for (const t of things) t.draw();
 
     if (game.frozen) this.drawFrost(game.freeze);
+    this.drawRings(dt);
     this.drawParticles(dt);
     this.drawPopups(dt);
 
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    this.drawMarkers(game);
+    if (this.markers) this.drawMarkers(game);
   }
 
   // ------------------------------------------------- off-screen pointers
@@ -171,12 +199,16 @@ export class Renderer {
     if (game.item && !(game.item.blinking && Math.floor(game.item.t * 8) % 2 === 0)) {
       marks.push({ x: game.item.x, y: game.item.y - 16, color: '#ffd25a', size: 10, icon: game.item.type });
     }
+    for (const c of game.coins) {
+      if (c.blinking && Math.floor(c.t * 10) % 2 === 0) continue;
+      marks.push({ x: c.x, y: c.y - 12, color: GOLD, size: 8, icon: 'coin' });
+    }
     if (!game.over) marks.push({ x: TREE_SPOT.x, y: TREE_SPOT.y - 30, color: '#8cc152', size: 10, icon: 'heart' });
 
     const { ctx } = this;
     const W = this.cssW;
     const H = this.cssH;
-    const top = 56;               // keep clear of the score bar
+    const top = 80;               // keep clear of the score and coins
     const pad = 16;
     const cx = W / 2;
     const cy = (H + top) / 2;
@@ -195,8 +227,9 @@ export class Renderer {
       ctx.save();
       ctx.translate(x, y);
       if (m.icon) {
-        const icon = m.icon === 'heart' ? this.sprites.heart : this.sprites.icons[m.icon];
-        const size = m.icon === 'heart' ? 14 : 18;
+        const icon = m.icon === 'heart' ? this.sprites.heart
+          : m.icon === 'coin' ? this.sprites.coin : this.sprites.icons[m.icon];
+        const size = m.icon === 'heart' || m.icon === 'coin' ? 14 : 18;
         ctx.drawImage(icon, -Math.cos(a) * 14 - size / 2, -Math.sin(a) * 14 - size / 2, size, (size * icon.height) / icon.width);
       }
       ctx.rotate(a);
@@ -233,24 +266,30 @@ export class Renderer {
   }
 
   drawTree(game) {
-    const sp = this.sprites;
+    const look = this.sprites.sprouts[game.gear.sprout];
     const frame = Math.floor(this.time * 1.6) % 2;
-    const scale = S * game.treeScale;
+    let scale = S * game.treeScale;
     const { x, y } = TREE_SPOT;
     const a = TREE_ART.anchor;
     if (game.over) {
-      this.sprite(sp.treeWilted, frame * 32, 0, 32, 48, x, y, a.x, a.y, { scale: scale * 0.9 });
+      this.sprite(look.wilted, frame * 32, 0, 32, 48, x, y, a.x, a.y, { scale: scale * 0.9 });
       return;
     }
-    this.sprite(sp.tree, frame * 32, 0, 32, 48, x, y, a.x, a.y, { scale });
+    // A mushroom about to release its spores swells a little.
+    if (game.gear.pulseEvery && game.pulseTimer < 0.8 && !this.calm) {
+      scale *= 1 + 0.06 * Math.abs(Math.sin(this.time * 18));
+    }
+    this.sprite(look.sheet, frame * 32, 0, 32, 48, x, y, a.x, a.y, { scale });
     if (game.treeHurt > 0) {
-      this.sprite(sp.treeHurt, frame * 32, 0, 32, 48, x, y, a.x, a.y, { scale, alpha: game.treeHurt / 0.5 });
+      this.sprite(look.hurt, frame * 32, 0, 32, 48, x, y, a.x, a.y, { scale, alpha: game.treeHurt / 0.5 });
     }
   }
 
   drawBacteria(b, frozen) {
     const sp = this.sprites;
-    const sheet = frozen && b.alive ? sp.bacFrozen : sp.bac;
+    let sheet = sp.bac;
+    if (frozen && b.alive) sheet = sp.bacFrozen;
+    else if (b.slowed && b.crawling) sheet = sp.bacSlow;
     const a = BAC.anchor;
 
     if (b.state === 'breaking') {
@@ -303,14 +342,46 @@ export class Renderer {
   drawShot(shot) {
     this.shadow(shot.x, shot.y, 4, 0.25);
     const r = KLAY.shot;
+    if (shot.gun) {
+      // A dirt gun pellet leaves a short streak.
+      const { ctx } = this;
+      const v = Math.hypot(shot.vx, shot.vy) || 1;
+      ctx.fillStyle = 'rgba(138, 90, 43, 0.45)';
+      for (let i = 1; i <= 3; i++) {
+        const k = (i * 5) / v;
+        ctx.fillRect(Math.round(shot.x - shot.vx * k) - 2, Math.round(shot.y - SHOT.height - shot.vy * k) - 2, 4, 4);
+      }
+    }
     this.sprite(this.sprites.klay, r.x, r.y, r.w, r.h, shot.x, shot.y - SHOT.height, r.w / 2, r.h / 2);
+  }
+
+  drawCoin(c) {
+    if (c.blinking && Math.floor(c.t * 10) % 2 === 0) return;
+    const { ctx } = this;
+    const pop = Math.min(1, c.t / 0.2);
+    const big = c.value >= COINS.dropValue ? 1.4 : 1;
+    const bob = Math.sin(c.t * 5) * 2;
+    const spin = this.calm ? 1 : 0.5 + 0.5 * Math.abs(Math.cos(c.t * 2.4)); // turns, never edge-on
+    const img = this.sprites.coin;
+    const w = img.width * S * big * pop;
+    const h = img.height * S * big * pop;
+    this.shadow(c.x, c.y, 8 * big * pop, 0.3);
+    ctx.save();
+    ctx.translate(Math.round(c.x), Math.round(c.y - 14 * big + bob));
+    ctx.scale(spin, 1);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+    if (big > 1 && Math.random() < 0.08) this.burst(c.x, c.y - 20, 1, SPARK, 20, -30);
   }
 
   drawKlayman(game) {
     const k = game.klay;
     const sp = this.sprites;
+    const tool = game.gear.tool;
+    const look = sp.klayFor[tool ?? 'none'];
+    // With the dirt gun he doesn't wind up a throw: he aims and fires.
     let kind = k.moving ? 'walk' : 'idle';
-    if (k.action) kind = k.action.kind;
+    if (k.action && !(tool === 'gun' && k.action.kind === 'attack')) kind = k.action.kind;
     const clock = kind === 'idle' ? this.time : k.t;
     const { col, row } = KLAY.frame(kind, k.facing, clock, k.action ? k.action.t : 0);
     const size = KLAY.size;
@@ -328,14 +399,90 @@ export class Renderer {
       if (Math.random() < 0.15) this.burst(k.x, k.y - 20, 1, SPARK, 30, -40);
     }
 
-    this.sprite(sp.klay, col * size, row * size, size, size, k.x + jitter, k.y, a.x, a.y, { flip });
+    const gun = tool === 'gun' ? () => this.drawGun(k, row, col, flip, jitter) : null;
+    if (gun && k.facing === 'back') gun();      // held up the pot, behind him
+    this.sprite(look.sheet, col * size, row * size, size, size, k.x + jitter, k.y, a.x, a.y, { flip });
     const green = k.greenness;
     if (green > 0) {
-      this.sprite(sp.klayGreen, col * size, row * size, size, size, k.x + jitter, k.y, a.x, a.y, {
+      this.sprite(look.green, col * size, row * size, size, size, k.x + jitter, k.y, a.x, a.y, {
         flip,
         alpha: green * 0.55, // "turn green a bit"
       });
     }
+    if (gun && k.facing !== 'back') gun();
+    if (tool === 'gloves' && k.action?.kind === 'attack') this.drawWind(k);
+  }
+
+  /** The dirt gun in Klayman's front hand, with a kick and a flash on each shot. */
+  drawGun(k, row, col, flip, jitter) {
+    const art = this.sprites.gun[k.facing];
+    const hand = this.sprites.gunSpots[row][col];
+    const firing = k.action?.kind === 'attack' ? k.action.t : Infinity;
+    const kick = firing < 0.1 ? 1 : 0;
+    const back = { side: [-kick, 0], front: [0, -kick], back: [0, kick] }[k.facing];
+    const gx = hand.x - art.grip.x + back[0] - KLAY.anchor.x;
+    const gy = hand.y - art.grip.y + back[1] - KLAY.anchor.y;
+    const { ctx } = this;
+    ctx.save();
+    ctx.translate(Math.round(k.x + jitter), Math.round(k.y));
+    if (flip) ctx.scale(-1, 1);
+    ctx.drawImage(art.img, gx * S, gy * S, art.img.width * S, art.img.height * S);
+    if (firing < 0.07) {
+      const out = { side: [1, 0], front: [0, 1], back: [0, -1] }[k.facing];
+      const mx = (gx + art.muzzle.x + out[0] * 1.5) * S;
+      const my = (gy + art.muzzle.y + out[1] * 1.5) * S;
+      ctx.fillStyle = GOLD;
+      ctx.fillRect(mx - 4 + out[0] * 3, my - 4 + out[1] * 3, 8, 8);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(mx - 2 + out[0] * 3, my - 2 + out[1] * 3, 4, 4);
+    }
+    ctx.restore();
+  }
+
+  /** Gloves: a little gust of wind sweeps round the throwing arm. */
+  drawWind(k) {
+    const p = Math.min(1, k.action.t / KLAYMAN.actionTime);
+    const turn = { side: 0, front: Math.PI / 2, back: -Math.PI / 2 }[k.facing];
+    const { ctx } = this;
+    ctx.save();
+    ctx.translate(k.x, k.y - 18);
+    if (k.facing === 'side' && k.flip) ctx.scale(-1, 1);
+    ctx.rotate(turn);
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      const r = 9 + i * 5;
+      const end = 0.35 - i * 0.12;
+      const sweep = 0.4 + 1.3 * Math.min(1, p * 1.8);
+      ctx.strokeStyle = `rgba(255, 255, 255, ${(1 - p) * (0.9 - i * 0.22)})`;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, end - sweep, end);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /** Mushroom spores: a ring rolling out across the soil. */
+  drawRings(dt) {
+    const { ctx } = this;
+    for (const r of this.rings) {
+      r.t += dt;
+      const k = r.t / r.max;
+      const radius = 30 + k * 300;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - k);
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = '#b06ed6';
+      ctx.beginPath();
+      ctx.ellipse(r.x, r.y, radius, radius * 0.6, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#f0d4ff';
+      ctx.beginPath();
+      ctx.ellipse(r.x, r.y, radius * 0.92, radius * 0.6 * 0.92, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    this.rings = this.rings.filter((r) => r.t < r.max);
   }
 
   drawFrost(left) {
@@ -379,7 +526,7 @@ export class Renderer {
       ctx.lineWidth = 4;
       ctx.strokeStyle = '#24190d';
       ctx.strokeText(p.text, p.x, y);
-      ctx.fillStyle = '#fff4e3';
+      ctx.fillStyle = p.color;
       ctx.fillText(p.text, p.x, y);
     }
     ctx.globalAlpha = 1;

@@ -1,10 +1,14 @@
 // Boots Klayman: loads assets, lays out the screen for the device, runs the loop.
+// Three pages: the title (Klayman's face), setup (tool, sprout, auto throw),
+// and the game itself, which ends with a score summary and a way back to setup.
 import { Game } from './game.js';
 import { loadSprites, BAC } from './sprites.js';
 import { Renderer } from './render.js';
 import { createInput } from './input.js';
 import { Sound } from './sound.js';
 import { createUI } from './ui.js';
+import { Wallet } from './gear.js';
+import { createSetup, createFace } from './setup.js';
 
 const STEP = 1 / 60;
 const BEST_KEY = 'klayman.best';
@@ -15,10 +19,11 @@ const frame = $('frame');
 const canvas = $('screen');
 const isPreview = Boolean(globalThis.KLAYMAN_ASSETS);
 
-let mode = 'loading';            // loading | title | playing | paused | over
+let mode = 'loading';            // loading | title | setup | playing | paused | over
 let touch = matchMedia('(pointer: coarse)').matches;
-let game, renderer, input, sound, ui, best;
+let game, renderer, input, sound, ui, best, wallet, setup, face;
 let overDelay = 0;
+const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ------------------------------------------------------------- best score
 
@@ -48,26 +53,49 @@ function layout() {
   if (!renderer) return;
   renderer.resize(w, h, Math.min(3, devicePixelRatio || 1));
   app.style.setProperty('--u', String(renderer.zoom));
+  if (mode === 'setup') setup.resize();
 }
 
 // ------------------------------------------------------------ game states
 
+function setMode(m) {
+  mode = m;
+  app.dataset.mode = m;
+}
+
+function showTitle() {
+  setMode('title');
+  ui.show('title');
+}
+
+function showSetup() {
+  sound.unlock();
+  input.clear();
+  overDelay = 0;
+  setMode('setup');
+  game.reset(wallet.loadout);    // a fresh pot behind the page
+  ui.show('setup');
+  setup.render();
+}
+
 function start() {
   sound.unlock();
-  game.reset();
+  document.activeElement?.blur();   // Space throws, rather than pressing a button
+  game.reset(wallet.loadout);
+  ui.setCoins(wallet.coins);
   renderer.particles = [];
   renderer.popups = [];
   ui.reset();
   input.clear();
   overDelay = 0;
-  mode = 'playing';
+  setMode('playing');
   ui.show(null);
   handleEvents(game.drainEvents());
 }
 
 function pause() {
   if (mode !== 'playing') return;
-  mode = 'paused';
+  setMode('paused');
   input.clear();
   ui.show('paused');
 }
@@ -75,8 +103,9 @@ function pause() {
 function resume() {
   if (mode !== 'paused') return;
   sound.unlock();
+  document.activeElement?.blur();
   input.clear();
-  mode = 'playing';
+  setMode('playing');
   ui.show(null);
 }
 
@@ -92,8 +121,8 @@ function finish(score, level) {
     saveBest(best);
     ui.setBest(best);
   }
-  ui.setFinal({ score, level, best, isNewBest });
-  mode = 'over';
+  ui.setFinal({ score, level, best, isNewBest, earned: game.earned });
+  setMode('over');
   overDelay = 1.3;               // let the sprout wilt before the screen comes up
 }
 
@@ -106,7 +135,22 @@ function handleEvents(events) {
   renderer.handle(events);
   for (const e of events) {
     switch (e.type) {
-      case 'throw': sound.play('throw', { volume: 0.35, rate: jitter(1, 0.05) }); break;
+      case 'throw':
+        if (e.gun) sound.play('gun', { volume: 0.45, rate: jitter(1, 0.06) });
+        else sound.play('throw', { volume: 0.35, rate: jitter(1, 0.05) });
+        break;
+      case 'coin':
+        wallet.add(e.value);       // saved the moment it's picked up
+        ui.setCoins(wallet.coins);
+        sound.play('coin', { volume: e.value > 1 ? 0.7 : 0.5, rate: e.value > 1 ? 0.85 : 1 });
+        break;
+      case 'coinAppears': sound.play('coin', { volume: 0.12, rate: 1.5 }); break;
+      case 'heal':
+      case 'grow': sound.play('buy', { volume: 0.4, rate: 1.2 }); break;
+      case 'spores':
+        sound.play('break', { volume: 0.8, rate: 0.5 });
+        sound.buzz(30);
+        break;
       case 'push': sound.play('throw', { volume: 0.5, rate: 0.7 }); break;
       case 'hit': sound.play('hit', { volume: 0.55, rate: jitter(1, 0.1) }); break;
       case 'dirtball': sound.play('hit', { volume: 0.75, rate: 0.8 }); break;
@@ -163,6 +207,8 @@ function loop(now) {
   }
   renderer.draw(game, dt);
   ui.update(game, dt);
+  if (mode === 'title') face.draw(dt, calm);
+  if (mode === 'setup') setup.update(dt);
   requestAnimationFrame(loop);
 }
 
@@ -252,6 +298,8 @@ async function boot() {
   ui = createUI();
   best = loadBest();
   ui.setBest(best);
+  wallet = new Wallet();
+  ui.setCoins(wallet.coins);
   sound = new Sound();
   ui.setSound(sound.muted);
 
@@ -262,9 +310,10 @@ async function boot() {
   ]);
   renderer = new Renderer(canvas, sprites);
   layout();
-  game = new Game();
+  game = new Game({ loadout: wallet.loadout });
   game.drainEvents();
   dressThrowButton(sprites.bac);
+  face = createFace($('face'), sprites.klay);
 
   input = createInput({
     stickZone: $('stick-zone'),
@@ -276,8 +325,12 @@ async function boot() {
     onPause: togglePause,
   });
 
+  setup = createSetup({ wallet, sprites, input, sound });
+
+  $('play').addEventListener('click', showSetup);
   $('start').addEventListener('click', start);
   $('again').addEventListener('click', start);
+  for (const b of document.querySelectorAll('[data-to-setup]')) b.addEventListener('click', showSetup);
   $('resume').addEventListener('click', resume);
   $('restart').addEventListener('click', start);
   $('pause').addEventListener('click', pause);
@@ -297,13 +350,12 @@ async function boot() {
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 
   if (new URLSearchParams(location.search).has('debug')) {
-    globalThis.klaymanDebug = { get game() { return game; }, start };
+    globalThis.klaymanDebug = { get game() { return game; }, get wallet() { return wallet; }, start, showSetup };
   }
 
   layout();
   app.classList.remove('is-loading');
-  mode = 'title';
-  ui.show('title');
+  showTitle();
   requestAnimationFrame(loop);
   registerServiceWorker();
 }

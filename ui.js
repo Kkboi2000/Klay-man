@@ -1,5 +1,7 @@
-// The DOM parts: score bar, hearts, power-up timers, level banner and screens.
-import { heartArt, iconArt } from './sprites.js';
+// The DOM parts: score bar, coins, hearts, power-up timers, level banner and
+// the screens laid over the game: title, setup, paused and game over.
+import { heartArt, iconArt, coinArt } from './sprites.js';
+import { formatK } from './gear.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => n.toLocaleString('en-US');
@@ -21,13 +23,18 @@ export function createUI() {
     banner: $('banner'),
     bannerTitle: $('banner-title'),
     bannerSub: $('banner-sub'),
-    screens: { title: $('title'), paused: $('paused'), over: $('over') },
+    screens: { title: $('title'), setup: $('setup'), paused: $('paused'), over: $('over') },
+    coins: $('coins'),
+    finalCoins: $('final-coins'),
     best: $('best'),
     finalScore: $('final-score'),
     finalBest: $('final-best'),
     finalLevel: $('final-level'),
     soundButtons: [...document.querySelectorAll('[data-sound]')],
   };
+
+  // The coin is drawn once and used as a CSS image everywhere it appears.
+  document.documentElement.style.setProperty('--coin', `url(${coinArt().toDataURL()})`);
 
   const heartFull = heartArt(true).toDataURL();
   const heartEmpty = heartArt(false).toDataURL();
@@ -50,6 +57,9 @@ export function createUI() {
       }),
     );
     el.hearts.setAttribute('aria-label', `Sprout has ${lives} of ${maxLives} hearts`);
+    // More than five hearts (corn, water, a grown mushroom): two even rows.
+    el.hearts.classList.toggle('is-many', maxLives > 5);
+    el.hearts.style.setProperty('--cols', String(Math.ceil(maxLives / 2)));
   }
 
   function renderEffects(game) {
@@ -115,14 +125,19 @@ export function createUI() {
     setBest(best) {
       el.best.textContent = best.score > 0
         ? `Best score ${fmt(best.score)}, reached level ${best.level}`
-        : 'Your best score will show here.';
+        : '';
     },
 
-    setFinal({ score, level, best, isNewBest }) {
+    setCoins(k) {
+      el.coins.textContent = formatK(k);
+    },
+
+    setFinal({ score, level, best, isNewBest, earned }) {
       el.finalScore.textContent = fmt(score);
       el.finalBest.textContent = isNewBest ? 'New best score!' : `Best ${fmt(best.score)}`;
       el.finalBest.classList.toggle('is-new', isNewBest);
       el.finalLevel.textContent = `You reached level ${level}.`;
+      el.finalCoins.textContent = `+${formatK(earned)} coins`;
     },
 
     setSound(muted) {

@@ -1,5 +1,6 @@
 // Ported from klayman.gd: moves, faces front/back/side, and one button either
-// pushes the dirtball in front of him or throws dirt.
+// pushes the dirtball in front of him or throws dirt. His tool (game.gear)
+// makes him faster, throw quicker and farther, or aim the dirt gun for him.
 import { KLAYMAN, POISON } from './config.js';
 import { keepOnSoil } from './world.js';
 
@@ -44,6 +45,19 @@ export class Klayman {
     return FACING_DIR[this.facing];
   }
 
+  /** Turns to look at a point: side, front or back, whichever is closest. */
+  faceToward(p) {
+    const dx = p.x - this.x;
+    const dy = p.y - this.y;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      this.facing = 'side';
+      this.flip = dx < 0;
+    } else {
+      this.facing = dy < 0 ? 'back' : 'front';
+      this.flip = false;
+    }
+  }
+
   update(dt, input, game) {
     this.t += dt;
     if (this.stun > 0) this.stun = Math.max(0, this.stun - dt);
@@ -64,13 +78,14 @@ export class Klayman {
 
     const slowFactor = this.slow > 0 ? POISON.slowFactor : 1;
     const boost = game.boostFactor;
+    const gear = game.gear;
 
     let dx = input.x, dy = input.y;
     const len = Math.hypot(dx, dy);
     this.moving = len > 0;
     if (this.moving) {
       dx /= len; dy /= len;
-      const speed = KLAYMAN.speed * slowFactor * boost;
+      const speed = KLAYMAN.speed * slowFactor * boost * gear.speed;
       this.x += dx * speed * dt;
       this.y += dy * speed * dt;
       if (Math.abs(dx) > Math.abs(dy)) {
@@ -85,7 +100,7 @@ export class Klayman {
       }
     }
     keepOnSoil(this, 14);
-    game.pushOutOfObstacles(this, KLAYMAN.radius);
+    game.pushOutOfObstacles(this, KLAYMAN.radius, !gear.passSprout);
 
     // Up close, the button pushes a dirtball. Auto throw never pushes: it
     // waits while a dirtball is right in front, so pushing stays your call.
@@ -94,16 +109,29 @@ export class Klayman {
       const dir = this.facingDir();
       const ball = game.dirtballInFront(this, dir);
       if (ball && !wantsAction) return;
-      this.cooldown = (KLAYMAN.attackCooldown / boost) / slowFactor;
+      this.cooldown = (KLAYMAN.attackCooldown / boost / gear.fireRate) / slowFactor;
       this.tapBuffer = 0;
       if (ball) {
         ball.push(dir);
         this.action = { kind: 'push', t: 0 };
         game.emit('push', { x: ball.x, y: ball.y });
-      } else {
-        this.action = { kind: 'attack', t: 0 };
-        game.spawnShot(this.x + dir.x * 12, this.y + dir.y * 12 + (dir.y < 0 ? -2 : 0), dir);
+        return;
       }
+      // The dirt gun picks the nearest bacteria. Standing still, he turns
+      // to it; walking, he keeps walking and the shot finds its own way.
+      const target = gear.lockOn ? game.lockTarget(this) : null;
+      if (target && !this.moving) this.faceToward(target);
+      const hand = this.facingDir();
+      const from = { x: this.x + hand.x * 12, y: this.y + hand.y * 12 + (hand.y < 0 ? -2 : 0) };
+      let aim = hand;
+      if (target) {
+        const dx = target.x - from.x;
+        const dy = target.y - from.y;
+        const d = Math.hypot(dx, dy) || 1;
+        aim = { x: dx / d, y: dy / d };
+      }
+      this.action = { kind: 'attack', t: 0 };
+      game.spawnShot(from.x, from.y, aim, target);
     }
   }
 }
