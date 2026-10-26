@@ -66,6 +66,17 @@ export function randomSpotOnSoil(rng, inset = 30) {
   };
 }
 
+// Rings on the soil (spores, a revived sprout) are drawn this much flatter
+// than they are wide, so the pot looks tilted toward you.
+export const RING_SQUASH = 0.6;
+
+/** Inside a ring of radius `reach` centred on `c`, drawn as the pot sees it. */
+export function insideRing(p, c, reach) {
+  const dx = (p.x - c.x) / reach;
+  const dy = (p.y - c.y) / (reach * RING_SQUASH);
+  return dx * dx + dy * dy <= 1;
+}
+
 export function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }

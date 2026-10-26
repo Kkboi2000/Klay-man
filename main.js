@@ -1,14 +1,18 @@
 // Boots Klayman: loads assets, lays out the screen for the device, runs the loop.
-// Three pages: the title (Klayman's face), setup (tool, sprout, auto throw),
-// and the game itself, which ends with a score summary and a way back to setup.
+// Three pages: the title (Klayman's face over rolling dirtballs), setup
+// (tools, sprouts, the shop, auto throw), and the game itself, which ends
+// with a score summary: a revive or the backup sprout can carry it on, or
+// play again, or go back to setup.
 import { Game } from './game.js';
 import { loadSprites, BAC } from './sprites.js';
 import { Renderer } from './render.js';
 import { createInput } from './input.js';
 import { Sound } from './sound.js';
 import { createUI } from './ui.js';
-import { Wallet, SAVE, ADMIN_SAVE } from './gear.js';
+import { Wallet, SAVE, ADMIN_SAVE, CATALOG } from './gear.js';
 import { createSetup, createFace } from './setup.js';
+import { createTitleBalls } from './titleballs.js';
+import { createOrientation } from './orientation.js';
 
 const STEP = 1 / 60;
 const BEST_KEY = 'klayman.best';
@@ -22,7 +26,8 @@ const isPreview = Boolean(globalThis.KLAYMAN_ASSETS);
 
 let mode = 'loading';            // loading | title | setup | playing | paused | over
 let touch = matchMedia('(pointer: coarse)').matches;
-let game, renderer, input, sound, ui, best, wallet, setup, face;
+let game, renderer, input, sound, ui, best, wallet, setup, face, titleBalls;
+const orientation = createOrientation();
 let overDelay = 0;
 let adminLevel = 1;              // admin mode can start a game further in
 const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -101,12 +106,15 @@ function setMode(m) {
   app.dataset.mode = m;
 }
 
+// The title and setup pages open upright; a game opens sideways.
 function showTitle() {
+  orientation.prefer('portrait');
   setMode('title');
   ui.show('title');
 }
 
 function showSetup() {
+  orientation.prefer('portrait');
   sound.unlock();
   input.clear();
   overDelay = 0;
@@ -116,18 +124,42 @@ function showSetup() {
   setup.render();
 }
 
+/** Where the next game starts: admin's pick, or a level skip you bought. */
+function startLevel() {
+  if (wallet.isAdmin && adminLevel > 1) return adminLevel;
+  return wallet.startLevel;
+}
+
 function start() {
+  orientation.prefer('landscape');
   sound.unlock();
   document.activeElement?.blur();   // Space throws, rather than pressing a button
-  game.reset(wallet.loadout, wallet.isAdmin ? adminLevel : 1);
+  const level = startLevel();
+  // A level skip is spent when the game it starts begins (admin's levels are free).
+  if (level > 1 && level === wallet.startLevel && !(wallet.isAdmin && adminLevel > 1)) wallet.use(wallet.skip);
+  game.reset(wallet.loadout, level);
   ui.setCoins(wallet.coins);
-  renderer.particles = [];
-  renderer.popups = [];
+  renderer.clearEffects();
   ui.reset();
   input.clear();
   overDelay = 0;
   setMode('playing');
   ui.show(null);
+  handleEvents(game.drainEvents());
+}
+
+/** Back into the same game after the sprout was lost: revived, or the backup takes over. */
+function carryOn(how) {
+  const ok = how === 'revive' ? wallet.owns('revive') && game.revive() : game.useBackup();
+  if (!ok) return;
+  if (how === 'revive') wallet.use('revive');
+  sound.unlock();
+  document.activeElement?.blur();
+  input.clear();
+  overDelay = 0;
+  setMode('playing');
+  ui.show(null);
+  ui.banner(how === 'revive' ? 'Revived!' : `${CATALOG[game.gear.sprout].name} takes over`, '', 1.6);
   handleEvents(game.drainEvents());
 }
 
@@ -159,7 +191,12 @@ function finish(score, level) {
     saveBest(best);
     ui.setBest(best);
   }
-  ui.setFinal({ score, level, best, isNewBest, earned: game.earned });
+  ui.hideBanner();                // a level banner shouldn't show through the summary
+  ui.setFinal({
+    score, level, best, isNewBest, earned: game.earned,
+    revive: wallet.owns('revive') ? game.reviveHearts : null,
+    backup: game.backupSprout,
+  });
   setMode('over');
   overDelay = 1.3;               // let the sprout wilt before the screen comes up
 }
@@ -183,8 +220,13 @@ function handleEvents(events) {
         sound.play('coin', { volume: e.value > 1 ? 0.7 : 0.5, rate: e.value > 1 ? 0.85 : 1 });
         break;
       case 'coinAppears': sound.play('coin', { volume: 0.12, rate: 1.5 }); break;
-      case 'heal':
+      case 'heal': sound.play('buy', { volume: 0.45, rate: 1.35 }); break;
       case 'grow': sound.play('buy', { volume: 0.4, rate: 1.2 }); break;
+      case 'revive':
+      case 'backup': sound.play('buy', { volume: 0.6, rate: 0.9 }); break;
+      case 'slowed': sound.play('hit', { volume: 0.25, rate: 1.5 }); break;
+      case 'shield':
+      case 'hide': sound.play('throw', { volume: 0.35, rate: 0.6 }); break;
       case 'spores':
         sound.play('break', { volume: 0.8, rate: 0.5 });
         sound.buzz(30);
@@ -203,7 +245,10 @@ function handleEvents(events) {
         sound.play('break', { volume: 0.9, rate: 0.6 });
         sound.buzz(70);
         break;
-      case 'itemAppears': sound.play('hit', { volume: 0.45, rate: 1.8 }); break;
+      case 'itemAppears':
+        if (e.from) sound.play('bling', { volume: 0.55 });
+        else sound.play('hit', { volume: 0.45, rate: 1.8 });
+        break;
       case 'pickup': sound.play('throw', { volume: 0.6, rate: 1.6 }); break;
       case 'cleared': ui.banner('Pot cleared!', '', 1.1); break;
       case 'level': {
@@ -245,20 +290,29 @@ function loop(now) {
   }
   renderer.draw(game, dt);
   ui.update(game, dt);
-  if (mode === 'title') face.draw(dt, calm);
+  if (mode === 'title') {
+    titleBalls.draw(dt, calm);
+    face.draw(dt, calm);
+  }
   if (mode === 'setup') setup.update(dt);
   requestAnimationFrame(loop);
 }
 
 // ------------------------------------------------------------------ setup
 
-function dressThrowButton(sheet) {
-  // The throw button is a dirtball, cut straight from the sprite sheet.
+function cut(sheet, x, y, w, h) {
   const c = document.createElement('canvas');
-  c.width = 18;
-  c.height = 18;
-  c.getContext('2d').drawImage(sheet, 7, BAC.ballY + 7, 18, 18, 0, 0, 18, 18);
-  $('throw').style.setProperty('--ball', `url(${c.toDataURL()})`);
+  c.width = w;
+  c.height = h;
+  c.getContext('2d').drawImage(sheet, x, y, w, h, 0, 0, w, h);
+  return `url(${c.toDataURL()})`;
+}
+
+function dressButtons(sheet) {
+  // The throw button is a dirtball, cut straight from the sprite sheet;
+  // the glasses' count shows a bacteria.
+  $('throw').style.setProperty('--ball', cut(sheet, 7, BAC.ballY + 7, 18, 18));
+  document.documentElement.style.setProperty('--bac', cut(sheet, 6, 8, 20, 18));
 }
 
 // ---------------------------------------------------------------- install
@@ -343,6 +397,7 @@ async function boot() {
   ui.setCoins(wallet.coins);
   if (wallet.isAdmin) $('admin-note').textContent = 'Admin mode: everything unlocked.';
   sound = new Sound();
+  sound.makeSynths();            // the gun, coin, shop and bling sounds
   ui.setSound(sound.muted);
 
   const [sprites] = await Promise.all([
@@ -356,8 +411,9 @@ async function boot() {
   layout();
   game = new Game({ loadout: wallet.loadout });
   game.drainEvents();
-  dressThrowButton(sprites.bac);
+  dressButtons(sprites.bac);
   face = createFace($('face'), sprites.klay);
+  titleBalls = createTitleBalls($('title-balls'), sprites.bac);
 
   input = createInput({
     stickZone: $('stick-zone'),
@@ -370,7 +426,7 @@ async function boot() {
   });
 
   setup = createSetup({
-    wallet, sprites, input, sound,
+    wallet, sprites, input, sound, startLevel,
     admin: {
       get level() { return adminLevel; },
       setLevel(n) { adminLevel = n; },
@@ -385,6 +441,8 @@ async function boot() {
   for (const b of document.querySelectorAll('[data-to-setup]')) b.addEventListener('click', showSetup);
   $('resume').addEventListener('click', resume);
   $('restart').addEventListener('click', start);
+  $('revive').addEventListener('click', () => carryOn('revive'));
+  $('backup').addEventListener('click', () => carryOn('backup'));
   $('pause').addEventListener('click', pause);
   for (const b of document.querySelectorAll('[data-sound]')) {
     b.addEventListener('click', () => {

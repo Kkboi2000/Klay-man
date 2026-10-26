@@ -1,8 +1,12 @@
-// Ported from klayman.gd: moves, faces front/back/side, and one button either
-// pushes the dirtball in front of him or throws dirt. His tool (game.gear)
-// makes him faster, throw quicker and farther, or aim the dirt gun for him.
+// Ported from klayman.gd: moves, faces front/back/side, throws dirt, and
+// pushes a dirtball he is touching. On a phone one button does both (push
+// when touching a dirtball, throw otherwise); on a keyboard Space throws and
+// K pushes. Auto throw does both by itself. His tools (game.gear) make him
+// faster, throw quicker and farther, or aim the dirt gun for him.
 import { KLAYMAN, POISON } from './config.js';
 import { keepOnSoil } from './world.js';
+
+const BUFFER = 0.3;              // seconds a press waits for the cooldown
 
 const FACING_DIR = {
   front: { x: 0, y: 1 },
@@ -21,7 +25,9 @@ export class Klayman {
     this.stun = 0;
     this.slow = 0;
     this.t = 0;
-    this.tapBuffer = 0;          // a tap during the cooldown still counts
+    this.tapBuffer = 0;          // a press during the cooldown still counts:
+    this.throwBuffer = 0;        //   the phone button, the throw key...
+    this.pushBuffer = 0;         //   ...and the push key (K)
     this.heading = { x: 0, y: 1 }; // the way he last walked: up, down, left or right
   }
 
@@ -64,8 +70,9 @@ export class Klayman {
     if (this.stun > 0) this.stun = Math.max(0, this.stun - dt);
     else if (this.slow > 0) this.slow = Math.max(0, this.slow - dt);
     if (this.cooldown > 0) this.cooldown -= dt;
-    if (input.pressed) this.tapBuffer = 0.3;
-    else if (this.tapBuffer > 0) this.tapBuffer -= dt;
+    this.tapBuffer = input.pressed ? BUFFER : Math.max(0, this.tapBuffer - dt);
+    this.throwBuffer = input.throwPressed ? BUFFER : Math.max(0, this.throwBuffer - dt);
+    this.pushBuffer = input.pushPressed ? BUFFER : Math.max(0, this.pushBuffer - dt);
     if (this.action) {
       this.action.t += dt;
       if (this.action.t >= KLAYMAN.actionTime) this.action = null;
@@ -98,38 +105,41 @@ export class Klayman {
     // The dirt gun keeps him facing the closest bacteria, walking or not.
     const target = game.lock;
     if (target) this.faceToward(target);
+    if (this.cooldown > 0) return;
 
-    // Up close, the button pushes a dirtball. Auto throw never pushes: it
-    // waits while a dirtball is right in front, so pushing stays your call.
-    const wantsAction = this.tapBuffer > 0 || input.held;
-    if ((wantsAction || input.auto) && this.cooldown <= 0) {
-      // A dirtball where he's facing, or (aiming the gun elsewhere) where he walked.
-      let dir = this.facingDir();
-      let ball = game.dirtballInFront(this, dir);
-      if (!ball && target) {
-        ball = game.dirtballInFront(this, this.heading);
-        if (ball) dir = this.heading;
-      }
-      if (ball && !wantsAction) return;
-      this.cooldown = (KLAYMAN.attackCooldown / boost / gear.fireRate) / slowFactor;
-      this.tapBuffer = 0;
-      if (ball) {
-        ball.push(dir);
-        this.action = { kind: 'push', t: 0 };
-        game.emit('push', { x: ball.x, y: ball.y });
-        return;
-      }
-      const hand = this.facingDir();
-      const from = { x: this.x + hand.x * 12, y: this.y + hand.y * 12 + (hand.y < 0 ? -2 : 0) };
-      let aim = hand;
-      if (target) {
-        const dx = target.x - from.x;
-        const dy = target.y - from.y;
-        const d = Math.hypot(dx, dy) || 1;
-        aim = { x: dx / d, y: dy / d };
-      }
-      this.action = { kind: 'attack', t: 0 };
-      game.spawnShot(from.x, from.y, aim, target);
+    // Only a dirtball he is touching can be pushed: the one he faces, or
+    // (aiming the gun elsewhere) the one he walked into.
+    let dir = this.facingDir();
+    let ball = game.dirtballTouching(this, dir);
+    if (!ball && target) {
+      ball = game.dirtballTouching(this, this.heading);
+      if (ball) dir = this.heading;
     }
+    const button = this.tapBuffer > 0 || input.held;
+    const pushNow = Boolean(ball) && (this.pushBuffer > 0 || button || input.auto);
+    const throwNow = !pushNow && (this.throwBuffer > 0 || input.throwHeld || button || input.auto);
+    if (!pushNow && !throwNow) return;
+
+    this.cooldown = (KLAYMAN.attackCooldown / boost / gear.fireRate) / slowFactor;
+    this.tapBuffer = 0;
+    if (pushNow) {
+      this.pushBuffer = 0;
+      ball.push(dir);
+      this.action = { kind: 'push', t: 0 };
+      game.emit('push', { x: ball.x, y: ball.y });
+      return;
+    }
+    this.throwBuffer = 0;
+    const hand = this.facingDir();
+    const from = { x: this.x + hand.x * 12, y: this.y + hand.y * 12 + (hand.y < 0 ? -2 : 0) };
+    let aim = hand;
+    if (target) {
+      const ax = target.x - from.x;
+      const ay = target.y - from.y;
+      const d = Math.hypot(ax, ay) || 1;
+      aim = { x: ax / d, y: ay / d };
+    }
+    this.action = { kind: 'attack', t: 0 };
+    game.spawnShot(from.x, from.y, aim, target);
   }
 }

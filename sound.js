@@ -1,6 +1,7 @@
 // Web Audio: quick, overlapping sound effects. Phones keep audio locked until
-// the first tap, so unlock() is called from the Start button. The gun, coin
-// and shop sounds are made here in code rather than loaded from files.
+// the first tap, so unlock() is called from the Start button. The gun, coin,
+// shop and bling sounds are made here in code (makeSynths, at start-up)
+// rather than loaded from files.
 import { assetUrl } from './sprites.js';
 
 const MUTE_KEY = 'klayman.muted';
@@ -42,6 +43,13 @@ const SYNTHS = {
     const f = t < 0.07 ? 988 : 1319;
     const env = t < 0.07 ? 1 : Math.exp(-(t - 0.07) * 14);
     return 0.28 * square(f, t) * env;
+  }],
+  // A sunflower's bling: a quick sparkle of high notes, ringing out.
+  bling: [0.5, (t) => {
+    const notes = [1568, 2093, 2637, 3136];
+    const n = Math.min(3, Math.floor(t / 0.05));
+    const env = Math.exp(-(t - n * 0.05) * 16) * (n < 3 ? 1 : Math.exp(-(t - 0.15) * 6));
+    return 0.16 * Math.sin(2 * Math.PI * notes[n] * t) * env + 0.05 * square(notes[n] * 2, t) * env;
   }],
   // Three rising notes: bought it.
   buy: [0.42, (t) => {

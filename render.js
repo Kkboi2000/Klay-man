@@ -1,6 +1,9 @@
 // Draws a Game onto the canvas. Reads the game; never changes it.
-import { SPRITE_SCALE as S, SHOT, POT_SCALE, COINS, KLAYMAN } from './config.js';
-import { SOIL, WORLD, CAMERA_BOUNDS as BOUNDS, TREE_SPOT } from './world.js';
+// With the glasses on, it also draws what they show, all in one light blue:
+// arrows to bacteria and items, an item's seconds left, and where the next
+// bacteria or item is about to appear.
+import { SPRITE_SCALE as S, SHOT, POT_SCALE, COINS, KLAYMAN, LOOKAHEAD, ITEM_FLIGHT } from './config.js';
+import { SOIL, WORLD, CAMERA_BOUNDS as BOUNDS, TREE_SPOT, RING_SQUASH } from './world.js';
 import { KLAY, BAC, TREE_ART } from './sprites.js';
 import { BREAK_TIME, ABSORB_TIME } from './bacteria.js';
 import { DIRTBALL_BREAK_TIME } from './dirtball.js';
@@ -13,6 +16,11 @@ const SPARK = ['#ffe9a8', '#ffd25a', '#ffffff'];
 const SPORE = ['#b06ed6', '#d9a6f0', '#7a3fa0'];
 const PETAL = ['#ff8593', '#d8263d', '#ffffff'];
 const GOLD = '#ffd25a';
+const LEAF = ['#668543', '#54762f', '#cfe39a'];
+const LILY = ['#fff4e3', '#efe0c4', '#ff8593'];
+const COAT = ['#eef2f5', '#9fb4c4'];
+const VISOR = '#7fdcff';          // everything the glasses show
+const VISOR_INK = '#0c2b3a';
 
 // The camera shows about this much of the world (in world units), so
 // Klayman stays the same size whatever the screen.
@@ -22,21 +30,30 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 export class Renderer {
   /** `zoom` fixes the zoom (the setup page's close-up); `markers` draws the
-   *  arrows to things off-screen. */
-  constructor(canvas, sprites, { zoom = null, markers = true } = {}) {
+   *  arrows to things off-screen; `smallGun` draws the game-sized dirt gun. */
+  constructor(canvas, sprites, { zoom = null, markers = true, smallGun = true } = {}) {
     this.canvas = canvas;
     this.fixedZoom = zoom;
     this.markers = markers;
+    this.smallGun = smallGun;
     this.ctx = canvas.getContext('2d');
     this.sprites = sprites;
-    this.particles = [];
-    this.popups = [];
-    this.rings = [];
-    this.shake = 0;
+    this.clearEffects();
     this.time = 0;
     this.cam = { x: 0, y: 0, w: 1, h: 1 };
     this.snapCamera = true;
     this.calm = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  }
+
+  /** Forgets every effect in flight: a new game, or a new look on the setup page. */
+  clearEffects() {
+    this.particles = [];
+    this.popups = [];
+    this.rings = [];
+    this.floaters = [];            // hearts rising from the sprout
+    this.sparkles = [];            // a sunflower's bling
+    this.bloom = 0;                // seconds the sunflower stays lit up
+    this.shake = 0;
   }
 
   resize(cssW, cssH, dpr) {
@@ -72,6 +89,7 @@ export class Renderer {
   // ------------------------------------------------------------- effects
 
   handle(events) {
+    const top = { x: TREE_SPOT.x, y: TREE_SPOT.y - 40 };
     for (const e of events) {
       switch (e.type) {
         case 'hit': this.burst(e.x, e.y - 12, 5, DIRT, 60); break;
@@ -81,6 +99,7 @@ export class Renderer {
         case 'crack': this.burst(e.x, e.y - 10, 6, DIRT, 70); break;
         case 'spawn': this.burst(e.x, e.y, 5, DIRT, 40); break;
         case 'poison': this.burst(e.x, e.y - 22, 8, GERM, 50, -60); break;
+        case 'slowed': this.burst(e.x, e.y - 14, 6, COAT, 50, -30); break;
         case 'treeHurt':
           this.burst(TREE_SPOT.x, TREE_SPOT.y - 30, 8, ['#6aa84f', '#3f7a2e'], 70);
           this.shake = 0.3;
@@ -91,8 +110,12 @@ export class Renderer {
           this.popup(ITEM_INFO[e.item].says, e.x, e.y - 44, 1.6);
           break;
         case 'itemAppears':
-          this.burst(e.x, e.y - 18, 10, SPARK, 80);
-          this.popup(ITEM_INFO[e.type].name, e.x, e.y - 48, 1.6);
+          if (e.from) {
+            this.bling(e.from.x, e.from.y);
+          } else {
+            this.burst(e.x, e.y - 18, 10, SPARK, 80);
+          }
+          this.popup(ITEM_INFO[e.item].name, e.x, e.y - 48, 1.6);
           break;
         case 'coinAppears': this.burst(e.x, e.y - 12, e.value > 1 ? 10 : 5, SPARK, 60); break;
         case 'coin':
@@ -100,19 +123,48 @@ export class Renderer {
           this.popup(`+${e.value}K`, e.x, e.y - 36, 0.9, GOLD);
           break;
         case 'heal':
-          this.burst(TREE_SPOT.x, TREE_SPOT.y - 40, 12, PETAL, 70, -50);
-          this.popup('+1 heart', TREE_SPOT.x, TREE_SPOT.y - 76, 1.4);
+          // A rose (or a mushroom's half heart): a pink wash, petals, and a heart floating up.
+          this.ring(TREE_SPOT.x, TREE_SPOT.y - 6, 90, 0.6, '#ff8593', '#ffd6dc');
+          this.burst(top.x, top.y, 26, PETAL, 120, -70);
+          this.floatHeart(top.x, top.y - 20, e.amount < 1 ? 'half' : 'full');
           break;
         case 'grow':
-          this.burst(TREE_SPOT.x, TREE_SPOT.y - 40, 14, SPORE, 90, -40);
+          this.burst(top.x, top.y, 14, SPORE, 90, -40);
           this.popup('+1 heart', TREE_SPOT.x, TREE_SPOT.y - 80, 1.4);
           break;
         case 'spores':
-          this.rings.push({ x: e.x, y: e.y - 6, t: 0, max: 0.7 });
+          this.ring(e.x, e.y - 6, e.reach, 0.7, '#b06ed6', '#f0d4ff');
           this.burst(e.x, e.y - 30, 18, SPORE, 160, -20);
+          break;
+        case 'shield': this.burst(top.x + 8, top.y, 14, LEAF, 70, -30); break;
+        case 'hide': this.burst(top.x, top.y - 10, 10, LILY, 60, -20); break;
+        case 'revive':
+        case 'backup':
+          this.ring(e.x, e.y - 6, e.reach, 0.8, GOLD, '#fff2b8');
+          this.burst(top.x, top.y, 24, e.type === 'revive' ? PETAL : LEAF, 130, -60);
+          this.floatHeart(top.x, top.y - 20, 'full');
           break;
       }
     }
+  }
+
+  /** A sunflower lights up and twinkles as an item jumps out of it. */
+  bling(x, y) {
+    this.bloom = 0.55;
+    this.burst(x, y, 12, SPARK, 90, -50);
+    const spots = [[-22, -10, 0], [18, -18, 0.06], [-8, -30, 0.12], [26, 6, 0.18], [-28, 12, 0.24], [6, -40, 0.3], [0, 0, 0.02]];
+    for (const [dx, dy, delay] of spots) {
+      this.sparkles.push({ x: x + dx, y: y + dy, t: -delay, max: 0.45, size: dx === 0 && dy === 0 ? 10 : 6 });
+    }
+  }
+
+  floatHeart(x, y, kind) {
+    const img = kind === 'half' ? this.sprites.halfHeart : this.sprites.heart;
+    this.floaters.push({ img, x, y, t: 0, max: 1.3 });
+  }
+
+  ring(x, y, reach, max, color, light) {
+    this.rings.push({ x, y, reach, t: 0, max, color, light });
   }
 
   burst(x, y, n, colors, speed, lift = 0) {
@@ -141,6 +193,7 @@ export class Renderer {
   /** Draws the pot, with the camera on `focus` (Klayman, unless told otherwise). */
   draw(game, dt, focus = game.klay) {
     this.time += dt;
+    if (this.bloom > 0) this.bloom = Math.max(0, this.bloom - dt);
     const { ctx } = this;
     const s = this.zoom * this.dpr;
     this.follow(focus, dt);
@@ -181,8 +234,11 @@ export class Renderer {
     if (game.lock?.alive && !game.over) this.drawLock(game.lock);
 
     if (game.frozen) this.drawFrost(game.freeze);
+    if (game.gear.glasses && !game.over) this.drawGuides(game);
     this.drawRings(dt);
     this.drawParticles(dt);
+    this.drawSparkles(dt);
+    this.drawFloaters(dt);
     this.drawPopups(dt);
 
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -191,14 +247,19 @@ export class Renderer {
 
   // ------------------------------------------------- off-screen pointers
 
-  /** Arrows at the screen edge pointing at things the camera can't see. */
+  /** Arrows at the screen edge pointing at things the camera can't see:
+   *  coins and the sprout always; bacteria and items only through the glasses. */
   drawMarkers(game) {
     const marks = [];
-    for (const b of game.bacteria) {
-      if (b.crawling) marks.push({ x: b.x, y: b.y - 12, color: '#5aa266', size: 7 });
-    }
-    if (game.item && !(game.item.blinking && Math.floor(game.item.t * 8) % 2 === 0)) {
-      marks.push({ x: game.item.x, y: game.item.y - 16, color: '#ffd25a', size: 10, icon: game.item.type });
+    const glasses = game.gear.glasses;
+    if (glasses) {
+      for (const b of game.bacteria) {
+        if (b.crawling) marks.push({ x: b.x, y: b.y - 12, color: '#5aa266', size: 7 });
+      }
+      const item = game.item;
+      if (item && !(item.blinking && Math.floor(item.t * 8) % 2 === 0)) {
+        marks.push({ x: item.x, y: item.y - 16, color: GOLD, size: 10, icon: item.type, secs: item.landed ? Math.ceil(item.life) : null });
+      }
     }
     for (const c of game.coins) {
       if (c.blinking && Math.floor(c.t * 10) % 2 === 0) continue;
@@ -232,6 +293,9 @@ export class Renderer {
           : m.icon === 'coin' ? this.sprites.coin : this.sprites.icons[m.icon];
         const size = m.icon === 'heart' || m.icon === 'coin' ? 14 : 18;
         ctx.drawImage(icon, -Math.cos(a) * 14 - size / 2, -Math.sin(a) * 14 - size / 2, size, (size * icon.height) / icon.width);
+        if (m.secs !== null && m.secs !== undefined) {
+          this.label(String(m.secs), -Math.cos(a) * 34, -Math.sin(a) * 34, 13);
+        }
       }
       ctx.rotate(a);
       ctx.beginPath();
@@ -267,20 +331,29 @@ export class Renderer {
   }
 
   drawTree(game) {
-    const look = this.sprites.sprouts[game.gear.sprout];
+    const sprout = this.sprites.sprouts[game.gear.sprout];
     const frame = Math.floor(this.time * 1.6) % 2;
     let scale = S * game.treeScale;
     const { x, y } = TREE_SPOT;
     const a = TREE_ART.anchor;
     if (game.over) {
-      this.sprite(look.wilted, frame * 32, 0, 32, 48, x, y, a.x, a.y, { scale: scale * 0.9 });
+      this.sprite(sprout.wilted, frame * 32, 0, 32, 48, x, y, a.x, a.y, { scale: scale * 0.9 });
       return;
     }
+    // Corn's leaves closed, or a lily shut: drawn closed. In the last moment
+    // it flickers open, so you can see it's about to open.
+    const shutFor = Math.max(game.shield, game.hidden);
+    const opening = shutFor > 0 && shutFor < 0.6 && !this.calm && Math.floor(this.time * 12) % 2 === 0;
+    const look = sprout.shut && shutFor > 0 && !opening ? sprout.shut : sprout;
     // A mushroom about to release its spores swells a little.
-    if (game.gear.pulseEvery && game.pulseTimer < 0.8 && !this.calm) {
+    if (game.gear.spores && game.sporeTimer < 0.8 && !this.calm) {
       scale *= 1 + 0.06 * Math.abs(Math.sin(this.time * 18));
     }
     this.sprite(look.sheet, frame * 32, 0, 32, 48, x, y, a.x, a.y, { scale });
+    if (this.bloom > 0) {
+      const flash = this.calm ? 0.5 : 0.35 + 0.35 * Math.abs(Math.sin(this.time * 24));
+      this.sprite(look.glow, frame * 32, 0, 32, 48, x, y, a.x, a.y, { scale, alpha: flash * Math.min(1, this.bloom / 0.3) });
+    }
     if (game.treeHurt > 0) {
       this.sprite(look.hurt, frame * 32, 0, 32, 48, x, y, a.x, a.y, { scale, alpha: game.treeHurt / 0.5 });
     }
@@ -332,10 +405,21 @@ export class Renderer {
 
   drawItem(item) {
     if (item.blinking && Math.floor(item.t * 8) % 2 === 0) return;
+    const img = this.sprites.icons[item.type];
+    if (!item.landed) {
+      // Out of a sunflower: a hop up and over, landing where it will wait.
+      const p = 1 - item.flight / ITEM_FLIGHT;
+      const x = item.from.x + (item.x - item.from.x) * p;
+      const y = item.from.y + (item.y - 16 - item.from.y) * p - 4 * 34 * p * (1 - p);
+      const groundY = TREE_SPOT.y + (item.y - TREE_SPOT.y) * p;
+      this.shadow(x, groundY, 10 * p, 0.3 * p);
+      this.sprite(img, 0, 0, 16, 16, x, y, 8, 8, { scale: S * (0.6 + 0.4 * p) });
+      return;
+    }
     const pop = Math.min(1, item.t / 0.25);
     const bob = Math.sin(item.t * 3) * 3;
     this.shadow(item.x, item.y, 10 * pop, 0.3);
-    this.sprite(this.sprites.icons[item.type], 0, 0, 16, 16, item.x, item.y - 16 + bob, 8, 8, {
+    this.sprite(img, 0, 0, 16, 16, item.x, item.y - 16 + bob, 8, 8, {
       scale: S * pop,
     });
   }
@@ -378,11 +462,12 @@ export class Renderer {
   drawKlayman(game) {
     const k = game.klay;
     const sp = this.sprites;
-    const tool = game.gear.tool;
-    const look = sp.klayFor[tool ?? 'none'];
+    const tools = game.gear.tools;
+    const hasGun = tools.includes('gun');
+    const look = sp.lookFor(tools);
     // With the dirt gun he doesn't wind up a throw: he aims and fires.
     let kind = k.moving ? 'walk' : 'idle';
-    if (k.action && !(tool === 'gun' && k.action.kind === 'attack')) kind = k.action.kind;
+    if (k.action && !(hasGun && k.action.kind === 'attack')) kind = k.action.kind;
     const clock = kind === 'idle' ? this.time : k.t;
     const { col, row } = KLAY.frame(kind, k.facing, clock, k.action ? k.action.t : 0);
     const size = KLAY.size;
@@ -400,7 +485,7 @@ export class Renderer {
       if (Math.random() < 0.15) this.burst(k.x, k.y - 20, 1, SPARK, 30, -40);
     }
 
-    const gun = tool === 'gun' ? () => this.drawGun(k, row, col, flip, jitter) : null;
+    const gun = hasGun ? () => this.drawGun(k, row, col, flip, jitter) : null;
     if (gun && k.facing === 'back') gun();      // held up the pot, behind him
     this.sprite(look.sheet, col * size, row * size, size, size, k.x + jitter, k.y, a.x, a.y, { flip });
     const green = k.greenness;
@@ -411,12 +496,14 @@ export class Renderer {
       });
     }
     if (gun && k.facing !== 'back') gun();
-    if (tool === 'gloves' && k.action?.kind === 'attack') this.drawWind(k);
+    if (tools.includes('gloves') && k.action?.kind === 'attack') this.drawWind(k);
   }
 
-  /** The dirt gun in Klayman's front hand, with a kick and a flash on each shot. */
+  /** The dirt gun in Klayman's front hand, with a kick and a flash on each shot.
+   *  In the game it's the small one, with a small flash; the setup page shows the big one. */
   drawGun(k, row, col, flip, jitter) {
-    const art = this.sprites.gun[k.facing];
+    const art = (this.smallGun ? this.sprites.gunSmall : this.sprites.gun)[k.facing];
+    const flash = this.smallGun ? 4 : 8;
     const hand = this.sprites.gunSpots[row][col];
     const firing = k.action?.kind === 'attack' ? k.action.t : Infinity;
     const kick = firing < 0.1 ? 1 : 0;
@@ -430,12 +517,12 @@ export class Renderer {
     ctx.drawImage(art.img, gx * S, gy * S, art.img.width * S, art.img.height * S);
     if (firing < 0.07) {
       const out = { side: [1, 0], front: [0, 1], back: [0, -1] }[k.facing];
-      const mx = (gx + art.muzzle.x + out[0] * 1.5) * S;
-      const my = (gy + art.muzzle.y + out[1] * 1.5) * S;
+      const mx = (gx + art.muzzle.x + out[0] * 1.5) * S + out[0] * (flash / 2 - 1);
+      const my = (gy + art.muzzle.y + out[1] * 1.5) * S + out[1] * (flash / 2 - 1);
       ctx.fillStyle = GOLD;
-      ctx.fillRect(mx - 4 + out[0] * 3, my - 4 + out[1] * 3, 8, 8);
+      ctx.fillRect(mx - flash / 2, my - flash / 2, flash, flash);
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(mx - 2 + out[0] * 3, my - 2 + out[1] * 3, 4, 4);
+      ctx.fillRect(mx - flash / 4, my - flash / 4, flash / 2, flash / 2);
     }
     ctx.restore();
   }
@@ -464,50 +551,162 @@ export class Renderer {
     ctx.restore();
   }
 
-  /** Gloves: a little gust of wind sweeps round the throwing arm. */
+  /** Gloves: a pixel gust sweeps round the throwing arm, and three streaks
+   *  shoot off the way the dirt flies. Every speck sits on the art's 2-unit
+   *  pixel grid, so it looks drawn rather than painted. */
   drawWind(k) {
     const p = Math.min(1, k.action.t / KLAYMAN.actionTime);
     const turn = { side: 0, front: Math.PI / 2, back: -Math.PI / 2 }[k.facing];
     const { ctx } = this;
+    const dot = (x, y) => ctx.fillRect(Math.round(x / 2) * 2 - 1, Math.round(y / 2) * 2 - 1, 2, 2);
+    const fade = (a) => Math.ceil(Math.max(0, a) * 4) / 4;     // alpha in steps, not a smooth fade
     ctx.save();
-    ctx.translate(k.x, k.y - 18);
+    ctx.translate(Math.round(k.x), Math.round(k.y - 18));
     if (k.facing === 'side' && k.flip) ctx.scale(-1, 1);
     ctx.rotate(turn);
-    ctx.lineWidth = 2;
+    // The swirl round the arm.
     for (let i = 0; i < 3; i++) {
-      const r = 9 + i * 5;
-      const end = 0.35 - i * 0.12;
-      const sweep = 0.4 + 1.3 * Math.min(1, p * 1.8);
-      ctx.strokeStyle = `rgba(255, 255, 255, ${(1 - p) * (0.9 - i * 0.22)})`;
-      ctx.beginPath();
-      ctx.arc(0, 0, r, end - sweep, end);
-      ctx.stroke();
+      const r = 10 + i * 6;
+      const end = 0.4 - i * 0.14;
+      const sweep = 0.5 + 1.4 * Math.min(1, p * 1.8);
+      ctx.fillStyle = i === 1 ? '#d8f3ff' : '#ffffff';
+      ctx.globalAlpha = fade((1 - p) * (1 - i * 0.22));
+      for (let a = end - sweep; a <= end; a += 2.2 / r) dot(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    // Streaks flying forward.
+    ctx.fillStyle = '#ffffff';
+    for (const [lane, len] of [[-7, 8], [0, 14], [7, 8]]) {
+      const from = 12 + p * 34;
+      ctx.globalAlpha = fade(1 - p * 0.9);
+      for (let d = 0; d < len * (1 - p * 0.5); d += 2) dot(from + d, lane);
     }
     ctx.restore();
   }
 
-  /** Mushroom spores: a ring rolling out across the soil. */
+  /** A ring rolling out across the soil (spores, a heal, a revived sprout).
+   *  Its edge is where its push stops. */
   drawRings(dt) {
     const { ctx } = this;
     for (const r of this.rings) {
       r.t += dt;
       const k = r.t / r.max;
-      const radius = 30 + k * 300;
+      const radius = 30 + k * (r.reach - 30);
       ctx.save();
       ctx.globalAlpha = Math.max(0, 1 - k);
       ctx.lineWidth = 6;
-      ctx.strokeStyle = '#b06ed6';
+      ctx.strokeStyle = r.color;
       ctx.beginPath();
-      ctx.ellipse(r.x, r.y, radius, radius * 0.6, 0, 0, Math.PI * 2);
+      ctx.ellipse(r.x, r.y, radius, radius * RING_SQUASH, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.lineWidth = 2;
-      ctx.strokeStyle = '#f0d4ff';
+      ctx.strokeStyle = r.light;
       ctx.beginPath();
-      ctx.ellipse(r.x, r.y, radius * 0.92, radius * 0.6 * 0.92, 0, 0, Math.PI * 2);
+      ctx.ellipse(r.x, r.y, radius * 0.92, radius * RING_SQUASH * 0.92, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
     this.rings = this.rings.filter((r) => r.t < r.max);
+  }
+
+  /** Four-point stars that grow and shrink: the sunflower's bling. */
+  drawSparkles(dt) {
+    const { ctx } = this;
+    for (const s of this.sparkles) {
+      s.t += dt;
+      if (s.t < 0) continue;
+      const k = s.t / s.max;
+      const arm = Math.round((s.size * Math.sin(Math.PI * Math.min(1, k))) / 2) * 2;
+      const x = Math.round(s.x / 2) * 2;
+      const y = Math.round(s.y / 2) * 2;
+      ctx.fillStyle = GOLD;
+      ctx.fillRect(x - arm, y - 1, arm * 2 + 2, 2);
+      ctx.fillRect(x, y - arm - 1, 2, arm * 2 + 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x - 1, y - 2, 4, 4);
+    }
+    this.sparkles = this.sparkles.filter((s) => s.t < s.max);
+  }
+
+  /** Hearts drifting up from the sprout and fading. */
+  drawFloaters(dt) {
+    for (const f of this.floaters) {
+      f.t += dt;
+      const k = f.t / f.max;
+      const lift = Math.round((1 - (1 - k) ** 2) * 36);
+      const alpha = k < 0.6 ? 1 : 1 - (k - 0.6) / 0.4;
+      const img = f.img;
+      this.sprite(img, 0, 0, img.width, img.height, f.x, f.y - lift, img.width / 2, img.height / 2, {
+        scale: S * 1.5, alpha: Math.max(0, alpha),
+      });
+    }
+    this.floaters = this.floaters.filter((f) => f.t < f.max);
+  }
+
+  // ------------------------------------------------------------- glasses
+
+  /** What the glasses add to the pot: where the next bacteria and item are
+   *  about to appear, and how long the item on the ground will wait. */
+  drawGuides(game) {
+    if (game.nextBacteria) {
+      const k = 1 - Math.min(1, game.untilSpawn / LOOKAHEAD);
+      this.target(game.nextBacteria, k, false);
+    }
+    if (game.nextItem) {
+      const k = 1 - Math.min(1, game.itemTimer / LOOKAHEAD);
+      this.target(game.nextItem, k, true);
+    }
+    const item = game.item;
+    if (item?.landed && !(item.blinking && Math.floor(item.t * 8) % 2 === 0)) {
+      this.label(String(Math.ceil(item.life)), item.x, item.y - 46, 13);
+    }
+  }
+
+  /** A dotted ring on the soil that closes in as the moment comes. Items
+   *  get a diamond in the middle; bacteria a dot. */
+  target(p, k, isItem) {
+    const { ctx } = this;
+    const r = Math.round(26 - 12 * k);
+    const blink = !this.calm && k > 0.8 && Math.floor(this.time * 14) % 2 === 0;
+    ctx.save();
+    ctx.globalAlpha = blink ? 0.4 : 0.9;
+    for (const [color, grow] of [[VISOR_INK, 2], [VISOR, 0]]) {
+      ctx.fillStyle = color;
+      const size = 2 + grow;
+      const n = 16;
+      for (let i = 0; i < n; i++) {
+        if (i % 4 === 3) continue;               // gaps, like a sight
+        const a = (i / n) * Math.PI * 2 + this.time * 1.5;
+        const x = Math.round((p.x + Math.cos(a) * r) / 2) * 2;
+        const y = Math.round((p.y + Math.sin(a) * r * RING_SQUASH) / 2) * 2;
+        ctx.fillRect(x - size / 2, y - size / 2, size, size);
+      }
+      const cx = Math.round(p.x / 2) * 2;
+      const cy = Math.round(p.y / 2) * 2;
+      if (isItem) {
+        for (const [dx, dy] of [[0, -4], [-2, -2], [2, -2], [-4, 0], [4, 0], [-2, 2], [2, 2], [0, 4], [0, 0]]) {
+          ctx.fillRect(cx + dx - size / 2, cy + dy - 8 - size / 2, size, size);
+        }
+      } else {
+        ctx.fillRect(cx - size / 2 - 1, cy - size / 2 - 1, size + 2, size + 2);
+      }
+    }
+    ctx.restore();
+  }
+
+  /** A number in the glasses' blue. */
+  label(text, x, y, px) {
+    const { ctx } = this;
+    ctx.save();
+    ctx.font = `700 ${px}px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = VISOR_INK;
+    ctx.strokeText(text, Math.round(x), Math.round(y));
+    ctx.fillStyle = VISOR;
+    ctx.fillText(text, Math.round(x), Math.round(y));
+    ctx.restore();
   }
 
   drawFrost(left) {

@@ -1,9 +1,11 @@
 // Ported from bacteria.gd. Crawls to the sprout; each dirt hit adds a layer and
 // stops it. Left alone, it sheds one layer every decay_time and crawls again.
+// With no sprout in sight (a closed lily) it wanders, keeping away from it.
 import { BACTERIA, KNOCK_TIME } from './config.js';
 
 export const BREAK_TIME = 0.4;   // green splat animation
 export const ABSORB_TIME = 0.3;  // sucked into the sprout or into Klayman
+const WANDER_CLEAR = 90;         // a wandering bacteria turns away inside this
 
 export class Bacteria {
   constructor(x, y, speed = BACTERIA.speed) {
@@ -54,15 +56,25 @@ export class Bacteria {
     this.fx = 0;
   }
 
-  /** Mushroom spores: slide `distance` along (dx, dy), then crawl slowly. */
-  knockBack(dx, dy, distance, slowTime, slowFactor) {
+  /** Spores or a revived sprout: slide `distance` along (dx, dy), then maybe crawl slowly. */
+  knockBack(dx, dy, distance, slowTime = 0, slowFactor = 1) {
     const d = Math.hypot(dx, dy) || 1;
     const v = (2 * distance) / KNOCK_TIME;   // easing out to a stop
     this.kx = (dx / d) * v;
     this.ky = (dy / d) * v;
     this.knock = KNOCK_TIME;
-    this.slow = slowTime;
-    this.slowFactor = slowFactor;
+    if (slowTime > 0) this.slowDown(slowTime, slowFactor);
+  }
+
+  /** Crawls at `factor` speed for `time` seconds. The stronger slow wins.
+   *  Returns true if it wasn't slowed before. */
+  slowDown(time, factor) {
+    const fresh = this.slow <= 0;
+    if (fresh || factor <= this.slowFactor) {
+      this.slowFactor = factor;
+      this.slow = Math.max(this.slow, time);
+    }
+    return fresh;
   }
 
   get slowed() { return this.slow > 0; }
@@ -73,7 +85,27 @@ export class Bacteria {
     this.absorbTo = { x: target.x, y: target.y };
   }
 
-  update(dt, target, frozen) {
+  /** Meanders on a heading that drifts by itself; near `avoid`, turns away. */
+  wander(dt, speed, avoid) {
+    const s = this.wobble;
+    let a = s * 3 + 1.7 * Math.sin(this.t * 0.8 + s * 2) + 1.1 * Math.sin(this.t * 0.31 + s);
+    let ux = Math.cos(a), uy = Math.sin(a);
+    if (avoid) {
+      const ax = this.x - avoid.x, ay = this.y - avoid.y;
+      const d = Math.hypot(ax, ay) || 1;
+      const k = Math.max(0, 1 - d / WANDER_CLEAR);   // 1 right at it, 0 far away
+      ux += (ax / d) * k * 2;
+      uy += (ay / d) * k * 2;
+      const n = Math.hypot(ux, uy) || 1;
+      ux /= n; uy /= n;
+    }
+    this.x += ux * speed * dt;
+    this.y += uy * speed * dt;
+  }
+
+  /** `target` is the sprout, or null when it can't be seen; then the
+   *  bacteria wanders and steers clear of `avoid`. */
+  update(dt, target, frozen, avoid = null) {
     if (this.state === 'breaking') {
       this.fx += dt;
       if (this.fx >= BREAK_TIME) this.dead = true;
@@ -102,6 +134,10 @@ export class Bacteria {
       if (this.slow > 0) {
         speed *= this.slowFactor;
         this.slow = Math.max(0, this.slow - dt);
+      }
+      if (!target) {
+        this.wander(dt, speed, avoid);
+        return;
       }
       const dx = target.x - this.x;
       const dy = target.y - this.y;

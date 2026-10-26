@@ -16,7 +16,8 @@ export const KLAYMAN = {
   speed: 72 * FEEL,          // klayman.gd SPEED
   attackCooldown: 0.3,       // klayman.gd ATTACK_COOLDOWN
   radius: 11,
-  reach: 26,                 // how far in front a dirtball can be pushed
+  pushGap: 6,                // a dirtball this close to touching him can be pushed...
+  pushCone: 0.64,            // ...if it's in front of him (within about 50 degrees)
   actionTime: 0.2,           // how long the throw / push pose is shown
   skillLevel: 7,             // from here, dirt thrown from afar breaks a dirtball
 };
@@ -31,7 +32,7 @@ export const SHOT = {
 };
 
 export const BACTERIA = {
-  speed: 16,                 // bacteria.gd speed was 24; slowed down
+  speed: 16 * 1.05,          // bacteria.gd speed was 24; slowed to 16, then 5% back up
   radius: 13,
   maxDirt: 4,                // hits to make a dirtball (bacteria.gd had 7)
   decayTime: 2.5,            // seconds to shed one layer (bacteria.gd had 1.2)
@@ -63,10 +64,14 @@ export const LEVELS = {
   extraPerLevel: 2,
   spawnEvery: 1.5,
   spawnEveryStep: 0.08,      // spawns come a little quicker each level...
-  minSpawnEvery: 0.7,        // ...but never faster than this
+  minSpawnEvery: 0.7,        // ...but never faster than this...
+  spawnRate: 1.1,            // ...and every level spawns 10% more often than that
   bannerTime: 1.8,
   clearDelay: 1.2,
 };
+
+// The glasses show where the next bacteria or item appears this long before it does.
+export const LOOKAHEAD = 1.5;
 
 export const ITEMS = {
   unlockLevel: 3,
@@ -85,26 +90,27 @@ export const SCORE = {
   smash: 300,                // a rolling dirtball smashes a bacteria
 };
 
-// Coins, counted in K. A 1K coin turns up somewhere on the soil every 27
+// Coins, counted in K. A 1K coin turns up somewhere on the soil every 30
 // seconds. A killed bacteria (its dirtball breaks, or a rolling dirtball
-// smashes it) drops a 5K coin 5% of the time. Every coin lasts 15 seconds.
+// smashes it) drops a 5K coin 4.5% of the time. Every coin lasts 18 seconds.
 export const COINS = {
-  every: 27,
+  every: 30,                 // was 27: 10% fewer
   value: 1,
-  lifetime: 15,
-  dropChance: 0.05,
+  lifetime: 18,              // was 15: 20% longer
+  dropChance: 0.045,         // was 0.05: 10% fewer
   dropValue: 5,
   pickupRadius: 22,
   blinkFrom: 3,              // blinks for its last 3 seconds, like items
 };
 
-// Tools. Bought once, kept forever; Klayman wears one per game.
-// Numbers are multipliers on his own: 1.1 means 10% more.
+// Tools. Bought once, kept forever; Klayman wears one per game (two with
+// the second tool slot). Numbers are multipliers on his own: 1.15 means 15% more.
 export const TOOLS = {
-  shoes: { price: 29, speed: 1.1 },                    // and he walks through the sprout
-  gloves: { price: 29, fireRate: 1.1, range: 1.1 },
-  coat: { price: 49 },                                 // bacteria can't get into him
-  gun: { price: 99, fireRate: 1.2, range: 1.2 },      // shots lock on to a bacteria
+  shoes: { price: 29, speed: 1.15 },                   // and he walks through the sprout
+  gloves: { price: 29, fireRate: 1.15, range: 1.15 },
+  coat: { price: 49, slowTime: 5, slowFactor: 0.85 },  // bacteria can't get in; a touch slows them
+  glasses: { price: 49 },                              // arrows, timers, counts, spawn warnings
+  gun: { price: 99, fireRate: 1.05, range: 1.05, speed: 1.05 }, // shots lock on to a bacteria
 };
 
 // The dirt gun locks on to the bacteria closest to Klayman (within reach of
@@ -116,18 +122,54 @@ export const GUN = {
 // Sprouts. The plain sprout is free; the others are bought once.
 export const SPROUTS = {
   sprout: { price: 0 },
-  sunflower: { price: 149, itemEvery: 20 },
-  corn: { price: 199, lives: 6, maxLives: 6 },
-  rose: { price: 249, healEvery: 30 },
+  sunflower: {
+    price: 149,
+    itemEvery: 35,           // a special item pops out of the flower...
+    drop: { min: 45, max: 110 }, // ...and lands this far away
+  },
+  rose: { price: 199, lives: 4, heal: { every: 15, amount: 1 } },
+  corn: {
+    price: 249,
+    lives: 6,
+    maxLives: 11,
+    shield: { every: 60, time: 10 }, // leaves close over it: bacteria can't get in
+  },
+  lilies: {
+    price: 249,
+    hide: { every: 60, time: 10 },   // it closes; bacteria lose sight of it and wander
+  },
   mushroom: {
     price: 299,
-    pulseEvery: 40,          // spores push crawling bacteria away...
-    push: 120,               // ...this far (not in the brief)...
-    slowTime: 4,             // ...and slow them down for 4 seconds...
-    slowFactor: 0.5,         // ...to half speed (not in the brief)
-    growEvery: 80,           // +1 heart, and a bigger mushroom...
+    spores: {
+      every: 25,             // spores push crawling bacteria away...
+      push: 60,              // ...this far...
+      reach: 248,            // ...if they're inside the ring (25% smaller than the old 330)...
+      slowTime: 4,           // ...and slow them down for 4 seconds...
+      slowFactor: 0.5,       // ...to half speed
+    },
+    growEvery: 50,           // +1 heart, and a bigger mushroom...
     maxLives: 9,             // ...up to 9
+    heal: { every: 30, amount: 0.5 },
   },
 };
 
+// Slots: bought once. A second tool to wear, and a backup sprout.
+export const SLOTS = {
+  toolSlot: { price: 499 },
+  sproutSlot: { price: 999 },
+};
+
+// Used once: bought, then spent the first time they're used. You hold one
+// of each at a time.
+export const ONCE = {
+  skip3: { price: 29, level: 3 },
+  skip7: { price: 74, level: 7 },
+  skip10: { price: 99, level: 10 },
+  revive: { price: 49 },     // a lost sprout comes back with half its hearts
+};
+
+// A revived sprout (or a backup sprout taking over) clears a little room.
+export const REVIVE = { reach: 170, push: 80 };
+
 export const KNOCK_TIME = 0.35; // how long a spore push takes
+export const ITEM_FLIGHT = 0.6; // a sunflower's item takes this long to land

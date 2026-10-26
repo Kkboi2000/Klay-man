@@ -1,7 +1,10 @@
 // Loads the sprite sheets and describes where each animation lives on them.
-// Also dresses Klayman for each tool and builds the bought sprouts, coins and
+// Also dresses Klayman in his tools and builds the bought sprouts, coins and
 // icons from the pixel art in art.js.
-import { SPROUT_PALETTE, SPROUT_ROWS, SPROUT_SWAY, ART_PALETTE, TOOL_ICON_ROWS, COIN_ROWS, GUN_ART } from './art.js';
+import {
+  SPROUT_PALETTE, SPROUT_ROWS, SHUT_ROWS, SPROUT_SWAY, ART_PALETTE, TOOL_ICON_ROWS, SHOP_ICON_ROWS,
+  COIN_ROWS, GUN_ART, GUN_ART_SMALL,
+} from './art.js';
 
 /** In the single-file preview build, assets arrive inline as data URLs. */
 export function assetUrl(path) {
@@ -181,11 +184,17 @@ const HEART_ROWS = [
   '....k....',
 ];
 
-export function heartArt(full) {
-  const pal = full
-    ? { k: '#2b0d0d', r: '#d9483b', h: '#ff9a8a' }
-    : { k: '#2b0d0d', r: 'rgba(36,25,13,0.55)', h: 'rgba(36,25,13,0.55)' };
-  return pixelArt(HEART_ROWS, pal);
+/** A heart: 'full', 'half' (the left half filled) or 'empty'. */
+export function heartArt(kind) {
+  const full = { k: '#2b0d0d', r: '#d9483b', h: '#ff9a8a' };
+  const empty = { k: '#2b0d0d', r: 'rgba(36,25,13,0.55)', h: 'rgba(36,25,13,0.55)' };
+  if (kind !== 'half') return pixelArt(HEART_ROWS, kind === 'full' ? full : empty);
+  const mid = Math.floor(HEART_ROWS[0].length / 2);
+  const left = HEART_ROWS.map((row) => [...row].map((ch, x) => (x <= mid ? ch : '.')).join(''));
+  const right = HEART_ROWS.map((row) => [...row].map((ch, x) => (x > mid ? ch : '.')).join(''));
+  const c = pixelArt(right, empty);
+  c.getContext('2d').drawImage(pixelArt(left, full), 0, 0);
+  return c;
 }
 
 export function iconArt(name) {
@@ -245,7 +254,7 @@ function groups(roles, role, size) {
   return out;
 }
 
-/** For one 48px frame: which pixels are hands, shirt and feet. */
+/** For one 48px frame: which pixels are hands, shirt, feet and eyes. */
 function readFrame(img, fx, fy) {
   const size = KLAY.size;
   const roles = new Uint8Array(size * size);
@@ -281,14 +290,55 @@ function readFrame(img, fx, fy) {
     const ys = g.px.map((i) => Math.floor(i / size));
     return { x: Math.max(...xs), y: Math.round(ys.reduce((a, b) => a + b, 0) / ys.length) };
   });
-  return { hands: hands.flatMap((g) => g.px), handSpots, shirt, feet, soles, lum };
+  const eyes = [];
+  roles.forEach((r, i) => { if (r === ROLE.eye) eyes.push(i); });
+  return { hands: hands.flatMap((g) => g.px), handSpots, shirt, feet, soles, eyes, roles, lum };
 }
 
 const DRESS = {
   shoes: { feet: ['#d9483b', '#d9483b'], soles: '#fff4e3' },
   gloves: { hands: ['#f6b545', '#c98420'] },
   coat: { shirt: ['#eef2f5', '#9fb4c4'] },
+  glasses: { lens: '#7fd8f5', shine: '#e6fbff', strap: '#1f5873' },
 };
+// The tools painted onto him. The gun is drawn in his hand instead.
+const DRESSABLE = Object.keys(DRESS);
+
+/** Digital glasses: a light blue screen across his eyes, from one eye to
+ *  the other and a pixel past each. From behind, the strap. */
+function glassesOn(f, back) {
+  const size = KLAY.size;
+  const out = [];
+  if (back) {
+    // Seen from behind: a strap across the hair, at the eyes' height.
+    if (back.eyeY === null) return out;
+    for (let x = 0; x < size; x++) {
+      const i = back.eyeY * size + x;
+      if (f.roles[i] === ROLE.dark) out.push([i, 'strap']);
+    }
+    return out;
+  }
+  if (!f.eyes.length) return out;
+  const xs = f.eyes.map((i) => i % size);
+  const ys = f.eyes.map((i) => Math.floor(i / size));
+  const [x0, x1] = [Math.min(...xs) - 1, Math.max(...xs) + 1];
+  const [y0, y1] = [Math.min(...ys), Math.max(...ys)];
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const i = y * size + x;
+      const r = f.roles[i];
+      if (r === ROLE.empty || r === ROLE.outline) continue;
+      out.push([i, r === ROLE.eye && y === y0 ? 'shine' : 'lens']);
+    }
+  }
+  return out;
+}
+
+/** Where his eyes sit in a front-facing frame, so the back frames get a strap. */
+function eyeRow(f) {
+  if (!f.eyes.length) return null;
+  return Math.min(...f.eyes.map((i) => Math.floor(i / KLAY.size)));
+}
 
 function hex(c) { return [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)); }
 
@@ -306,9 +356,8 @@ function readKlay(img) {
   return { data, frames };
 }
 
-/** A copy of klay.png with one tool painted onto every frame. */
-function dressKlay(img, info, tool) {
-  const look = DRESS[tool];
+/** A copy of klay.png with these tools painted onto every frame. */
+function dressKlay(img, info, tools) {
   const c = makeCanvas(img.width, img.height);
   const g = c.getContext('2d');
   const out = new ImageData(new Uint8ClampedArray(info.data.data), img.width, img.height);
@@ -322,12 +371,20 @@ function dressKlay(img, info, tool) {
   info.frames.forEach((cols, row) => cols.forEach((f, col) => {
     const fx = col * KLAY.size;
     const fy = row * KLAY.size;
-    // Lighter pixels of the original stay lighter, so the shading survives.
-    if (look.hands) for (const i of f.hands) paint(fx, fy, i, look.hands[f.lum[i] >= 460 ? 0 : 1]);
-    if (look.shirt) for (const i of f.shirt) paint(fx, fy, i, look.shirt[f.lum[i] >= 500 ? 1 : 0]);
-    if (look.feet) {
-      for (const i of f.feet) paint(fx, fy, i, look.feet[0]);
-      for (const i of f.soles) paint(fx, fy, i, look.soles);
+    for (const tool of tools) {
+      const look = DRESS[tool];
+      // Lighter pixels of the original stay lighter, so the shading survives.
+      if (look.hands) for (const i of f.hands) paint(fx, fy, i, look.hands[f.lum[i] >= 460 ? 0 : 1]);
+      if (look.shirt) for (const i of f.shirt) paint(fx, fy, i, look.shirt[f.lum[i] >= 500 ? 1 : 0]);
+      if (look.feet) {
+        for (const i of f.feet) paint(fx, fy, i, look.feet[0]);
+        for (const i of f.soles) paint(fx, fy, i, look.soles);
+      }
+      if (look.lens) {
+        // Rows 2, 5 and 8 face away; their front-facing twins are rows 0, 3, 6.
+        const back = row % 3 === 2 ? { eyeY: eyeRow(info.frames[row - 2][col]) } : null;
+        for (const [i, part] of glassesOn(f, back)) paint(fx, fy, i, look[part]);
+      }
     }
   }));
   g.putImageData(out, 0, 0);
@@ -360,11 +417,16 @@ function sproutLooks(sheet) {
     sheet,
     hurt: tinted(sheet, 'rgba(255, 70, 50, 0.7)'),
     wilted: tinted(sheet, 'rgba(70, 45, 20, 0.85)'),
+    glow: tinted(sheet, 'rgba(255, 248, 196, 0.85)'),   // a sunflower's bling
   };
 }
 
+/** The open sprout's rows with a closed top: corn's leaves, a lily's bud. */
+const shutRows = (name) => SHUT_ROWS[name].concat(SPROUT_ROWS[name].slice(SHUT_ROWS[name].length));
+
 export const coinArt = () => pixelArt(COIN_ROWS, ART_PALETTE);
 export const toolIconArt = (id) => pixelArt(TOOL_ICON_ROWS[id], ART_PALETTE);
+export const shopIconArt = (id) => pixelArt(SHOP_ICON_ROWS[id], ART_PALETTE);
 
 export async function loadSprites() {
   const [bg, klay, bac, tree] = await Promise.all([
@@ -374,32 +436,42 @@ export async function loadSprites() {
     loadImage('tree.png'),
   ]);
   const info = readKlay(klay);
-  const dressed = { none: klay };
-  for (const tool of ['shoes', 'gloves', 'coat']) dressed[tool] = dressKlay(klay, info, tool);
-  const klayFor = {};
-  for (const [tool, sheet] of Object.entries(dressed)) {
-    klayFor[tool] = { sheet, green: tinted(sheet, 'rgba(96, 196, 72, 0.55)') };
-  }
-  klayFor.gun = klayFor.none;           // the gun is drawn in his hand
+  // Klayman in any mix of tools, painted the first time it's needed.
+  const looks = new Map();
+  const lookFor = (tools = []) => {
+    const wear = DRESSABLE.filter((t) => tools.includes(t));
+    const key = wear.join('+') || 'none';
+    if (!looks.has(key)) {
+      const sheet = wear.length ? dressKlay(klay, info, wear) : klay;
+      looks.set(key, { sheet, green: tinted(sheet, 'rgba(96, 196, 72, 0.55)') });
+    }
+    return looks.get(key);
+  };
   const sprouts = { sprout: sproutLooks(tree) };
-  for (const [name, rows] of Object.entries(SPROUT_ROWS)) sprouts[name] = sproutLooks(sproutSheet(rows, SPROUT_SWAY[name]));
-  const gun = {};
-  for (const [facing, art] of Object.entries(GUN_ART)) gun[facing] = { ...art, img: pixelArt(art.rows, ART_PALETTE) };
+  for (const [name, rows] of Object.entries(SPROUT_ROWS)) {
+    sprouts[name] = sproutLooks(sproutSheet(rows, SPROUT_SWAY[name]));
+    if (SHUT_ROWS[name]) sprouts[name].shut = sproutLooks(sproutSheet(shutRows(name), SPROUT_SWAY[name]));
+  }
+  const gunFrom = (arts) => Object.fromEntries(
+    Object.entries(arts).map(([facing, art]) => [facing, { ...art, img: pixelArt(art.rows, ART_PALETTE) }]),
+  );
 
   return {
     bg,
     klay,
-    klayGreen: tinted(klay, 'rgba(96, 196, 72, 0.55)'),
-    klayFor,
+    lookFor,
     gunSpots: gunSpots(info),
-    gun,
+    gun: gunFrom(GUN_ART),
+    gunSmall: gunFrom(GUN_ART_SMALL),
     sprouts,
     coin: coinArt(),
     toolIcons: Object.fromEntries(Object.keys(TOOL_ICON_ROWS).map((id) => [id, toolIconArt(id)])),
+    shopIcons: Object.fromEntries(Object.keys(SHOP_ICON_ROWS).map((id) => [id, shopIconArt(id)])),
     bacSlow: tinted(bac, 'rgba(176, 110, 214, 0.5)'),
     bac,
     bacFrozen: tinted(bac, 'rgba(150, 215, 255, 0.55)'),
-    heart: heartArt(true),
+    heart: heartArt('full'),
+    halfHeart: heartArt('half'),
     icons: {
       plus: iconArt('plus'),
       bag: iconArt('bag'),

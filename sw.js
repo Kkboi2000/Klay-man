@@ -1,6 +1,6 @@
 // Keeps Klayman playable offline. When you change any file, bump VERSION so
 // phones fetch the new build the next time the game is opened.
-const VERSION = 'klayman-v13';
+const VERSION = 'klayman-v14';
 
 const FILES = [
   './',
@@ -24,6 +24,8 @@ const FILES = [
   './gear.js',
   './setup.js',
   './art.js',
+  './titleballs.js',
+  './orientation.js',
   './bg.png',
   './klay.png',
   './bacteiras.png',

@@ -24,43 +24,64 @@ Every file sits in one folder, with no subfolders, so uploading is simple.
 ### Updating
 
 Upload the changed files the same way. Also open `sw.js` and bump `VERSION`
-(`klayman-v13` → `klayman-v14`): phones keep an offline copy, and this is how
+(`klayman-v14` → `klayman-v15`): phones keep an offline copy, and this is how
 they know to fetch the new one.
 
 ## Pages
 
-1. **Title:** Klayman’s face. Tap **Play**.
-2. **Setup:** pick a tool and a sprout, switch **Auto throw**, then **Start**.
-   The window at the top shows Klayman dressed for the game.
+1. **Title:** Klayman’s face, over faded dirtballs rolling in from every side
+   (two that meet break). Tap **Play**.
+2. **Setup:** pick tools and a sprout, buy things, switch **Auto throw**, then
+   **Start**. The window at the top shows Klayman dressed for the game.
 3. **Game:** when the sprout is gone you see your score and the coins you
-   picked up, then **Play again** or go back to **Setup**. Pause has **Setup** too.
+   picked up. With a Revive or a backup sprout you can carry on from there;
+   otherwise **Play again** or go back to **Setup**. Pause has **Setup** too.
+
+The title and setup pages open upright and a game opens sideways; turn the
+phone and the screen follows. Only the installed app on Android can turn the
+screen by itself. On an iPhone, or in a browser tab, the screen follows the
+phone, and every page works either way.
 
 ## Coins and the shop
 
-Coins are counted in K. A 1K coin appears somewhere on the soil every 27
-seconds. Each bacteria you kill has a 5% chance to drop a 5K coin. Every coin
-lasts 15 seconds and blinks for its last 3; arrows at the screen edge point to
+Coins are counted in K. A 1K coin appears somewhere on the soil every 30
+seconds. Each bacteria you kill has a 4.5% chance to drop a 5K coin. Every coin
+lasts 18 seconds and blinks for its last 3; arrows at the screen edge point to
 coins you can’t see. Coins are saved the moment you pick them up.
 
 On the setup page, tap something you don’t own, then tap again to buy it.
-You keep it for good. Klayman wears one tool per game.
 
 | Tool | Price | What it does |
 | --- | --- | --- |
-| Shoes | 29K | 10% faster; walks through the sprout |
-| Gloves | 29K | Throws 10% faster and 10% farther, with a gust at the arm |
-| Lab coat | 49K | Bacteria can’t get into Klayman |
-| Dirt gun | 99K | Locks on to the closest bacteria (red brackets) and keeps Klayman facing it; shots hit from any angle; 20% faster and farther; gun sound |
+| Shoes | 29K | 15% faster; walks through the sprout |
+| Gloves | 29K | Throws 15% faster and 15% farther, with a pixel gust at the arm |
+| Lab coat | 49K | Bacteria can’t get into Klayman; one that touches him crawls 15% slower for 5 s |
+| Glasses | 49K | A light-blue visor: arrows to bacteria and items off-screen, an item’s seconds left, bacteria left this level, and a ring where the next bacteria or item appears, 1.5 s early |
+| Dirt gun | 99K | Locks on to the closest bacteria (red brackets) and keeps Klayman facing it; throws, range and walking 5% up |
 
 | Sprout | Price | What it does |
 | --- | --- | --- |
-| Sprout | free | 3 hearts, up to 7 with water drops (so can sunflower and rose) |
-| Sunflower | 149K | Special items every 20 seconds instead of 60 |
-| Corn | 199K | Starts with 6 hearts, and stays at 6 |
-| Rose | 249K | Heals 1 heart every 30 seconds |
-| Mushroom | 299K | Every 40 s, spores push crawling bacteria back and slow them for 4 s; every 80 s it grows 1 heart, up to 9 |
+| Sprout | free | 3 hearts, up to 7 with water drops (so can sunflower, rose and lilies) |
+| Sunflower | 149K | Every 35 s a special item pops out of the flower and lands nearby |
+| Rose | 199K | Starts with 4 hearts; heals 1 heart every 15 s |
+| Corn | 249K | 6 hearts, up to 11; every 60 s its leaves close for 10 s and bacteria can’t get in |
+| Lilies | 249K | Every 60 s it closes for 10 s; bacteria lose sight of it and wander |
+| Mushroom | 299K | Every 25 s spores push nearby bacteria 60 back and slow them; heals half a heart every 30 s; grows 1 heart every 50 s, up to 9 |
 
-All these numbers are in `config.js` (`COINS`, `TOOLS`, `SPROUTS`).
+| Slot | Price | What it does |
+| --- | --- | --- |
+| 2nd tool slot | 499K | Wear two tools. Tap a tool to put it on or take it off; a third swaps out the oldest |
+| 2nd sprout slot | 999K | Pick a 1st and a 2nd sprout (the **1st / 2nd** buttons). When the 1st is lost, carry on with the 2nd |
+
+| Used once | Price | What it does |
+| --- | --- | --- |
+| Skip to level 3 / 7 / 10 | 29K / 74K / 99K | The next game starts there. Tap it to pick or unpick it; it’s spent when the game starts |
+| Revive | 49K | When the sprout is lost, bring it back with half the hearts it could hold (5 → 2.5) |
+
+You hold one of each used-once item at a time, and can buy it again after
+using it. Tools, sprouts and slots are yours for good.
+
+All these numbers are in `config.js` (`COINS`, `TOOLS`, `SPROUTS`, `SLOTS`, `ONCE`).
 
 ## Admin mode (for testing)
 
@@ -79,42 +100,51 @@ Admin mode stays on (even after closing the app) until you leave it.
 ## Controls
 
 - **Phone:** joystick on the left, throw on the right (hold to keep throwing).
-  The **Auto throw** switch (on the setup page, and under the throw button)
-  keeps Klayman throwing on his own; it never pushes dirtballs, so tap the throw button for that.
-- **Computer:** arrow keys or WASD to move, Space to throw, P to pause.
+  Right up against a dirtball and facing it, the same button pushes it. The
+  **Auto throw** switch (on the setup page, and in the bottom-right corner in a
+  game) keeps Klayman throwing, and pushes a dirtball he walks into.
+- **Computer:** arrow keys or WASD to move, Space to throw, K to push, P to pause.
 
-Facing a dirtball up close, the throw button pushes it instead. From level 7,
-dirt thrown at a dirtball from a distance breaks it.
+A push only works when Klayman is touching the dirtball. From level 7, dirt
+thrown at a dirtball breaks it.
+
+Bacteria are 5% faster than before and every level spawns them 10% more often
+(`BACTERIA.speed`, `LEVELS.spawnRate`).
 
 ## Changing how it feels
 
 Every gameplay number is in `config.js`, with your original Godot values
 noted. `FEEL` scales Klayman’s speed, his shots and dirtballs (1 = your exact
 Godot numbers); bacteria use your original speed. `POT_SCALE` sets how big the
-pot is: the camera follows Klayman, so you only see part of it, and
-arrows at the screen edge point to bacteria, items and the sprout off-screen.
+pot is: the camera follows Klayman, so you only see part of it. Arrows at the
+screen edge point to the sprout and coins off-screen (and, with the glasses,
+bacteria and items).
 
 ## Files
 
 | File | What it does |
 | --- | --- |
 | `klayman.js`, `bacteria.js`, `dirtball.js`, `dirtshot.js` | Ported from your `.gd` scripts |
-| `items.js` | The four special items, and coins |
-| `gear.js` | Tools and sprouts: names, what they change, and the saved wallet |
+| `items.js` | The four special items (a sunflower’s fly out of it), and coins |
+| `gear.js` | Tools, sprouts, slots and used-once items: names, what they change, and the saved wallet |
 | `setup.js` | The setup page and the title face |
-| `art.js` | Pixel art drawn in code: sprouts, tool icons, coin, dirt gun |
+| `titleballs.js` | The dirtballs rolling behind the title |
+| `orientation.js` | Which way round the screen opens, and following the phone after that |
+| `art.js` | Pixel art drawn in code: sprouts (open and closed), tool and shop icons, coin, dirt guns |
 | `game.js` | Rules: levels, spawning, collisions, score |
 | `world.js` | The pot: soil edge, sprout spot, where items appear |
-| `render.js`, `sprites.js` | Drawing and sprite-sheet frames; shoes, gloves and coat are painted onto Klayman’s frames when the game loads |
+| `render.js`, `sprites.js` | Drawing and sprite-sheet frames; shoes, gloves, coat and glasses are painted onto Klayman’s frames the first time they’re worn |
 | `input.js`, `sound.js`, `ui.js`, `main.js` | Controls, sound, screens, start-up |
 | `sw.js`, `manifest.webmanifest` | Offline play and home-screen install |
 | `klay-digits.woff2`, `klay-digits-bold.woff2` | The numbers 0–9, drawn for this game so 2 and 5 never read as 8 and S |
 | `make-digits.py` | Builds those two files: edit a digit’s pixels there and run it (`pip install fonttools brotli`) |
-| `game.test.js`, `gear.test.js` | Rule checks: run `npm test` (needs Node 18+) |
+| `game.test.js`, `gear.test.js`, `orientation.test.js` | Rule checks: run `npm test` (needs Node 18+) |
 
 The sound effects were trimmed to remove the silence at the start of each
-file, so they play the moment something happens. The gun, coin and shop
-sounds are made in code (`sound.js`), so there are no new sound files.
+file, so they play the moment something happens. The gun, coin, shop and
+sunflower sounds are made in code (`sound.js`), so there are no new sound files.
+
+The app icon is Klayman’s head, cut from the same frame as the title face.
 
 Font: Pixelify Sans, SIL Open Font License (`OFL.txt`). The digits are the
 game’s own (Klay Digits), on Pixelify’s pixel grid.

@@ -1,10 +1,10 @@
-// Pixel art drawn in code: the four bought sprouts, the tool icons, the coin
-// and the dirt gun. One character per pixel; '.' is see-through. Drawn with
+// Pixel art drawn in code: the bought sprouts (and how corn and lilies look
+// closed), the tool and shop icons, the coin and the dirt gun. One character per pixel; '.' is see-through. Drawn with
 // the same black outline as the original art. sprites.js turns these into
 // canvases.
 
 // Sprouts are 32 x 48 like tree.png, rooted at the same spot (16, 35).
-export const SPROUT_PALETTE = { C: '#f4d65a', M: '#d9483b', N: '#3f2209', R: '#d8263d', T: '#a8864d', Y: '#f6c431', a: '#000000', b: '#668543', c: '#54762f', d: '#abba9b', e: '#31631b', f: '#224f0e', g: '#1a2e11', l: '#ff9a8a', m: '#9e2a22', n: '#6b3d12', o: '#a8742e', p: '#ff8593', q: '#c99a2a', r: '#8f1023', t: '#e3c98f', u: '#c4ad86', v: '#efe0c4', w: '#fff4e3', x: '#8a6a45', y: '#d68f1c' };
+export const SPROUT_PALETTE = { C: '#f4d65a', M: '#d9483b', N: '#3f2209', P: '#e85a8a', R: '#d8263d', h: '#cfe39a', T: '#a8864d', Y: '#f6c431', a: '#000000', b: '#668543', c: '#54762f', d: '#abba9b', e: '#31631b', f: '#224f0e', g: '#1a2e11', l: '#ff9a8a', m: '#9e2a22', n: '#6b3d12', o: '#a8742e', p: '#ff8593', q: '#c99a2a', r: '#8f1023', t: '#e3c98f', u: '#c4ad86', v: '#efe0c4', w: '#fff4e3', x: '#8a6a45', y: '#d68f1c' };
 
 export const SPROUT_ROWS = {
   sunflower: [
@@ -124,6 +124,45 @@ export const SPROUT_ROWS = {
     '............aagggaa.............',
     '..............aaa...............',
   ],
+  lilies: [
+    '................................',
+    '................................',
+    '...............aa...............',
+    '..............awva..............',
+    '......aa......awva......aa......',
+    '......awaa...awwvva...aawa......',
+    '.......awwaa.awpPva.aawwa.......',
+    '........avwwaawpPaawwwva........',
+    '.........aavwwYpPYwwvaa.........',
+    '...........awpPPPPpwa...........',
+    '.........aawwYpPPpYwwaa.........',
+    '.......aawwvvawpPpwavvwwaa......',
+    '......awwvvaa.awva..aavvwa......',
+    '......aaaaa...aava....aaaa......',
+    '..............aefa..............',
+    '..............aefa..............',
+    '..............aefaaaa...........',
+    '.............afefbbbba..........',
+    '..............aefccbbba.........',
+    '..............aefacccdba........',
+    '..............aefaaccccba.......',
+    '..........aaaaaefa.acccca.......',
+    '.........abbbcaeffa.aaaa........',
+    '........abbcccaefa..............',
+    '.......abbcccaaefa..............',
+    '.......acccca.aefa..............',
+    '........aaaa..aefa..............',
+    '..............aefa..............',
+    '..............aefa..............',
+    '.............afefa..............',
+    '..............aefa..............',
+    '..............aefa..............',
+    '............aagefaa.............',
+    '...........agggefgga............',
+    '...........aggggggga............',
+    '............aagggaa.............',
+    '..............aaa...............',
+  ],
   mushroom: [
     '................................',
     '................................',
@@ -164,10 +203,52 @@ export const SPROUT_ROWS = {
   ],
 };
 
-// How far down each sprout sways (rows above this lean 1px in frame 2).
-export const SPROUT_SWAY = { sunflower: 20, corn: 13, rose: 14, mushroom: 21 };
+// Closed up: corn with its leaves folded over the cob (bacteria can't get
+// in), and a lily shut into a bud (bacteria can't see it). Only the rows
+// that change; the rest are the open sprout's.
+export const SHUT_ROWS = {
+  corn: [
+    '................................',
+    '...............a................',
+    '............a.aTa.a.............',
+    '...........aTaataaTa............',
+    '...........attatatta............',
+    '............atatata.............',
+    '.............attta.a............',
+    '.............atttaaba...........',
+    '.............aetfabhba..........',
+    '.............aecfbhbcba.........',
+    '..........aa.aecbhbcbcba........',
+    '........aabbaaecbhbcbcba........',
+    '.......abbbcbaecbhbcbcba........',
+    '......accccccbecbhbcbcba........',
+    '......accaaaccbcbbbcbcba........',
+    '......acca..acccbbcbcbca........',
+    '.....accca...aecfbcbcbca........',
+    '......aaa....aecfcbcbca.........',
+  ],
+  lilies: [
+    '................................',
+    '................................',
+    '................................',
+    '...............aa...............',
+    '..............awva..............',
+    '..............awpa..............',
+    '.............awwvva.............',
+    '.............awwPva.............',
+    '............awwwvvva............',
+    '............awwwpvva............',
+    '............awwwwvva............',
+    '.............awwwva.............',
+    '.............acwwca.............',
+    '..............acca..............',
+  ],
+};
 
-export const ART_PALETTE = { B: '#7fa8c9', D: '#4a2f17', L: '#ffd27a', M: '#3d474d', O: '#b8761a', R: '#9e2a22', S: '#b9c6cf', W: '#eef2f5', Y: '#ffd25a', Z: '#fff2b8', d: '#8a5a2b', h: '#ff9a8a', k: '#2b1a0c', l: '#a9b6bc', m: '#6f7d84', o: '#f0a830', r: '#d9483b', s: '#c9bfb2', w: '#fff4e3', y: '#d99a1e' };
+// How far down each sprout sways (rows above this lean 1px in frame 2).
+export const SPROUT_SWAY = { sunflower: 20, corn: 13, rose: 14, lilies: 14, mushroom: 21 };
+
+export const ART_PALETTE = { C: '#8fe3ff', G: '#3f7a2e', g: '#6aa84f', B: '#7fa8c9', D: '#4a2f17', L: '#ffd27a', M: '#3d474d', O: '#b8761a', R: '#9e2a22', S: '#b9c6cf', W: '#eef2f5', Y: '#ffd25a', Z: '#fff2b8', d: '#8a5a2b', h: '#ff9a8a', k: '#2b1a0c', l: '#a9b6bc', m: '#6f7d84', o: '#f0a830', r: '#d9483b', s: '#c9bfb2', w: '#fff4e3', y: '#d99a1e' };
 
 // 16 x 16 shop icons.
 export const TOOL_ICON_ROWS = {
@@ -221,6 +302,22 @@ export const TOOL_ICON_ROWS = {
     '...kSSSkSSSSk...',
     '...kkkkkkkkkk...',
   ],
+  glasses: [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    'k..............k',
+    'kkkkkkkkkkkkkkkk',
+    '.kWCCCCkkWCCCCk.',
+    '.kCCCCCkkCCCCCk.',
+    '.kCCCCBk.kCCCBk.',
+    '..kkkkk...kkkkk.',
+    '................',
+    '................',
+  ],
   gun: [
     '................',
     '................',
@@ -236,6 +333,74 @@ export const TOOL_ICON_ROWS = {
     '...kmMk.........',
     '...kmMk.........',
     '...kkkk.........',
+  ],
+};
+
+// 16 x 16 icons for the slots and the one-use items.
+export const SHOP_ICON_ROWS = {
+  toolSlot: [
+    '................',
+    '................',
+    '.....kkkkkk.....',
+    '....kk....kk....',
+    '....k......k....',
+    '.kkkkkkkkkkkkkk.',
+    'krrrrrrrrrrrrrrk',
+    'krhhrrrrrrrrrrRk',
+    'kRRRRRRkkRRRRRRk',
+    'kkkkkkkkYYkkkkkk',
+    'krrrrrrkkkrrrrRk',
+    'krrrrrrrrrrrrrRk',
+    'kRRRRRRRRRRRRRRk',
+    '.kkkkkkkkkkkkkk.',
+  ],
+  sproutSlot: [
+    '................',
+    '................',
+    '..kk........kk..',
+    '.kggk..kk..kggk.',
+    '.kgGkkkggkkkGgk.',
+    '..kkGkgGGkkGkk..',
+    '....kGkkkkGk....',
+    '....kGk..kGk....',
+    '....kGk..kGk....',
+    '...kkGkk.kGkk...',
+    '..kdddddkddddk..',
+    '..kdDDDDdDDDdk..',
+    '...kkkkkkkkkk...',
+  ],
+  skip: [
+    '................',
+    '................',
+    '..kk....kk......',
+    '..kYk...kYk.....',
+    '..kYYk..kYYk....',
+    '..kYYYk.kYYYk...',
+    '..kYYYYkkYYYYk..',
+    '..kYYYYYkYYYYYk.',
+    '..kyyyyykyyyyyk.',
+    '..kyyyykkyyyyk..',
+    '..kyyyk.kyyyk...',
+    '..kyyk..kyyk....',
+    '..kyk...kyk.....',
+    '..kk....kk......',
+  ],
+  revive: [
+    '................',
+    '..kkk.....kkk...',
+    '.khrrk...krrrk..',
+    'khrrrrk.krrrrrk.',
+    'khrrrrrkrrrrrrk.',
+    'krrrrrwwwrrrrrk.',
+    'krrrrrwwwrrrrrk.',
+    '.krrwwwwwwwrrk..',
+    '.krrwwwwwwwrrk..',
+    '..krrrwwwrrrk...',
+    '...krrwwwrrk....',
+    '....krrrrrk.....',
+    '.....krrrk......',
+    '......krk.......',
+    '.......k........',
   ],
 };
 
@@ -307,6 +472,49 @@ export const GUN_ART = {
       '.kklmmkk',
       '..klmk..',
       '..kkkk..',
+    ],
+  },
+};
+
+// A smaller dirt gun for the game itself, where the big one hid Klayman.
+// (The setup page keeps the big one, as a close-up.)
+export const GUN_ART_SMALL = {
+  side: {
+    grip: { x: 1, y: 4 },
+    muzzle: { x: 7, y: 2 },
+    rows: [
+      '.kkk....',
+      'kkdkkkkk',
+      'klmmmmMk',
+      'kmmkkkkk',
+      'kmMk....',
+      'kkkk....',
+    ],
+  },
+  front: {
+    grip: { x: 1, y: 2 },
+    muzzle: { x: 3, y: 6 },
+    rows: [
+      '.kkk.',
+      'kkmlk',
+      'kMmlk',
+      'kkmmk',
+      '.kmmk',
+      '.kmMk',
+      '.kkk.',
+    ],
+  },
+  back: {
+    grip: { x: 3, y: 4 },
+    muzzle: { x: 2, y: 0 },
+    rows: [
+      '.kkk.',
+      '.kMmk',
+      '.kmmk',
+      'kkmmk',
+      'kMmlk',
+      'kkmlk',
+      '.kkk.',
     ],
   },
 };

@@ -1,5 +1,6 @@
 // Things to walk over: special items near the sprout from level 3, and coins.
-import { COINS, ITEMS, TREE } from './config.js';
+// A sunflower's item first flies out of the flower and lands nearby.
+import { COINS, ITEMS, ITEM_FLIGHT, TREE } from './config.js';
 
 export const ITEM_INFO = {
   plus: { name: 'Red plus', says: '+1 heart' },
@@ -9,20 +10,25 @@ export const ITEM_INFO = {
 };
 
 export class Item {
-  constructor(type, x, y) {
+  /** `from`: where it flies out of (a sunflower's head), or null to just appear. */
+  constructor(type, x, y, from = null) {
     this.type = type;
     this.x = x;
     this.y = y;
-    this.life = ITEMS.lifetime;
+    this.from = from;
+    this.flight = from ? ITEM_FLIGHT : 0;
+    this.life = ITEMS.lifetime;    // counts down once it has landed
     this.t = 0;
   }
 
+  get landed() { return this.flight <= 0; }
   get blinking() { return this.life < ITEMS.blinkFrom; }
   get gone() { return this.life <= 0; }
 
   update(dt) {
     this.t += dt;
-    this.life -= dt;
+    if (this.flight > 0) this.flight = Math.max(0, this.flight - dt);
+    else this.life -= dt;
   }
 }
 

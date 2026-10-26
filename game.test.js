@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game, NO_INPUT } from './game.js';
-import { BACTERIA, DIRTBALL, ITEMS, POISON, SCORE, TREE } from './config.js';
+import { BACTERIA, DIRTBALL, ITEMS, KLAYMAN, LEVELS, LOOKAHEAD, POISON, SCORE, TREE } from './config.js';
 import { Bacteria } from './bacteria.js';
 import { itemChoices } from './items.js';
 import { SOIL, TREE_SPOT, dist, insideSoil } from './world.js';
@@ -145,7 +145,7 @@ test('from level 3, an item appears near the sprout every 60s and waits 20s', ()
   assert.equal(game.item, null, 'gone if nobody picks it up');
 });
 
-test('auto throw keeps throwing; a tap still pushes a dirtball', () => {
+test('auto throw keeps throwing, and pushes a dirtball he walks into', () => {
   const game = quietGame();
   const k = game.klay;
   k.facing = 'side'; k.flip = false;
@@ -155,12 +155,55 @@ test('auto throw keeps throwing; a tap still pushes a dirtball', () => {
   const throws = game.drainEvents().filter((e) => e.type === 'throw').length;
   assert.ok(throws >= 3, `threw ${throws} times`);
 
-  const ball = game.addDirtball(k.x + 28, k.y);
-  run(game, 0.5, auto);
-  assert.equal(ball.state, 'idle', 'auto throw never pushes');
-  game.update(STEP, { ...auto, pressed: true });
-  run(game, 0.4, auto);
-  assert.notEqual(ball.state, 'idle', 'a real tap still pushes');
+  const ball = game.addDirtball(k.x + 60, k.y);
+  run(game, 0.3, auto);
+  assert.equal(ball.state, 'idle', 'not touching yet: no push');
+  run(game, 0.6, { ...auto, x: 1 });
+  assert.notEqual(ball.state, 'idle', 'walked into it: auto push');
+});
+
+test('a push needs Klayman right up against the dirtball', () => {
+  const tap = { x: 0, y: 0, pressed: true, held: false, auto: false };
+  const tryPush = (gap, side = 0) => {
+    const game = quietGame();
+    const k = game.klay;
+    k.facing = 'side'; k.flip = false;
+    const ball = game.addDirtball(k.x + gap, k.y + side);
+    game.update(STEP, tap);
+    return ball.state === 'rolling';
+  };
+  const touching = KLAYMAN.radius + DIRTBALL.radius;
+  assert.equal(tryPush(touching), true, 'touching');
+  assert.equal(tryPush(touching + KLAYMAN.pushGap), true, 'a hair away');
+  assert.equal(tryPush(touching + 12), false, 'a step away');
+  assert.equal(tryPush(45), false, 'the old reach no longer counts');
+  assert.equal(tryPush(14, 22), false, 'off to the side');
+  assert.equal(tryPush(-touching), false, 'behind him');
+});
+
+test('keys: Space throws, never pushes; K pushes, never throws', () => {
+  const setUp = () => {
+    const game = quietGame();
+    const k = game.klay;
+    k.facing = 'side'; k.flip = false;
+    game.drainEvents();
+    return { game, k };
+  };
+  let { game, k } = setUp();
+  let ball = game.addDirtball(k.x + 28, k.y);
+  game.update(STEP, { ...NO_INPUT, throwPressed: true });
+  assert.equal(ball.state, 'idle', 'Space next to a dirtball still throws');
+  assert.ok(game.drainEvents().some((e) => e.type === 'throw'));
+
+  ({ game, k } = setUp());
+  ball = game.addDirtball(k.x + 28, k.y);
+  game.update(STEP, { ...NO_INPUT, pushPressed: true });
+  assert.equal(ball.state, 'rolling', 'K pushes');
+
+  ({ game, k } = setUp());
+  game.update(STEP, { ...NO_INPUT, pushPressed: true });
+  run(game, 0.5);
+  assert.equal(game.drainEvents().filter((e) => e.type === 'throw').length, 0, 'K with nothing to push does nothing');
 });
 
 test('level 7 skill: dirt from afar breaks a dirtball; up close it still pushes', () => {
@@ -189,16 +232,70 @@ test('level 7 skill: dirt from afar breaks a dirtball; up close it still pushes'
   assert.equal(ball.state, 'rolling', 'up close, it is pushed');
 });
 
-test('auto throw waits while a dirtball is right in front', () => {
+test('the phone button pushes a dirtball he touches, and throws otherwise', () => {
   const game = quietGame();
-  game.level = 7;
   const k = game.klay;
   k.facing = 'side'; k.flip = false;
-  const ball = game.addDirtball(k.x + 28, k.y);
+  const ball = game.addDirtball(k.x + 60, k.y);
   game.drainEvents();
-  run(game, 1, { x: 0, y: 0, pressed: false, held: false, auto: true });
+  game.update(STEP, { ...NO_INPUT, pressed: true });
   assert.equal(ball.state, 'idle');
-  assert.equal(game.drainEvents().filter((e) => e.type === 'throw').length, 0);
+  assert.ok(game.drainEvents().some((e) => e.type === 'throw'), 'not touching: a throw');
+  run(game, 0.4);
+  ball.x = k.x + 27;
+  game.update(STEP, { ...NO_INPUT, pressed: true });
+  assert.equal(ball.state, 'rolling', 'touching: a push');
+});
+
+test('bacteria are 5% faster and every level spawns 10% more often', () => {
+  assert.equal(BACTERIA.speed, 16 * 1.05);
+  const game = new Game({ rng: () => 0.5 });
+  for (const n of [1, 4, 12]) {
+    const before = Math.max(LEVELS.minSpawnEvery, LEVELS.spawnEvery - LEVELS.spawnEveryStep * (n - 1));
+    assert.ok(Math.abs(game.spawnEveryFor(n) - before / 1.1) < 1e-9, `level ${n}`);
+  }
+});
+
+test('bacteria left counts the ones to come, the ones out, and the ones in dirtballs', () => {
+  const game = quietGame();
+  game.toSpawn = 3;
+  game.addBacteria(TREE_SPOT.x - 150, TREE_SPOT.y);
+  game.addDirtball(TREE_SPOT.x + 150, TREE_SPOT.y);
+  assert.equal(game.bacteriaLeft, 5);
+  game.breakDirtball(game.dirtballs[0]);
+  assert.equal(game.bacteriaLeft, 4, 'a breaking dirtball no longer counts');
+});
+
+test('the next bacteria is placed 1.5 seconds early, and appears right there', () => {
+  const game = new Game({ rng: () => 0.3 });
+  game.klay.x = SOIL.cx - 300;                   // away from the rim spot
+  assert.equal(game.nextBacteria, null);
+  run(game, LEVELS.bannerTime + 0.4 - LOOKAHEAD - 0.1);
+  assert.equal(game.nextBacteria, null, 'not yet');
+  run(game, 0.2);
+  const planned = game.nextBacteria;
+  assert.ok(planned, 'planned 1.5s ahead');
+  assert.equal(game.bacteria.length, 0);
+  game.drainEvents();
+  run(game, LOOKAHEAD);
+  const spawn = game.drainEvents().find((e) => e.type === 'spawn');
+  assert.deepEqual({ x: spawn.x, y: spawn.y }, { x: planned.x, y: planned.y });
+});
+
+test('the next special item is placed 1.5 seconds early, and lands right there', () => {
+  const game = quietGame();
+  game.startLevel(ITEMS.unlockLevel);
+  game.phase = 'test';
+  game.toSpawn = 0;
+  game.itemTimer = 2;
+  run(game, 0.4);
+  assert.equal(game.nextItem, null);
+  run(game, 0.2);
+  const planned = game.nextItem;
+  assert.ok(planned);
+  run(game, 1.5);
+  assert.ok(game.item);
+  assert.deepEqual({ x: game.item.x, y: game.item.y }, planned);
 });
 
 test('red plus never shows up when the sprout is full', () => {

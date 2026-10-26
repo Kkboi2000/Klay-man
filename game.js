@@ -1,7 +1,11 @@
 // The rules of Klayman. No drawing, no sound, no DOM: the game only changes
 // numbers and announces what happened through events, so it can be tested.
-import { BACTERIA, COINS, DIRTBALL, ITEMS, KLAYMAN, LEVELS, SCORE, SHOT, SPROUTS, TREE } from './config.js';
-import { TREE_SPOT, dist, insideSoil, keepOnSoil, randomSpotNear, randomSpotOnSoil, rimPoint } from './world.js';
+import {
+  BACTERIA, COINS, DIRTBALL, ITEMS, KLAYMAN, LEVELS, LOOKAHEAD, REVIVE, SCORE, SHOT, TOOLS, TREE,
+} from './config.js';
+import {
+  TREE_SPOT, dist, insideRing, insideSoil, keepOnSoil, randomSpotNear, randomSpotOnSoil, rimPoint,
+} from './world.js';
 import { Klayman } from './klayman.js';
 import { Bacteria } from './bacteria.js';
 import { Dirtball } from './dirtball.js';
@@ -9,7 +13,14 @@ import { DirtShot } from './dirtshot.js';
 import { Coin, Item, pickItem } from './items.js';
 import { gearFor } from './gear.js';
 
-export const NO_INPUT = Object.freeze({ x: 0, y: 0, pressed: false, held: false, auto: false });
+/** pressed/held: the phone's button (push or throw). throwPressed/throwHeld:
+ *  the throw key. pushPressed: the push key. auto: auto throw (and push). */
+export const NO_INPUT = Object.freeze({
+  x: 0, y: 0, pressed: false, held: false, throwPressed: false, throwHeld: false, pushPressed: false, auto: false,
+});
+
+// Where the sunflower's head is, above the spot it's rooted in (unscaled).
+const FLOWER_TOP = 54;
 
 /** Moves `a` out of `b` until they are at least `minD` apart. */
 function separate(a, b, minD, share = 1) {
@@ -24,17 +35,22 @@ function separate(a, b, minD, share = 1) {
 }
 
 export class Game {
-  /** `loadout` is { tool, sprout }: what the player picked on the setup page. */
+  /** `loadout` is { tools, sprouts }: what the player picked on the setup
+   *  page. sprouts[1], if there is one, is the backup. */
   constructor({ rng = Math.random, loadout } = {}) {
     this.rng = rng;
     this.events = [];
     this.reset(loadout);
   }
 
-  /** A new game. `level` lets admin mode start further in. */
-  reset(loadout = this.gear, level = 1) {
-    this.gear = gearFor(loadout);
-    const g = this.gear;
+  /** A new game. `level` is where it starts (a level skip, or admin mode). */
+  reset(loadout = this.loadout, level = 1) {
+    this.loadout = {
+      tools: [...(loadout?.tools ?? [])],
+      sprouts: loadout?.sprouts?.length ? [...loadout.sprouts] : ['sprout'],
+    };
+    this.sproutIndex = 0;
+    this.plant(this.loadout.sprouts[0]);
     this.klay = new Klayman(TREE_SPOT.x, TREE_SPOT.y + 62);
     this.tree = { x: TREE_SPOT.x, y: TREE_SPOT.y };
     this.bacteria = [];
@@ -43,23 +59,35 @@ export class Game {
     this.item = null;
     this.coins = [];
     this.lock = null;              // the dirt gun's target: the closest bacteria
+    this.nextBacteria = null;      // where the next one will appear (the glasses show it)
+    this.nextItem = null;          // ...and the next special item
     this.score = 0;
     this.earned = 0;               // coins (K) picked up this game
+    this.boost = 0;
+    this.freeze = 0;
+    this.itemTimer = this.itemEvery;
+    this.coinTimer = COINS.every;
+    this.over = false;
+    this.resumeTo = null;
+    this.events.length = 0;
+    this.startLevel(level);
+  }
+
+  /** Puts a sprout in the pot: its hearts and its powers' clocks. */
+  plant(sprout) {
+    this.gear = gearFor({ tools: this.loadout.tools, sprout });
+    const g = this.gear;
     this.lives = g.lives;
     this.maxLives = g.lives;
     this.treeHurt = 0;
-    this.boost = 0;
-    this.freeze = 0;
     this.itemEvery = g.itemEvery ?? ITEMS.every;
-    this.itemTimer = this.itemEvery;
-    this.coinTimer = COINS.every;
-    this.healTimer = g.healEvery;
-    this.pulseTimer = g.pulseEvery;
+    this.healTimer = g.heal?.every;
+    this.sporeTimer = g.spores?.every;
     this.growTimer = g.growEvery;
-    this.over = false;
-    this.events.length = 0;
-    this.startLevel(level);
-    if (level >= ITEMS.unlockLevel) this.itemTimer = this.itemEvery;
+    this.shieldTimer = g.shield?.every;
+    this.shield = 0;               // corn: seconds left with its leaves closed
+    this.hideTimer = g.hide?.every;
+    this.hidden = 0;               // lilies: seconds left closed
   }
 
   // ---------------------------------------------------------------- state
@@ -71,8 +99,27 @@ export class Game {
   get skillUnlocked() { return this.level >= KLAYMAN.skillLevel; }
   /** How much bigger the sprout has grown (water drops, a mushroom growing). */
   get treeScale() { return 1 + TREE.growPerWater * (this.maxLives - this.gear.lives); }
+  /** Bacteria can't get into the sprout: corn's leaves are closed, or a lily is. */
+  get sproutClosed() { return this.shield > 0 || this.hidden > 0; }
+
+  /** Bacteria still to beat this level: to come, crawling or dirty, or inside a dirtball. */
+  get bacteriaLeft() {
+    const alive = this.bacteria.filter((b) => b.alive).length;
+    const balls = this.dirtballs.filter((d) => d.state !== 'breaking').length;
+    return this.toSpawn + alive + balls;
+  }
+
+  /** Seconds until the next bacteria appears (the level banner counts too). */
+  get untilSpawn() {
+    return (this.phase === 'banner' ? this.phaseT : 0) + this.spawnTimer;
+  }
 
   levelSize(n) { return LEVELS.firstCount + LEVELS.extraPerLevel * (n - 1); }
+
+  spawnEveryFor(n) {
+    const plain = Math.max(LEVELS.minSpawnEvery, LEVELS.spawnEvery - LEVELS.spawnEveryStep * (n - 1));
+    return plain / LEVELS.spawnRate;
+  }
 
   bacteriaSpeed(n) {
     const factor = Math.min(BACTERIA.maxSpeedFactor, BACTERIA.levelSpeedUp ** (n - 1));
@@ -92,8 +139,9 @@ export class Game {
   startLevel(n) {
     this.level = n;
     this.toSpawn = this.levelSize(n);
-    this.spawnEvery = Math.max(LEVELS.minSpawnEvery, LEVELS.spawnEvery - LEVELS.spawnEveryStep * (n - 1));
+    this.spawnEvery = this.spawnEveryFor(n);
     this.spawnTimer = 0.4;
+    this.nextBacteria = null;
     this.phase = 'banner';
     this.phaseT = LEVELS.bannerTime;
     const unlocksItems = n === ITEMS.unlockLevel;
@@ -102,11 +150,18 @@ export class Game {
     this.emit('level', { level: n, unlocksItems, unlocksSkill });
   }
 
-  spawnOne() {
+  /** A spot on the rim, not right next to Klayman. */
+  planBacteria() {
     let p = rimPoint(this.rng() * Math.PI * 2, 12);
     for (let i = 0; i < 12 && dist(p, this.klay) < 90; i++) {
       p = rimPoint(this.rng() * Math.PI * 2, 12);
     }
+    return p;
+  }
+
+  spawnOne() {
+    const p = this.nextBacteria ?? this.planBacteria();
+    this.nextBacteria = null;
     const b = this.addBacteria(p.x, p.y);
     this.emit('spawn', { x: b.x, y: b.y });
   }
@@ -125,18 +180,20 @@ export class Game {
 
   // ------------------------------------------------- asked for by Klayman
 
-  dirtballInFront(k, dir) {
-    const cx = k.x + dir.x * KLAYMAN.reach;
-    const cy = k.y + dir.y * KLAYMAN.reach;
-    const half = 18 + DIRTBALL.radius * 0.5;
+  /** The dirtball Klayman is touching on the side `dir` points to, if any.
+   *  He has to be right up against it: no pushing from a step away. */
+  dirtballTouching(k, dir) {
+    const reach = KLAYMAN.radius + DIRTBALL.radius + KLAYMAN.pushGap;
     let best = null;
     let bestD = Infinity;
     for (const b of this.dirtballs) {
       if (!b.solid) continue;
-      if (Math.abs(b.x - cx) < half && Math.abs(b.y - cy) < half) {
-        const d = dist(b, k);
-        if (d < bestD) { best = b; bestD = d; }
-      }
+      const dx = b.x - k.x;
+      const dy = b.y - k.y;
+      const d = Math.hypot(dx, dy);
+      if (d > reach || d < 0.001) continue;
+      if ((dx * dir.x + dy * dir.y) / d < KLAYMAN.pushCone) continue;
+      if (d < bestD) { best = b; bestD = d; }
     }
     return best;
   }
@@ -222,20 +279,27 @@ export class Game {
 
   updateBacteria(dt) {
     const frozen = this.frozen;
+    const closed = this.sproutClosed;
+    const coat = TOOLS.coat;
+    // A closed lily can't be seen: bacteria wander instead of heading for it.
+    const target = this.hidden > 0 ? null : this.tree;
     for (const b of this.bacteria) {
-      b.update(dt, this.tree, frozen);
+      b.update(dt, target, frozen, this.tree);
       if (!b.crawling || frozen) continue;
 
-      if (dist(b, this.tree) < TREE.radius + 4) {
+      if (!closed && dist(b, this.tree) < TREE.radius + 4) {
         b.absorbInto(this.tree);
         this.hurtTree();
         if (this.over) return;
         continue;
       }
-      // A healthy Klayman swallows the bacteria and turns green.
-      // While he's green, or in his lab coat, bacteria crawl straight past him.
-      if (!this.gear.immune && !this.klay.poisoned
-        && dist(b, this.klay) < BACTERIA.radius + KLAYMAN.radius - 4) {
+      if (dist(b, this.klay) >= BACTERIA.radius + KLAYMAN.radius - 4) continue;
+      if (this.gear.immune) {
+        // The lab coat keeps it out, and a touch slows it down.
+        if (b.slowDown(coat.slowTime, coat.slowFactor)) this.emit('slowed', { x: b.x, y: b.y });
+      } else if (!this.klay.poisoned) {
+        // A healthy Klayman swallows the bacteria and turns green.
+        // While he's green, bacteria crawl straight past him.
         b.absorbInto(this.klay);
         this.klay.poison();
         this.emit('poison', { x: this.klay.x, y: this.klay.y });
@@ -257,6 +321,8 @@ export class Game {
         for (const d of this.dirtballs) {
           if (d.solid) separate(c, d, BACTERIA.radius + DIRTBALL.radius);
         }
+        // A closed sprout is a wall: they bump into it and wait.
+        if (closed) separate(c, this.tree, TREE.radius + 8);
         keepOnSoil(c, 6);
       }
     }
@@ -264,7 +330,7 @@ export class Game {
   }
 
   hurtTree() {
-    this.lives -= 1;
+    this.lives = Math.max(0, this.lives - 1);
     this.treeHurt = 0.5;
     this.emit('treeHurt', { lives: this.lives });
     if (this.lives <= 0) this.gameOver();
@@ -327,11 +393,24 @@ export class Game {
     this.emit('score', { points, x: at.x, y: at.y });
   }
 
+  // ---------------------------------------------------------------- items
+
+  /** Where the sunflower's head is right now (it grows with the sprout). */
+  get flowerTop() {
+    return { x: this.tree.x, y: this.tree.y - FLOWER_TOP * this.treeScale };
+  }
+
+  /** Where the next item lands: near the sprout, or close to a sunflower. */
+  planItem() {
+    const { min, max } = this.gear.drop ?? ITEMS.nearSprout;
+    return randomSpotNear(this.tree, min, max, this.rng, this.klay);
+  }
+
   updateItems(dt) {
     if (!this.itemsUnlocked) return;
     if (this.item) {
       this.item.update(dt);
-      if (dist(this.item, this.klay) < ITEMS.pickupRadius) {
+      if (this.item.landed && dist(this.item, this.klay) < ITEMS.pickupRadius) {
         this.useItem(this.item);
         this.item = null;
       } else if (this.item.gone) {
@@ -339,15 +418,17 @@ export class Game {
       }
     }
     this.itemTimer -= dt;
+    if (!this.item && !this.nextItem && this.itemTimer <= LOOKAHEAD) this.nextItem = this.planItem();
     if (this.itemTimer <= 0) {
       this.itemTimer += this.itemEvery;
       if (!this.item) {
-        const { min, max } = ITEMS.nearSprout;
-        const spot = randomSpotNear(this.tree, min, max, this.rng, this.klay);
+        const spot = this.nextItem ?? this.planItem();
         const type = pickItem(this.lives, this.maxLives, this.rng, this.gear.maxLives);
-        this.item = new Item(type, spot.x, spot.y);
-        this.emit('itemAppears', { type, x: spot.x, y: spot.y });
+        const from = this.gear.drop ? this.flowerTop : null;
+        this.item = new Item(type, spot.x, spot.y, from);
+        this.emit('itemAppears', { item: type, x: spot.x, y: spot.y, from });
       }
+      this.nextItem = null;
     }
   }
 
@@ -398,21 +479,27 @@ export class Game {
 
   updateSprout(dt) {
     const g = this.gear;
-    if (g.healEvery) {
+    const at = { x: this.tree.x, y: this.tree.y };
+    if (this.shield > 0) this.shield = Math.max(0, this.shield - dt);
+    if (this.hidden > 0) this.hidden = Math.max(0, this.hidden - dt);
+
+    if (g.heal) {
       this.healTimer -= dt;
       if (this.healTimer <= 0) {
-        this.healTimer += g.healEvery;
+        this.healTimer += g.heal.every;
         if (this.lives < this.maxLives) {
-          this.lives += 1;
-          this.emit('heal', { x: this.tree.x, y: this.tree.y });
+          this.lives = Math.min(this.maxLives, this.lives + g.heal.amount);
+          this.emit('heal', { ...at, amount: g.heal.amount });
         }
       }
     }
-    if (g.pulseEvery) {
-      this.pulseTimer -= dt;
-      if (this.pulseTimer <= 0) {
-        this.pulseTimer += g.pulseEvery;
-        this.releaseSpores();
+    if (g.spores) {
+      this.sporeTimer -= dt;
+      if (this.sporeTimer <= 0) {
+        this.sporeTimer += g.spores.every;
+        const { reach, push, slowTime, slowFactor } = g.spores;
+        this.repel(reach, push, slowTime, slowFactor);
+        this.emit('spores', { ...at, reach });
       }
     }
     if (g.growEvery) {
@@ -422,20 +509,35 @@ export class Game {
         if (this.maxLives < g.maxLives) {
           this.maxLives += 1;
           this.lives += 1;
-          this.emit('grow', { x: this.tree.x, y: this.tree.y });
+          this.emit('grow', at);
         }
+      }
+    }
+    if (g.shield) {
+      this.shieldTimer -= dt;
+      if (this.shieldTimer <= 0) {
+        this.shieldTimer += g.shield.every;
+        this.shield = g.shield.time;
+        this.emit('shield', at);
+      }
+    }
+    if (g.hide) {
+      this.hideTimer -= dt;
+      if (this.hideTimer <= 0) {
+        this.hideTimer += g.hide.every;
+        this.hidden = g.hide.time;
+        this.emit('hide', at);
       }
     }
   }
 
-  /** Mushroom: pushes every crawling bacteria away and slows it down.
-   *  Dirty ones and dirtballs stay where they are. */
-  releaseSpores() {
-    const m = SPROUTS.mushroom;
+  /** Pushes every crawling bacteria inside the ring away from the sprout,
+   *  and slows it down if `slowTime` is set. Dirty ones and dirtballs stay. */
+  repel(reach, push, slowTime = 0, slowFactor = 1) {
     for (const b of this.bacteria) {
-      if (b.crawling) b.knockBack(b.x - this.tree.x, b.y - this.tree.y, m.push, m.slowTime, m.slowFactor);
+      if (!b.crawling || !insideRing(b, this.tree, reach)) continue;
+      b.knockBack(b.x - this.tree.x, b.y - this.tree.y, push, slowTime, slowFactor);
     }
-    this.emit('spores', { x: this.tree.x, y: this.tree.y });
   }
 
   updateFlow(dt) {
@@ -460,11 +562,53 @@ export class Game {
       this.phaseT -= dt;
       if (this.phaseT <= 0) this.startLevel(this.level + 1);
     }
+    // Decide where the next bacteria appears a little early, so the glasses can show it.
+    if (this.toSpawn > 0 && !this.nextBacteria && this.untilSpawn <= LOOKAHEAD
+      && (this.phase === 'banner' || this.phase === 'play')) {
+      this.nextBacteria = this.planBacteria();
+    }
   }
+
+  // ------------------------------------------------------ the sprout is lost
 
   gameOver() {
     this.over = true;
+    this.resumeTo = this.phase;
     this.phase = 'over';
     this.emit('gameover', { score: this.score, level: this.level });
+  }
+
+  /** The backup sprout, if one was picked and it hasn't taken over yet. */
+  get backupSprout() { return this.loadout.sprouts[this.sproutIndex + 1] ?? null; }
+
+  /** Hearts a revive brings back: half the hearts the sprout could hold. */
+  get reviveHearts() { return this.maxLives / 2; }
+
+  /** Brings the lost sprout back with half its hearts. */
+  revive() {
+    if (!this.over) return false;
+    this.lives = this.reviveHearts;
+    this.carryOn('revive');
+    return true;
+  }
+
+  /** The backup sprout takes over, fresh, and the game goes on. */
+  useBackup() {
+    if (!this.over || !this.backupSprout) return false;
+    this.sproutIndex += 1;
+    this.plant(this.loadout.sprouts[this.sproutIndex]);
+    this.itemTimer = Math.min(this.itemTimer, this.itemEvery);
+    this.carryOn('backup');
+    return true;
+  }
+
+  /** Back to the game, with a little room cleared round the sprout. */
+  carryOn(type) {
+    this.over = false;
+    this.phase = this.resumeTo ?? 'play';
+    this.resumeTo = null;
+    this.treeHurt = 0;
+    this.repel(REVIVE.reach, REVIVE.push);
+    this.emit(type, { x: this.tree.x, y: this.tree.y, lives: this.lives, sprout: this.gear.sprout, reach: REVIVE.reach });
   }
 }

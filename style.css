@@ -103,13 +103,13 @@ body {
 /* Like a handheld: the game above, the controls below. */
 [data-layout="portrait"] #frame {
   grid-template: "stage stage" 1fr "stick throw" clamp(13.5rem, 32vh, 16rem) / 1fr 1fr;
-  --pad-y: 44%;
+  --pad-y: 40%;
 }
 [data-layout="portrait"] .pad { border-top: 3px solid var(--ink); }
 
 [data-layout="landscape"] #frame {
   grid-template: "stick stage throw" 1fr / clamp(140px, 20vw, 220px) 1fr clamp(140px, 20vw, 220px);
-  --pad-y: 60%;
+  --pad-y: 48%;
 }
 [data-layout="landscape"] .pad-stick { border-right: 3px solid var(--ink); }
 [data-layout="landscape"] .pad-throw { border-left: 3px solid var(--ink); }
@@ -208,26 +208,30 @@ body {
 .hud-pause svg { width: 0.9em; height: 0.9em; fill: currentColor; shape-rendering: crispEdges; }
 .hud-pause:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 
-.effects {
-  position: absolute;
-  top: calc(var(--u, 1) * 50px);
-  right: calc(var(--u, 1) * 14px);
+/* Through the glasses: bacteria left this level, on the visor's blue screen. */
+.visor {
   display: flex;
-  gap: 0.5em;
-  font-size: clamp(13px, calc(var(--u, 1) * 18px), 20px);
-  font-weight: 700;
-  pointer-events: none;
-}
-.effect {
-  display: inline-flex;
   align-items: center;
   gap: 0.3em;
-  padding: 0.1em 0.45em 0.1em 0.25em;
-  background: rgba(36, 25, 13, 0.75);
-  box-shadow: 0 -2px var(--ink), 0 2px var(--ink), -2px 0 var(--ink), 2px 0 var(--ink);
+  justify-self: start;
+  margin-top: 0.2em !important;
+  padding: 0.05em 0.45em 0.05em 0.25em;
+  font-size: clamp(13px, calc(var(--u, 1) * 16px), 19px);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
+  color: #7fdcff;
+  text-shadow: none;
+  background: rgba(12, 43, 58, 0.85);
+  box-shadow: 0 -2px #0c2b3a, 0 2px #0c2b3a, -2px 0 #0c2b3a, 2px 0 #0c2b3a, inset 0 0 0 1px rgba(127, 220, 255, 0.35);
 }
-.effect img { height: 1.4em; image-rendering: pixelated; }
+.visor[hidden] { display: none; }
+.visor-bac {
+  width: 1.25em;
+  height: 1.1em;
+  background: var(--bac, none) center / contain no-repeat;
+  image-rendering: pixelated;
+}
+.visor-unit { font-weight: 600; opacity: 0.8; }
 
 /* --------------------------------------------------------- level banner */
 
@@ -320,12 +324,12 @@ body {
   filter: drop-shadow(0 0.1rem 0 rgba(0, 0, 0, 0.35)) brightness(1.15);
 }
 
-/* Under the throw button: a switch that keeps Klayman throwing. */
+/* In the bottom-right corner, well clear of the throw button: a switch that
+   keeps Klayman throwing (and pushing). */
 .auto-toggle {
   position: absolute;
-  left: 50%;
-  top: calc(var(--pad-y) + 3.9rem);
-  transform: translateX(-50%);
+  right: 0.6rem;
+  bottom: 0.6rem;
   min-height: 2.5rem;
   padding: 0.3em 0.85em;
   border: 0;
@@ -382,6 +386,16 @@ body {
   text-align: center;
 }
 .screen-body p { margin: 0; }
+
+/* Behind the title: faded dirtballs rolling in from every side. */
+.title-balls {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+#title .screen-body { position: relative; }
 
 /* Title: just Klayman's face, big. */
 .face {
@@ -491,6 +505,11 @@ body {
 }
 .final-coins .coin-icon { width: 1.2em; height: 1.2em; }
 
+/* A revive, or the backup sprout: the way to keep this game going. */
+.chance { display: grid; gap: 0.6rem; justify-items: center; }
+.chance[hidden], .chance .btn[hidden] { display: none; }
+.chance .btn { padding-inline: 1.4em; font-size: 1.2rem; }
+
 /* ------------------------------------------------------------- setup */
 
 /* Title and setup are pages of their own, not a veil over the game. */
@@ -547,6 +566,25 @@ body {
 }
 
 .shelf { display: grid; gap: 0.5rem; }
+.shelf-head { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
+
+/* With the 2nd sprout slot: which sprout a tap picks. */
+.slot-tabs { display: flex; flex: none; gap: 0.4rem; }
+.slot-tabs[hidden] { display: none; }
+.slot-tabs button {
+  min-width: 3rem;
+  min-height: 2.4rem;
+  border: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--chalk);
+  background: rgba(36, 25, 13, 0.7);
+  box-shadow: 0 -2px var(--ink), 0 2px var(--ink), -2px 0 var(--ink), 2px 0 var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.slot-tabs button[aria-pressed="true"] { color: var(--ink); background: var(--gold); }
+.slot-tabs button:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
 .shelf-name {
   margin: 0;
   font-size: 1.15rem;
@@ -737,4 +775,18 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .banner.is-in { animation: none; }
   .gear.is-short { animation: none; }
+}
+
+/* A phone held sideways is short: the pause and summary screens, which open
+   mid-game, tighten up so every button fits without scrolling. */
+@media (max-height: 520px) {
+  #paused, #over { padding-top: calc(env(safe-area-inset-top, 0px) + 0.6rem); padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.6rem); }
+  #paused .screen-body, #over .screen-body { width: min(34rem, 100%); gap: 0.4rem; }
+  #paused .screen-name, #over .screen-name { font-size: 1.8rem; }
+  #over .final { font-size: 1.05rem; }
+  #over #final-score { display: inline; font-size: 1.9rem; margin-left: 0.25em; vertical-align: -0.1em; }
+  #over .final-best, #over .final-level, #over .final-coins { font-size: 0.95rem; }
+  #over .chance { grid-auto-flow: column; }
+  #over .btn { min-height: 2.6rem; margin-top: 0.2rem; padding: 0.35em 1.4em 0.45em; font-size: 1.1rem; }
+  #over .chance .btn { font-size: 1rem; }
 }
