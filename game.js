@@ -13,11 +13,10 @@ import { DirtShot } from './dirtshot.js';
 import { Coin, Item, pickItem } from './items.js';
 import { gearFor } from './gear.js';
 
-/** pressed/held: the phone's button (push or throw). throwPressed/throwHeld:
- *  the throw key. pushPressed: the push key. auto: auto throw (and push). */
-export const NO_INPUT = Object.freeze({
-  x: 0, y: 0, pressed: false, held: false, throwPressed: false, throwHeld: false, pushPressed: false, auto: false,
-});
+/** x, y: which way to walk. pressed/held: the action button (the K button on
+ *  a phone, Space on a computer): it pushes a dirtball Klayman is touching,
+ *  and throws otherwise. auto: auto throw (and push). */
+export const NO_INPUT = Object.freeze({ x: 0, y: 0, pressed: false, held: false, auto: false });
 
 // Where the sunflower's head is, above the spot it's rooted in (unscaled).
 const FLOWER_TOP = 54;
@@ -60,7 +59,8 @@ export class Game {
     this.coins = [];
     this.lock = null;              // the dirt gun's target: the closest bacteria
     this.upcoming = [];            // where the next bacteria will appear, soonest first (the glasses show them)
-    this.nextItem = null;          // ...and the next special item
+    this.nextItem = null;          // ...the next special item...
+    this.nextCoin = null;          // ...and the next 1K coin
     this.score = 0;
     this.earned = 0;               // coins (K) picked up this game
     this.boost = 0;
@@ -461,9 +461,12 @@ export class Game {
 
   updateCoins(dt) {
     this.coinTimer -= dt;
+    // Where the next 1K coin lands is decided a little early, for the glasses.
+    if (!this.nextCoin && this.coinTimer <= LOOKAHEAD) this.nextCoin = randomSpotOnSoil(this.rng);
     if (this.coinTimer <= 0) {
       this.coinTimer += COINS.every;
-      this.dropCoin(randomSpotOnSoil(this.rng), COINS.value);
+      this.dropCoin(this.nextCoin ?? randomSpotOnSoil(this.rng), COINS.value);
+      this.nextCoin = null;
     }
     for (const c of this.coins) {
       c.update(dt);

@@ -124,7 +124,7 @@ export const SPROUTS = {
   sprout: { price: 0 },
   sunflower: {
     price: 149,
-    itemEvery: 35,           // a special item pops out of the flower...
+    itemEvery: 30,           // a special item pops out of the flower...
     drop: { min: 45, max: 110 }, // ...and lands this far away
   },
   rose: { price: 199, lives: 4, heal: { every: 20, amount: 1 } },

@@ -652,16 +652,20 @@ export class Renderer {
 
   // ------------------------------------------------------------- glasses
 
-  /** What the glasses add to the pot: where the next bacteria will appear,
-   *  and which item will appear where (up to 3 seconds ahead), and how long
-   *  the item and coins on the ground will wait. */
+  /** What the glasses add to the pot: where the next bacteria, item and 1K
+   *  coin will appear (up to 3 seconds ahead, with a picture of which item),
+   *  and how long the item and coins on the ground will wait. */
   drawGuides(game) {
     game.upcoming.forEach((p, i) => {
-      this.target(p, 1 - Math.min(1, game.untilUpcoming(i) / LOOKAHEAD), false);
+      this.target(p, 1 - Math.min(1, game.untilUpcoming(i) / LOOKAHEAD), null);
     });
     if (game.nextItem) {
       const k = 1 - Math.min(1, game.itemTimer / LOOKAHEAD);
-      this.target(game.nextItem, k, true);
+      this.target(game.nextItem, k, this.sprites.icons[game.nextItem.type]);
+    }
+    if (game.nextCoin) {
+      const k = 1 - Math.min(1, game.coinTimer / LOOKAHEAD);
+      this.target(game.nextCoin, k, this.sprites.coin);
     }
     const item = game.item;
     if (item?.landed && !(item.blinking && Math.floor(item.t * 8) % 2 === 0)) {
@@ -674,10 +678,10 @@ export class Renderer {
     }
   }
 
-  /** A dotted ring on the soil that closes in as the moment comes. An item
-   *  shows a see-through picture of what's coming in the middle; a bacteria
-   *  a dot. */
-  target(p, k, isItem) {
+  /** A dotted ring on the soil that closes in as the moment comes, with a
+   *  see-through `picture` of what's coming (an item, a coin) in the middle,
+   *  or a dot for a bacteria. */
+  target(p, k, picture) {
     const { ctx } = this;
     const r = Math.round(26 - 12 * k);
     const blink = !this.calm && k > 0.8 && Math.floor(this.time * 14) % 2 === 0;
@@ -696,12 +700,13 @@ export class Renderer {
       }
       const cx = Math.round(p.x / 2) * 2;
       const cy = Math.round(p.y / 2) * 2;
-      if (!isItem) ctx.fillRect(cx - size / 2 - 1, cy - size / 2 - 1, size + 2, size + 2);
+      if (!picture) ctx.fillRect(cx - size / 2 - 1, cy - size / 2 - 1, size + 2, size + 2);
     }
     ctx.restore();
-    if (isItem && p.type) {
+    if (picture) {
       const bob = this.calm ? 0 : Math.round(Math.sin(this.time * 4) * 2);
-      this.sprite(this.sprites.icons[p.type], 0, 0, 16, 16, p.x, p.y - 16 + bob, 8, 8, {
+      const { width: w, height: h } = picture;
+      this.sprite(picture, 0, 0, w, h, p.x, p.y - 14 + bob, w / 2, h / 2, {
         alpha: blink ? 0.3 : 0.55 + 0.3 * k,
       });
     }

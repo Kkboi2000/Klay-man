@@ -1,7 +1,7 @@
-// Keyboard on a computer; a floating joystick, a throw button and an
+// Keyboard on a computer; a floating joystick, the K button and an
 // auto-throw switch on a phone. read() returns the step's input once per
-// game step (see NO_INPUT in game.js): the phone button pushes or throws,
-// Space (or J, Enter) only throws, and K only pushes.
+// game step (see NO_INPUT in game.js). The K button and Space do the same:
+// push a dirtball Klayman is touching, throw otherwise.
 
 const MOVE_KEYS = {
   ArrowLeft: [-1, 0], KeyA: [-1, 0],
@@ -9,16 +9,13 @@ const MOVE_KEYS = {
   ArrowUp: [0, -1], KeyW: [0, -1],
   ArrowDown: [0, 1], KeyS: [0, 1],
 };
-const THROW_KEYS = new Set(['Space', 'KeyJ', 'Enter']);
-const PUSH_KEY = 'KeyK';
+const ACTION_KEY = 'Space';
 const DEAD_ZONE = 0.22;
 const AUTO_KEY = 'klayman.autoThrow';
 
 export function createInput({ stickZone, stickBase, stickKnob, throwZone, throwButton, autoButton, onPause }) {
   const keys = new Set();
-  let throwKeys = 0;
-  let throwPressed = false;
-  let pushPressed = false;
+  let spaceDown = false;
   let pressed = false;
   let btnPointer = null;
   let auto = false;
@@ -31,20 +28,16 @@ export function createInput({ stickZone, stickBase, stickKnob, throwZone, throwB
     // On a focused button or link, Enter and Space press it rather than throw.
     if (e.target instanceof Element && e.target.closest('button, a, summary, input')) return;
     if (MOVE_KEYS[e.code]) { keys.add(e.code); e.preventDefault(); }
-    if (THROW_KEYS.has(e.code)) {
-      if (!e.repeat) { throwPressed = true; throwKeys++; }
-      e.preventDefault();
-    }
-    if (e.code === PUSH_KEY) {
-      if (!e.repeat) pushPressed = true;
+    if (e.code === ACTION_KEY) {
+      if (!e.repeat) { pressed = true; spaceDown = true; }
       e.preventDefault();
     }
   });
   addEventListener('keyup', (e) => {
     keys.delete(e.code);
-    if (THROW_KEYS.has(e.code)) throwKeys = Math.max(0, throwKeys - 1);
+    if (e.code === ACTION_KEY) spaceDown = false;
   });
-  addEventListener('blur', () => { keys.clear(); throwKeys = 0; releaseStick(); releaseButton(); });
+  addEventListener('blur', () => { keys.clear(); spaceDown = false; releaseStick(); releaseButton(); });
 
   // ------------------------------------------------------------ joystick
   function baseRadius() { return stickBase.offsetWidth / 2 || 56; }
@@ -148,24 +141,14 @@ export function createInput({ stickZone, stickBase, stickKnob, throwZone, throwB
         x += MOVE_KEYS[code][0];
         y += MOVE_KEYS[code][1];
       }
-      const out = {
-        x, y,
-        pressed, held: btnPointer !== null,
-        throwPressed, throwHeld: throwKeys > 0,
-        pushPressed,
-        auto,
-      };
+      const out = { x, y, pressed, held: spaceDown || btnPointer !== null, auto };
       pressed = false;
-      throwPressed = false;
-      pushPressed = false;
       return out;
     },
     clear() {
       pressed = false;
-      throwPressed = false;
-      pushPressed = false;
       keys.clear();
-      throwKeys = 0;
+      spaceDown = false;
       releaseStick();
       releaseButton();
     },

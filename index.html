@@ -47,7 +47,7 @@
       </div>
 
       <div id="throw-zone" class="pad pad-throw">
-        <button id="throw" class="throw" type="button" tabindex="-1" aria-label="Throw dirt"></button>
+        <button id="throw" class="throw" type="button" tabindex="-1" aria-label="Throw dirt, or push a dirtball you’re touching"><span aria-hidden="true">K</span></button>
         <button id="auto" class="auto-toggle" type="button" aria-pressed="false">Auto throw: off</button>
       </div>
     </div>
@@ -141,13 +141,13 @@
           <summary>How to play</summary>
           <ul class="howto">
             <li>Hit a bacteria with dirt four times to turn it into a dirtball.</li>
-            <li>Walk right up to a dirtball and push it to roll it into other bacteria. Auto throw pushes too.</li>
+            <li>Walk right up to a dirtball and press K to push it into other bacteria. Auto throw pushes too.</li>
             <li>When the sprout is lost, you can revive it once a game for 49K.</li>
             <li>Walk over coins to pick them up. Spend them here.</li>
             <li>From level 3, special items appear near the sprout.</li>
             <li>From level 7, dirt thrown at a dirtball from afar breaks it.</li>
           </ul>
-          <p class="keys">Arrow keys or WASD to move. Space to throw, K to push. P to pause.</p>
+          <p class="keys">Arrow keys or WASD to move. Space to throw, or to push a dirtball you’re touching. P to pause.</p>
         </details>
 
         <div class="setup-go">
@@ -180,7 +180,7 @@
         <div id="chance" class="chance" hidden>
           <button id="revive" class="btn btn-chance" type="button" hidden>
             <img class="chance-pic" id="revive-pic" alt="">
-            <span class="chance-text"><span class="chance-main">Revive the sprout</span><span id="revive-note" class="chance-note"></span></span>
+            <span class="chance-text"><span id="revive-name" class="chance-main">Revive the sprout</span><span id="revive-note" class="chance-note"></span></span>
           </button>
           <button id="backup" class="btn btn-chance" type="button" hidden>
             <img class="chance-pic" id="backup-pic" alt="">

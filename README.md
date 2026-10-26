@@ -24,7 +24,7 @@ Every file sits in one folder, with no subfolders, so uploading is simple.
 ### Updating
 
 Upload the changed files the same way. Also open `sw.js` and bump `VERSION`
-(`klayman-v16` → `klayman-v17`): phones keep an offline copy, and this is how
+(`klayman-v17` → `klayman-v18`): phones keep an offline copy, and this is how
 they know to fetch the new one.
 
 ## Pages
@@ -35,8 +35,9 @@ they know to fetch the new one.
    **Start**. The window at the top shows Klayman dressed for the game.
 3. **Game:** when the sprout is gone you see your score and the coins you
    picked up. With a backup sprout you can carry on with it; once there's no
-   backup left, you can revive the sprout for 49K (half its hearts back), once
-   a game. Otherwise **Play again** or go back to **Setup**. Pause has
+   backup left, you can revive the sprout just lost for 49K: half its hearts
+   back, and the game goes on at the same level with the same score. Once a
+   game. Otherwise **Play again** or go back to **Setup**. Pause has
    **Setup** too.
 
 **Sound** and **Music** each have their own switch, on the title page, the
@@ -63,13 +64,13 @@ On the setup page, tap something you don’t own, then tap again to buy it.
 | Shoes | 29K | 15% faster; walks through the sprout |
 | Gloves | 29K | Throws 15% faster and 15% farther, with three pixel streaks off the hand |
 | Coat | 49K | Bacteria can’t get into Klayman; one that touches him crawls 30% slower for 5 s |
-| Glasses | 69K | A light-blue visor: arrows to bacteria, items and coins off-screen; seconds left on items and coins; bacteria left this level; and a ring wherever bacteria will appear in the next 3 s, or an item (with a see-through picture of which one) |
+| Glasses | 69K | A light-blue visor: arrows to bacteria, items and coins off-screen; seconds left on items and coins; bacteria left this level; and a ring wherever bacteria, an item or a 1K coin will appear in the next 3 s (with a see-through picture of which item, or the coin) |
 | Dirt gun | 99K | Locks on to the closest bacteria (red brackets) and keeps Klayman facing it; throws, range and walking 5% up |
 
 | Sprout | Price | What it does |
 | --- | --- | --- |
 | Sprout | free | 3 hearts, up to 7 with water drops (so can sunflower, rose and lilies) |
-| Sunflower | 149K | Every 35 s a special item pops out of the flower and lands nearby |
+| Sunflower | 149K | Every 30 s a special item pops out of the flower and lands nearby |
 | Rose | 199K | Starts with 4 hearts; heals 1 heart every 20 s |
 | Corn | 249K | 6 hearts, up to 11; every 40 s its leaves snap shut for 15 s (it darkens) and bacteria can’t get in |
 | Lilies | 249K | Every 40 s its petals roll up into a bud for 15 s; bacteria lose sight of it and wander |
@@ -89,7 +90,9 @@ it. Tools, sprouts and slots are yours for good.
 
 **Revive** isn’t on the setup page. When the sprout is lost and there’s no
 backup sprout left to carry on with, the summary offers it for 49K: the sprout
-comes back with half the hearts it could hold (5 → 2.5). Once a game.
+just lost comes back with half the hearts it could hold (5 → 2.5), and the
+game goes on at the same level, with the same score and the same bacteria.
+Once a game.
 
 All these numbers are in `config.js` (`COINS`, `TOOLS`, `SPROUTS`, `SLOTS`, `ONCE`, `REVIVE`).
 
@@ -109,11 +112,13 @@ Admin mode stays on (even after closing the app) until you leave it.
 
 ## Controls
 
-- **Phone:** joystick on the left, throw on the right (hold to keep throwing).
-  Right up against a dirtball and facing it, the same button pushes it. The
-  **Auto throw** switch (on the setup page, and in the bottom-right corner in a
-  game) keeps Klayman throwing, and pushes a dirtball he walks into.
-- **Computer:** arrow keys or WASD to move, Space to throw, K to push, P to pause.
+- **Phone:** joystick on the left, the **K** button on the right: it throws
+  (hold to keep throwing), and right up against a dirtball and facing it, it
+  pushes it. The **Auto throw** switch (on the setup page, and in the
+  bottom-right corner in a game) keeps Klayman throwing, and pushes a dirtball
+  he walks into.
+- **Computer:** arrow keys or WASD to move, Space to throw (or push, up
+  against a dirtball), P to pause.
 
 A push only works when Klayman is touching the dirtball. From level 7, dirt
 thrown at a dirtball breaks it.
@@ -151,7 +156,8 @@ to bacteria, items and coins).
 | `game.test.js`, `gear.test.js`, `orientation.test.js` | Rule checks: run `npm test` (needs Node 18+) |
 
 The sound effects were trimmed to remove the silence at the start of each
-file, so they play the moment something happens. The gun, coin, shop and
+file, so they play the moment something happens, and every effect plays at
+half volume (`EFFECTS_VOLUME` in `sound.js`). The gun, coin, shop and
 sunflower sounds are made in code (`sound.js`). The music is `music.mp3`, an
 8.8-second loop; `sound.js` finds where it really starts and ends, so it
 loops without a click.

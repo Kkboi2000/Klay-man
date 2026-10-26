@@ -217,13 +217,13 @@ test('two tools at once: their boosts multiply, and both powers work', () => {
 
 // ---------------------------------------------------------------- sprouts
 
-test('sunflower: every 35 seconds an item pops out of the flower and lands near it', () => {
+test('sunflower: every 30 seconds an item pops out of the flower and lands near it', () => {
   const game = quietGame(planting('sunflower'));
   game.startLevel(ITEMS.unlockLevel);
   game.phase = 'test';
   game.toSpawn = 0;
   game.drainEvents();
-  run(game, 34.5);
+  run(game, 29.5);
   assert.equal(game.item, null);
   run(game, 0.6);
   const item = game.item;
@@ -381,6 +381,26 @@ test('revive: once a game, the sprout comes back with half the hearts it could h
     assert.equal(game.canRevive, false, 'not twice in one game');
     assert.equal(game.revive(), false);
   }
+});
+
+test('revive carries on the same game: same level, score and bacteria, the sprout that was just lost', () => {
+  const game = quietGame({ tools: [], sprouts: ['rose', 'corn'] });
+  game.startLevel(4);
+  game.phase = 'play';
+  game.score = 2300;
+  lose(game);
+  game.useBackup();                                   // the corn takes over...
+  game.score += 400;
+  const out = game.addBacteria(game.tree.x - 200, game.tree.y + 60);
+  lose(game);                                         // ...and is lost too
+  const left = game.toSpawn;
+  assert.equal(game.revive(), true);
+  assert.equal(game.gear.sprout, 'corn', 'the one just lost, not the first');
+  assert.equal(game.lives, 3, 'half of its 6');
+  assert.equal(game.level, 4);
+  assert.equal(game.score, 2700);
+  assert.equal(game.toSpawn, left, 'the level goes on where it stopped');
+  assert.ok(game.bacteria.includes(out), 'bacteria still out there');
 });
 
 test('revive is paid for on the summary: 49K, if you have it', () => {

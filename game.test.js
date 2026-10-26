@@ -181,31 +181,6 @@ test('a push needs Klayman right up against the dirtball', () => {
   assert.equal(tryPush(-touching), false, 'behind him');
 });
 
-test('keys: Space throws, never pushes; K pushes, never throws', () => {
-  const setUp = () => {
-    const game = quietGame();
-    const k = game.klay;
-    k.facing = 'side'; k.flip = false;
-    game.drainEvents();
-    return { game, k };
-  };
-  let { game, k } = setUp();
-  let ball = game.addDirtball(k.x + 28, k.y);
-  game.update(STEP, { ...NO_INPUT, throwPressed: true });
-  assert.equal(ball.state, 'idle', 'Space next to a dirtball still throws');
-  assert.ok(game.drainEvents().some((e) => e.type === 'throw'));
-
-  ({ game, k } = setUp());
-  ball = game.addDirtball(k.x + 28, k.y);
-  game.update(STEP, { ...NO_INPUT, pushPressed: true });
-  assert.equal(ball.state, 'rolling', 'K pushes');
-
-  ({ game, k } = setUp());
-  game.update(STEP, { ...NO_INPUT, pushPressed: true });
-  run(game, 0.5);
-  assert.equal(game.drainEvents().filter((e) => e.type === 'throw').length, 0, 'K with nothing to push does nothing');
-});
-
 test('level 7 skill: dirt from afar breaks a dirtball; up close it still pushes', () => {
   const tap = { x: 0, y: 0, pressed: true, held: false, auto: false };
   const setUp = (level, gap) => {
@@ -232,7 +207,7 @@ test('level 7 skill: dirt from afar breaks a dirtball; up close it still pushes'
   assert.equal(ball.state, 'rolling', 'up close, it is pushed');
 });
 
-test('the phone button pushes a dirtball he touches, and throws otherwise', () => {
+test('the action button (K on a phone, Space on a computer) pushes a dirtball he touches, and throws otherwise', () => {
   const game = quietGame();
   const k = game.klay;
   k.facing = 'side'; k.flip = false;
@@ -281,6 +256,20 @@ test('the glasses know every bacteria due in the next 3 seconds, and each appear
   run(game, 3);
   const spawns = game.drainEvents().filter((e) => e.type === 'spawn').map((e) => ({ x: e.x, y: e.y }));
   assert.deepEqual(spawns.slice(0, 2), planned);
+});
+
+test('the next 1K coin is placed 3 seconds early, and lands right there', () => {
+  const game = quietGame();
+  game.coinTimer = 3.5;
+  run(game, 0.4);
+  assert.equal(game.nextCoin, null);
+  run(game, 0.2);
+  const planned = game.nextCoin;
+  assert.ok(planned && insideSoil(planned.x, planned.y));
+  run(game, 3);
+  assert.equal(game.coins.length, 1);
+  assert.deepEqual({ x: game.coins[0].x, y: game.coins[0].y }, planned);
+  assert.equal(game.nextCoin, null, 'and the next is planned 3 seconds before it, not now');
 });
 
 test('nothing is planned past the end of the level', () => {

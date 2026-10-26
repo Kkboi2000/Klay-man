@@ -42,6 +42,7 @@ export function createUI() {
     chance: $('chance'),
     revive: $('revive'),
     reviveNote: $('revive-note'),
+    reviveName: $('revive-name'),
     revivePic: $('revive-pic'),
     backup: $('backup'),
     backupName: $('backup-name'),
@@ -146,7 +147,7 @@ export function createUI() {
       el.coins.textContent = formatK(k);
     },
 
-    /** `revive`: { hearts, price, coins, have, picture } when a revive is on
+    /** `revive`: { sprout, hearts, price, coins, have, picture } when a revive is on
      *  offer (`have`: one bought before, so it's free), else null.
      *  `backup`: { id, picture } for the backup sprout that can take over, else null. */
     setFinal({ score, level, best, isNewBest, earned, revive = null, backup = null }) {
@@ -160,14 +161,18 @@ export function createUI() {
       el.revive.hidden = !revive;
       el.revive.disabled = short;
       if (revive) {
+        // It's the sprout just lost that comes back, and the game goes on
+        // from where it stopped: the button says both.
         el.revivePic.src = revive.picture;
-        if (revive.have) el.reviveNote.textContent = `${hearts(revive.hearts)} back`;
+        el.reviveName.textContent = `Revive the ${CATALOG[revive.sprout].name.toLowerCase()}`;
+        const back = `Same level and score, ${hearts(revive.hearts)} back`;
+        if (revive.have) el.reviveNote.textContent = back;
         else if (short) el.reviveNote.textContent = `Needs ${formatK(revive.price)}. You have ${formatK(revive.coins)}.`;
         else {
           // The price, with the coin before it, as everywhere else.
           const coin = Object.assign(document.createElement('span'), { className: 'coin-icon' });
           coin.setAttribute('aria-hidden', 'true');
-          el.reviveNote.replaceChildren(`${hearts(revive.hearts)} back for `, coin, formatK(revive.price));
+          el.reviveNote.replaceChildren(`${back}, for `, coin, formatK(revive.price));
         }
       }
       el.backup.hidden = !backup;

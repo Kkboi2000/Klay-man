@@ -4,7 +4,7 @@
 // with a score summary: a revive or the backup sprout can carry it on, or
 // play again, or go back to setup.
 import { Game } from './game.js';
-import { loadSprites, BAC } from './sprites.js';
+import { loadSprites } from './sprites.js';
 import { Renderer } from './render.js';
 import { createInput } from './input.js';
 import { Sound } from './sound.js';
@@ -215,6 +215,7 @@ function finish(score, level) {
   }
   ui.hideBanner();                // a level banner shouldn't show through the summary
   const revive = game.canRevive ? {
+    sprout: game.gear.sprout,
     hearts: game.reviveHearts,
     price: ONCE.revive.price,
     coins: wallet.coins,
@@ -335,9 +336,7 @@ function cut(sheet, x, y, w, h) {
 }
 
 function dressButtons(sheet) {
-  // The throw button is a dirtball, cut straight from the sprite sheet;
-  // the glasses' count shows a bacteria.
-  $('throw').style.setProperty('--ball', cut(sheet, 7, BAC.ballY + 7, 18, 18));
+  // The glasses' count shows a bacteria, cut straight from the sprite sheet.
   document.documentElement.style.setProperty('--bac', cut(sheet, 6, 8, 20, 18));
 }
 

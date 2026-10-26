@@ -11,7 +11,8 @@ import { assetUrl } from './sprites.js';
 const MUTE_KEY = 'klayman.muted';
 const MUSIC_KEY = 'klayman.music';
 const MUSIC_FILE = 'music.mp3';
-const MUSIC_VOLUME = 0.3;          // under the effects
+const EFFECTS_VOLUME = 0.5;        // every sound effect, at half what each asks for
+const MUSIC_VOLUME = 0.3;
 
 /** Where the music really starts and ends: an MP3 can carry a few silent
  *  samples at either end, and looping those would click. */
@@ -173,7 +174,7 @@ export class Sound {
     src.buffer = buffer;
     src.playbackRate.value = rate;
     const gain = this.ctx.createGain();
-    gain.gain.value = volume;
+    gain.gain.value = volume * EFFECTS_VOLUME;
     src.connect(gain).connect(this.ctx.destination);
     src.start();
   }

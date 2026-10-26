@@ -17,7 +17,7 @@ export const CATALOG = {
   glasses: { name: 'Glasses', says: 'Points to bacteria, items and coins, times items and coins, counts what’s left, and shows what appears next and where.' },
   gun: { name: 'Dirt gun', says: 'Locks on to the closest bacteria. Throws, range and walking 5% up.' },
   sprout: { name: 'Sprout', says: '3 hearts, up to 7 with water.' },
-  sunflower: { name: 'Sunflower', says: 'Every 35 seconds a special item pops out of the flower.' },
+  sunflower: { name: 'Sunflower', says: 'Every 30 seconds a special item pops out of the flower.' },
   rose: { name: 'Rose', says: 'Starts with 4 hearts. Heals 1 heart every 20 seconds.' },
   corn: { name: 'Corn', says: '6 hearts, up to 11. Every 40 seconds its leaves close and keep bacteria out for 15 seconds.' },
   lilies: { name: 'Lilies', says: 'Every 40 seconds it closes for 15 seconds. Bacteria lose sight of it and wander.' },
