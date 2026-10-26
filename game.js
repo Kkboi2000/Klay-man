@@ -403,10 +403,14 @@ export class Game {
     return { x: this.tree.x, y: this.tree.y - FLOWER_TOP * this.treeScale };
   }
 
-  /** Where the next item lands: near the sprout, or close to a sunflower. */
+  /** The next item: what it is, and where it lands (near the sprout, or
+   *  close to a sunflower). Decided ahead, so the glasses can show it; what
+   *  they show is what comes. */
   planItem() {
     const { min, max } = this.gear.drop ?? ITEMS.nearSprout;
-    return randomSpotNear(this.tree, min, max, this.rng, this.klay);
+    const spot = randomSpotNear(this.tree, min, max, this.rng, this.klay);
+    const type = pickItem(this.lives, this.maxLives, this.rng, this.gear.maxLives);
+    return { type, x: spot.x, y: spot.y };
   }
 
   updateItems(dt) {
@@ -425,11 +429,10 @@ export class Game {
     if (this.itemTimer <= 0) {
       this.itemTimer += this.itemEvery;
       if (!this.item) {
-        const spot = this.nextItem ?? this.planItem();
-        const type = pickItem(this.lives, this.maxLives, this.rng, this.gear.maxLives);
+        const { type, x, y } = this.nextItem ?? this.planItem();
         const from = this.gear.drop ? this.flowerTop : null;
-        this.item = new Item(type, spot.x, spot.y, from);
-        this.emit('itemAppears', { item: type, x: spot.x, y: spot.y, from });
+        this.item = new Item(type, x, y, from);
+        this.emit('itemAppears', { item: type, x, y, from });
       }
       this.nextItem = null;
     }
@@ -594,8 +597,9 @@ export class Game {
   /** Hearts a revive brings back: half the hearts the sprout could hold. */
   get reviveHearts() { return this.maxLives / 2; }
 
-  /** A revive is on offer: the sprout is lost and this game hasn't used one. */
-  get canRevive() { return this.over && this.revivesLeft > 0; }
+  /** A revive is on offer: the sprout is lost, there's no backup left to
+   *  carry on with, and this game hasn't used one. */
+  get canRevive() { return this.over && this.revivesLeft > 0 && !this.backupSprout; }
 
   /** Brings the lost sprout back with half its hearts (once a game). */
   revive() {

@@ -109,7 +109,7 @@ export const TOOLS = {
   shoes: { price: 29, speed: 1.15 },                   // and he walks through the sprout
   gloves: { price: 29, fireRate: 1.15, range: 1.15 },
   coat: { price: 49, slowTime: 5, slowFactor: 0.7 },   // bacteria can't get in; a touch slows them 30%
-  glasses: { price: 49 },                              // arrows, timers, counts, spawn warnings
+  glasses: { price: 69 },                              // arrows, timers, counts, what's coming next
   gun: { price: 99, fireRate: 1.05, range: 1.05, speed: 1.05 }, // shots lock on to a bacteria
 };
 
@@ -127,16 +127,16 @@ export const SPROUTS = {
     itemEvery: 35,           // a special item pops out of the flower...
     drop: { min: 45, max: 110 }, // ...and lands this far away
   },
-  rose: { price: 199, lives: 4, heal: { every: 15, amount: 1 } },
+  rose: { price: 199, lives: 4, heal: { every: 20, amount: 1 } },
   corn: {
     price: 249,
     lives: 6,
     maxLives: 11,
-    shield: { every: 60, time: 10 }, // leaves close over it: bacteria can't get in
+    shield: { every: 40, time: 15 }, // leaves close over it: bacteria can't get in
   },
   lilies: {
     price: 249,
-    hide: { every: 60, time: 10 },   // it closes; bacteria lose sight of it and wander
+    hide: { every: 40, time: 15 },   // it closes; bacteria lose sight of it and wander
   },
   mushroom: {
     price: 299,
@@ -168,8 +168,9 @@ export const ONCE = {
   revive: { price: 49 },     // bought on the summary when the sprout is lost
 };
 
-// A revive brings a lost sprout back with half its hearts, once a game. A
-// revived sprout (or a backup sprout taking over) clears a little room.
+// A revive brings a lost sprout back with half its hearts, once a game, and
+// only when there's no backup sprout left to carry on with. A revived sprout
+// (or a backup sprout taking over) clears a little room.
 export const REVIVE = { reach: 170, push: 80, perGame: 1 };
 
 export const KNOCK_TIME = 0.35; // how long a spore push takes

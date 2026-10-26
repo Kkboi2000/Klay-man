@@ -272,7 +272,7 @@ export class Renderer {
       }
       for (const c of game.coins) {
         if (c.blinking && Math.floor(c.t * 10) % 2 === 0) continue;
-        marks.push({ x: c.x, y: c.y - 12, color: GOLD, size: 8, icon: 'coin' });
+        marks.push({ x: c.x, y: c.y - 12, color: GOLD, size: 8, icon: 'coin', secs: Math.ceil(c.life) });
       }
     }
     if (!game.over) marks.push({ x: TREE_SPOT.x, y: TREE_SPOT.y - 30, color: '#8cc152', size: 10, icon: 'heart' });
@@ -652,8 +652,9 @@ export class Renderer {
 
   // ------------------------------------------------------------- glasses
 
-  /** What the glasses add to the pot: where the next bacteria and item will
-   *  appear (up to 3 seconds ahead), and how long the item on the ground will wait. */
+  /** What the glasses add to the pot: where the next bacteria will appear,
+   *  and which item will appear where (up to 3 seconds ahead), and how long
+   *  the item and coins on the ground will wait. */
   drawGuides(game) {
     game.upcoming.forEach((p, i) => {
       this.target(p, 1 - Math.min(1, game.untilUpcoming(i) / LOOKAHEAD), false);
@@ -666,10 +667,16 @@ export class Renderer {
     if (item?.landed && !(item.blinking && Math.floor(item.t * 8) % 2 === 0)) {
       this.label(String(Math.ceil(item.life)), item.x, item.y - 46, 13);
     }
+    for (const c of game.coins) {
+      if (c.blinking && Math.floor(c.t * 10) % 2 === 0) continue;
+      const big = c.value >= COINS.dropValue;
+      this.label(String(Math.ceil(c.life)), c.x, c.y - (big ? 44 : 34), 12);
+    }
   }
 
-  /** A dotted ring on the soil that closes in as the moment comes. Items
-   *  get a diamond in the middle; bacteria a dot. */
+  /** A dotted ring on the soil that closes in as the moment comes. An item
+   *  shows a see-through picture of what's coming in the middle; a bacteria
+   *  a dot. */
   target(p, k, isItem) {
     const { ctx } = this;
     const r = Math.round(26 - 12 * k);
@@ -689,15 +696,15 @@ export class Renderer {
       }
       const cx = Math.round(p.x / 2) * 2;
       const cy = Math.round(p.y / 2) * 2;
-      if (isItem) {
-        for (const [dx, dy] of [[0, -4], [-2, -2], [2, -2], [-4, 0], [4, 0], [-2, 2], [2, 2], [0, 4], [0, 0]]) {
-          ctx.fillRect(cx + dx - size / 2, cy + dy - 8 - size / 2, size, size);
-        }
-      } else {
-        ctx.fillRect(cx - size / 2 - 1, cy - size / 2 - 1, size + 2, size + 2);
-      }
+      if (!isItem) ctx.fillRect(cx - size / 2 - 1, cy - size / 2 - 1, size + 2, size + 2);
     }
     ctx.restore();
+    if (isItem && p.type) {
+      const bob = this.calm ? 0 : Math.round(Math.sin(this.time * 4) * 2);
+      this.sprite(this.sprites.icons[p.type], 0, 0, 16, 16, p.x, p.y - 16 + bob, 8, 8, {
+        alpha: blink ? 0.3 : 0.55 + 0.3 * k,
+      });
+    }
   }
 
   /** A number in the glasses' blue. */

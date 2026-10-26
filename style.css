@@ -730,6 +730,7 @@ body {
 .admin-note { color: var(--gold); font-size: 0.95rem; }
 .admin-note:empty { display: none; }
 
+.settings { display: grid; gap: 0.5rem; }
 .setting {
   display: flex;
   justify-content: space-between;

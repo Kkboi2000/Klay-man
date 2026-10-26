@@ -8,6 +8,20 @@ const $ = (id) => document.getElementById(id);
 const fmt = (n) => n.toLocaleString('en-US');
 const hearts = (n) => `${n} ${n === 1 ? 'heart' : 'hearts'}`;
 
+/** The same setting shown in several places: a switch on the setup page
+ *  ("On"), a button on the title and pause screens ("Sound on"). */
+function showSwitch(buttons, name, on) {
+  for (const b of buttons) {
+    if (b.getAttribute('role') === 'switch') {
+      b.textContent = on ? 'On' : 'Off';
+      b.setAttribute('aria-checked', String(on));
+    } else {
+      b.textContent = `${name} ${on ? 'on' : 'off'}`;
+      b.setAttribute('aria-pressed', String(on));
+    }
+  }
+}
+
 export function createUI() {
   const el = {
     score: $('score'),
@@ -170,19 +184,8 @@ export function createUI() {
       first.setAttribute('data-autofocus', '');
     },
 
-    setSound(muted) {
-      for (const b of el.soundButtons) {
-        b.textContent = muted ? 'Sound off' : 'Sound on';
-        b.setAttribute('aria-pressed', String(!muted));
-      }
-    },
-
-    setMusic(on) {
-      for (const b of el.musicButtons) {
-        b.textContent = on ? 'Music on' : 'Music off';
-        b.setAttribute('aria-pressed', String(on));
-      }
-    },
+    setSound(muted) { showSwitch(el.soundButtons, 'Sound', !muted); },
+    setMusic(on) { showSwitch(el.musicButtons, 'Music', on); },
 
     reset() {
       shown = { score: -1, level: -1, hearts: '', left: null };

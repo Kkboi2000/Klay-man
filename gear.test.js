@@ -241,11 +241,11 @@ test('sunflower: every 35 seconds an item pops out of the flower and lands near 
   assert.equal(game.item, null, 'picked up once it landed');
 });
 
-test('rose: starts with 4 hearts and heals 1 every 15 seconds', () => {
+test('rose: starts with 4 hearts and heals 1 every 20 seconds', () => {
   const game = quietGame(planting('rose'));
   assert.equal(game.lives, 4);
   game.lives = 1;
-  run(game, 14.9);
+  run(game, 19.9);
   assert.equal(game.lives, 1);
   run(game, 0.2);
   assert.equal(game.lives, 2);
@@ -253,7 +253,7 @@ test('rose: starts with 4 hearts and heals 1 every 15 seconds', () => {
   assert.equal(game.lives, 4, 'full, and stays full');
 });
 
-test('corn: 6 hearts, grows to 11, and its leaves keep bacteria out for 10 of every 60 seconds', () => {
+test('corn: 6 hearts, grows to 11, and its leaves keep bacteria out for 15 of every 40 seconds', () => {
   const fresh = new Game({ loadout: planting('corn') });
   assert.equal(fresh.lives, 6);
   assert.equal(fresh.treeScale, 1, 'not drawn oversized');
@@ -266,10 +266,10 @@ test('corn: 6 hearts, grows to 11, and its leaves keep bacteria out for 10 of ev
   game.shieldTimer = 0.01;
   game.drainEvents();
   run(game, 0.05);
-  assert.ok(game.shield > 9.9, 'leaves closed');
+  assert.ok(game.shield > 14.9, 'leaves closed');
   assert.ok(game.drainEvents().some((e) => e.type === 'shield'));
   const b = game.addBacteria(game.tree.x + 60, game.tree.y);
-  run(game, 9);
+  run(game, 14);
   assert.equal(game.lives, 6, 'nothing got in');
   assert.equal(b.crawling, true, 'it waits at the leaves');
   assert.ok(dist(b, game.tree) < 40);
@@ -277,18 +277,19 @@ test('corn: 6 hearts, grows to 11, and its leaves keep bacteria out for 10 of ev
   run(game, 1.5);
   assert.ok(game.drainEvents().some((e) => e.type === 'unshield'), 'it says when the leaves open');
   assert.equal(game.lives, 5, 'leaves open: it gets in');
-  assert.ok(Math.abs(game.shieldTimer - (60 - 10.55)) < 0.1, 'next time a minute after the last');
+  assert.ok(Math.abs(game.shieldTimer - (40 - 15.55)) < 0.1, 'next time 40 seconds after the last');
 });
 
-test('lilies: closed for 10 of every 60 seconds; bacteria wander and keep away', () => {
+test('lilies: closed for 15 of every 40 seconds; bacteria wander and keep away', () => {
   const game = quietGame(planting('lilies'));
   assert.equal(game.lives, TREE.lives);
+  assert.deepEqual(SPROUTS.lilies.hide, { every: 40, time: 15 });
   game.hideTimer = 0.01;
   run(game, 0.05);
-  assert.ok(game.hidden > 9.9);
+  assert.ok(game.hidden > 14.9);
   const b = game.addBacteria(game.tree.x + 70, game.tree.y + 10);
   let closest = Infinity;
-  for (let t = 0; t < 9.5; t += STEP) {
+  for (let t = 0; t < 14.5; t += STEP) {
     game.update(STEP);
     closest = Math.min(closest, dist(b, game.tree));
   }
@@ -408,6 +409,8 @@ test('backup sprout: when the first is lost, the second carries on with its own 
   game.level = 4;
   assert.equal(game.backupSprout, 'corn');
   lose(game);
+  assert.equal(game.canRevive, false, 'with a backup to carry on with, no revive on offer');
+  assert.equal(game.revive(), false);
   assert.equal(game.useBackup(), true);
   assert.equal(game.gear.sprout, 'corn');
   assert.equal(game.lives, 6);
@@ -416,8 +419,11 @@ test('backup sprout: when the first is lost, the second carries on with its own 
   assert.equal(game.backupSprout, null, 'only one backup');
   lose(game);
   assert.equal(game.useBackup(), false);
-  assert.equal(game.revive(), true, 'this game’s revive still works on the backup');
+  assert.equal(game.canRevive, true, 'no backup left: now the revive is offered');
+  assert.equal(game.revive(), true);
   assert.equal(game.lives, 3);
+  lose(game);
+  assert.equal(game.canRevive, false, 'and only once a game');
 });
 
 // ------------------------------------------------------------------- shop
@@ -528,7 +534,7 @@ test('prices match the brief', () => {
   assert.deepEqual(
     Object.fromEntries(Object.entries({ ...TOOLS, ...SPROUTS, ...SLOTS, ...ONCE }).map(([k, v]) => [k, v.price])),
     {
-      shoes: 29, gloves: 29, coat: 49, glasses: 49, gun: 99,
+      shoes: 29, gloves: 29, coat: 49, glasses: 69, gun: 99,
       sprout: 0, sunflower: 149, rose: 199, corn: 249, lilies: 249, mushroom: 299,
       toolSlot: 499, sproutSlot: 999,
       skip3: 29, skip7: 74, skip10: 99, revive: 49,

@@ -24,7 +24,7 @@ Every file sits in one folder, with no subfolders, so uploading is simple.
 ### Updating
 
 Upload the changed files the same way. Also open `sw.js` and bump `VERSION`
-(`klayman-v15` → `klayman-v16`): phones keep an offline copy, and this is how
+(`klayman-v16` → `klayman-v17`): phones keep an offline copy, and this is how
 they know to fetch the new one.
 
 ## Pages
@@ -34,12 +34,14 @@ they know to fetch the new one.
 2. **Setup:** pick tools and a sprout, buy things, switch **Auto throw**, then
    **Start**. The window at the top shows Klayman dressed for the game.
 3. **Game:** when the sprout is gone you see your score and the coins you
-   picked up. Once a game you can revive the sprout there for 49K (half its
-   hearts back), and with a backup sprout you can carry on with it; otherwise
-   **Play again** or go back to **Setup**. Pause has **Setup** too.
+   picked up. With a backup sprout you can carry on with it; once there's no
+   backup left, you can revive the sprout for 49K (half its hearts back), once
+   a game. Otherwise **Play again** or go back to **Setup**. Pause has
+   **Setup** too.
 
-**Music** is off until you switch it on (title page or pause). It has its own
-switch, apart from **Sound**, and is remembered between visits.
+**Sound** and **Music** each have their own switch, on the title page, the
+setup page and the pause screen. Music is off until you switch it on, and
+both are remembered between visits.
 
 The title and setup pages open upright and a game opens sideways; turn the
 phone and the screen follows. Only the installed app on Android can turn the
@@ -61,16 +63,16 @@ On the setup page, tap something you don’t own, then tap again to buy it.
 | Shoes | 29K | 15% faster; walks through the sprout |
 | Gloves | 29K | Throws 15% faster and 15% farther, with three pixel streaks off the hand |
 | Coat | 49K | Bacteria can’t get into Klayman; one that touches him crawls 30% slower for 5 s |
-| Glasses | 49K | A light-blue visor: arrows to bacteria, items and coins off-screen, an item’s seconds left, bacteria left this level, and a ring wherever bacteria or an item will appear in the next 3 s |
+| Glasses | 69K | A light-blue visor: arrows to bacteria, items and coins off-screen; seconds left on items and coins; bacteria left this level; and a ring wherever bacteria will appear in the next 3 s, or an item (with a see-through picture of which one) |
 | Dirt gun | 99K | Locks on to the closest bacteria (red brackets) and keeps Klayman facing it; throws, range and walking 5% up |
 
 | Sprout | Price | What it does |
 | --- | --- | --- |
 | Sprout | free | 3 hearts, up to 7 with water drops (so can sunflower, rose and lilies) |
 | Sunflower | 149K | Every 35 s a special item pops out of the flower and lands nearby |
-| Rose | 199K | Starts with 4 hearts; heals 1 heart every 15 s |
-| Corn | 249K | 6 hearts, up to 11; every 60 s its leaves snap shut for 10 s (it darkens) and bacteria can’t get in |
-| Lilies | 249K | Every 60 s its petals roll up into a bud for 10 s; bacteria lose sight of it and wander |
+| Rose | 199K | Starts with 4 hearts; heals 1 heart every 20 s |
+| Corn | 249K | 6 hearts, up to 11; every 40 s its leaves snap shut for 15 s (it darkens) and bacteria can’t get in |
+| Lilies | 249K | Every 40 s its petals roll up into a bud for 15 s; bacteria lose sight of it and wander |
 | Mushroom | 299K | Every 25 s spores push nearby bacteria 60 back and slow them; heals half a heart every 30 s; grows 1 heart every 50 s, up to 9 |
 
 | Slot | Price | What it does |
@@ -85,9 +87,9 @@ On the setup page, tap something you don’t own, then tap again to buy it.
 You hold one of each level skip at a time, and can buy it again after using
 it. Tools, sprouts and slots are yours for good.
 
-**Revive** isn’t on the setup page. When the sprout is lost, the summary
-offers it for 49K: the sprout comes back with half the hearts it could hold
-(5 → 2.5). Once a game.
+**Revive** isn’t on the setup page. When the sprout is lost and there’s no
+backup sprout left to carry on with, the summary offers it for 49K: the sprout
+comes back with half the hearts it could hold (5 → 2.5). Once a game.
 
 All these numbers are in `config.js` (`COINS`, `TOOLS`, `SPROUTS`, `SLOTS`, `ONCE`, `REVIVE`).
 

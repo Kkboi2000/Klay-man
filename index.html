@@ -122,9 +122,19 @@
           <div id="once" class="shelf-list" role="group" aria-labelledby="once-name"></div>
         </section>
 
-        <div class="setting">
-          <span id="auto-name" class="setting-name">Auto throw <span class="shelf-note">keeps Klayman throwing</span></span>
-          <button id="setup-auto" class="switch" type="button" role="switch" aria-checked="false" aria-labelledby="auto-name">Off</button>
+        <div class="settings">
+          <div class="setting">
+            <span id="auto-name" class="setting-name">Auto throw <span class="shelf-note">keeps Klayman throwing and pushing</span></span>
+            <button id="setup-auto" class="switch" type="button" role="switch" aria-checked="false" aria-labelledby="auto-name">Off</button>
+          </div>
+          <div class="setting">
+            <span id="sound-name" class="setting-name">Sound <span class="shelf-note">throws, hits and coins</span></span>
+            <button class="switch" type="button" role="switch" aria-checked="true" aria-labelledby="sound-name" data-sound>On</button>
+          </div>
+          <div class="setting">
+            <span id="music-name" class="setting-name">Music <span class="shelf-note">a loop that plays in the background</span></span>
+            <button class="switch" type="button" role="switch" aria-checked="false" aria-labelledby="music-name" data-music>Off</button>
+          </div>
         </div>
 
         <details class="howto-box">

@@ -301,9 +301,10 @@ test('the next special item is placed 3 seconds early, and lands right there', (
   run(game, 0.2);
   const planned = game.nextItem;
   assert.ok(planned);
+  assert.ok(['plus', 'bag', 'water', 'sandclock'].includes(planned.type), 'it knows what is coming');
   run(game, 3);
   assert.ok(game.item);
-  assert.deepEqual({ x: game.item.x, y: game.item.y }, planned);
+  assert.deepEqual({ type: game.item.type, x: game.item.x, y: game.item.y }, planned, 'and that is what comes');
 });
 
 test('red plus never shows up when the sprout is full', () => {
