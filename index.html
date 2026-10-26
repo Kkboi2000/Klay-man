@@ -62,6 +62,7 @@
         <button id="play" class="btn" type="button" data-autofocus>Play</button>
         <div class="screen-row">
           <button class="btn-quiet" type="button" data-sound aria-pressed="true">Sound on</button>
+          <button class="btn-quiet" type="button" data-music aria-pressed="false">Music off</button>
           <button id="install" class="btn-quiet" type="button" hidden>Install</button>
         </div>
         <p id="install-tip" class="tip" hidden></p>
@@ -117,7 +118,7 @@
         </section>
 
         <section class="shelf" aria-labelledby="once-name">
-          <h3 id="once-name" class="shelf-name">Used once <span class="shelf-note">buy again after you use it</span></h3>
+          <h3 id="once-name" class="shelf-name">Level skips <span class="shelf-note">used once; buy again after</span></h3>
           <div id="once" class="shelf-list" role="group" aria-labelledby="once-name"></div>
         </section>
 
@@ -131,6 +132,7 @@
           <ul class="howto">
             <li>Hit a bacteria with dirt four times to turn it into a dirtball.</li>
             <li>Walk right up to a dirtball and push it to roll it into other bacteria. Auto throw pushes too.</li>
+            <li>When the sprout is lost, you can revive it once a game for 49K.</li>
             <li>Walk over coins to pick them up. Spend them here.</li>
             <li>From level 3, special items appear near the sprout.</li>
             <li>From level 7, dirt thrown at a dirtball from afar breaks it.</li>
@@ -151,6 +153,7 @@
         <button id="resume" class="btn" type="button" data-autofocus>Resume</button>
         <div class="screen-row">
           <button class="btn-quiet" type="button" data-sound aria-pressed="true">Sound on</button>
+          <button class="btn-quiet" type="button" data-music aria-pressed="false">Music off</button>
           <button id="restart" class="btn-quiet" type="button">Restart</button>
           <button class="btn-quiet" type="button" data-to-setup>Setup</button>
         </div>
@@ -165,8 +168,14 @@
         <p id="final-level" class="final-level"></p>
         <p class="final-coins"><span class="coin-icon" aria-hidden="true"></span><span id="final-coins">+0K</span></p>
         <div id="chance" class="chance" hidden>
-          <button id="revive" class="btn" type="button" hidden>Revive the sprout</button>
-          <button id="backup" class="btn" type="button" hidden>Carry on with the backup</button>
+          <button id="revive" class="btn btn-chance" type="button" hidden>
+            <img class="chance-pic" id="revive-pic" alt="">
+            <span class="chance-text"><span class="chance-main">Revive the sprout</span><span id="revive-note" class="chance-note"></span></span>
+          </button>
+          <button id="backup" class="btn btn-chance" type="button" hidden>
+            <img class="chance-pic" id="backup-pic" alt="">
+            <span class="chance-text"><span id="backup-name" class="chance-main">Carry on with the backup</span></span>
+          </button>
         </div>
         <div class="screen-row">
           <button id="again" class="btn" type="button" data-autofocus>Play again</button>

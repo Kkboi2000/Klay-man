@@ -70,8 +70,8 @@ export const LEVELS = {
   clearDelay: 1.2,
 };
 
-// The glasses show where the next bacteria or item appears this long before it does.
-export const LOOKAHEAD = 1.5;
+// The glasses show where the next bacteria or items appear this long before they do.
+export const LOOKAHEAD = 3;
 
 export const ITEMS = {
   unlockLevel: 3,
@@ -108,7 +108,7 @@ export const COINS = {
 export const TOOLS = {
   shoes: { price: 29, speed: 1.15 },                   // and he walks through the sprout
   gloves: { price: 29, fireRate: 1.15, range: 1.15 },
-  coat: { price: 49, slowTime: 5, slowFactor: 0.85 },  // bacteria can't get in; a touch slows them
+  coat: { price: 49, slowTime: 5, slowFactor: 0.7 },   // bacteria can't get in; a touch slows them 30%
   glasses: { price: 49 },                              // arrows, timers, counts, spawn warnings
   gun: { price: 99, fireRate: 1.05, range: 1.05, speed: 1.05 }, // shots lock on to a bacteria
 };
@@ -165,11 +165,12 @@ export const ONCE = {
   skip3: { price: 29, level: 3 },
   skip7: { price: 74, level: 7 },
   skip10: { price: 99, level: 10 },
-  revive: { price: 49 },     // a lost sprout comes back with half its hearts
+  revive: { price: 49 },     // bought on the summary when the sprout is lost
 };
 
-// A revived sprout (or a backup sprout taking over) clears a little room.
-export const REVIVE = { reach: 170, push: 80 };
+// A revive brings a lost sprout back with half its hearts, once a game. A
+// revived sprout (or a backup sprout taking over) clears a little room.
+export const REVIVE = { reach: 170, push: 80, perGame: 1 };
 
 export const KNOCK_TIME = 0.35; // how long a spore push takes
 export const ITEM_FLIGHT = 0.6; // a sunflower's item takes this long to land

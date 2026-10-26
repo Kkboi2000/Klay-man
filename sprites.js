@@ -2,7 +2,7 @@
 // Also dresses Klayman in his tools and builds the bought sprouts, coins and
 // icons from the pixel art in art.js.
 import {
-  SPROUT_PALETTE, SPROUT_ROWS, SHUT_ROWS, SPROUT_SWAY, ART_PALETTE, TOOL_ICON_ROWS, SHOP_ICON_ROWS,
+  SPROUT_PALETTE, SPROUT_ROWS, CLOSING_ROWS, SPROUT_SWAY, ART_PALETTE, TOOL_ICON_ROWS, SHOP_ICON_ROWS,
   COIN_ROWS, GUN_ART, GUN_ART_SMALL,
 } from './art.js';
 
@@ -421,8 +421,8 @@ function sproutLooks(sheet) {
   };
 }
 
-/** The open sprout's rows with a closed top: corn's leaves, a lily's bud. */
-const shutRows = (name) => SHUT_ROWS[name].concat(SPROUT_ROWS[name].slice(SHUT_ROWS[name].length));
+/** The open sprout's rows with a different top: a step of closing up. */
+const withTop = (name, top) => top.concat(SPROUT_ROWS[name].slice(top.length));
 
 export const coinArt = () => pixelArt(COIN_ROWS, ART_PALETTE);
 export const toolIconArt = (id) => pixelArt(TOOL_ICON_ROWS[id], ART_PALETTE);
@@ -450,7 +450,16 @@ export async function loadSprites() {
   const sprouts = { sprout: sproutLooks(tree) };
   for (const [name, rows] of Object.entries(SPROUT_ROWS)) {
     sprouts[name] = sproutLooks(sproutSheet(rows, SPROUT_SWAY[name]));
-    if (SHUT_ROWS[name]) sprouts[name].shut = sproutLooks(sproutSheet(shutRows(name), SPROUT_SWAY[name]));
+    // Closing up: the open look, each step, then closed. Corn darkens as its
+    // leaves close; a lily just curls up.
+    const steps = CLOSING_ROWS[name];
+    if (steps) {
+      sprouts[name].steps = [sprouts[name], ...steps.map((top, i) => {
+        let sheet = sproutSheet(withTop(name, top), SPROUT_SWAY[name]);
+        if (name === 'corn') sheet = tinted(sheet, `rgba(16, 26, 8, ${(0.32 * (i + 1)) / steps.length})`);
+        return sproutLooks(sheet);
+      })];
+    }
   }
   const gunFrom = (arts) => Object.fromEntries(
     Object.entries(arts).map(([facing, art]) => [facing, { ...art, img: pixelArt(art.rows, ART_PALETTE) }]),

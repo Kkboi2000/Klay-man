@@ -1,10 +1,27 @@
-// Web Audio: quick, overlapping sound effects. Phones keep audio locked until
-// the first tap, so unlock() is called from the Start button. The gun, coin,
-// shop and bling sounds are made here in code (makeSynths, at start-up)
-// rather than loaded from files.
+// Web Audio: quick, overlapping sound effects, and the background music.
+// Phones keep audio locked until the first tap, so unlock() is called from
+// the buttons that start things. The gun, coin, shop and bling sounds are
+// made here in code (makeSynths, at start-up) rather than loaded from files.
+//
+// Music is off until switched on, and has its own switch: Sound off silences
+// the effects, Music off the music. It loops sample-exact from a decoded
+// buffer, so there's no click each time round (an <audio loop> would have one).
 import { assetUrl } from './sprites.js';
 
 const MUTE_KEY = 'klayman.muted';
+const MUSIC_KEY = 'klayman.music';
+const MUSIC_FILE = 'music.mp3';
+const MUSIC_VOLUME = 0.3;          // under the effects
+
+/** Where the music really starts and ends: an MP3 can carry a few silent
+ *  samples at either end, and looping those would click. */
+export function loopPoints(samples, rate) {
+  let first = 0;
+  while (first < samples.length - 1 && Math.abs(samples[first]) < 1e-4) first++;
+  let last = samples.length - 1;
+  while (last > first && Math.abs(samples[last]) < 1e-5) last--;
+  return { start: first / rate, end: (last + 1) / rate };
+}
 
 function base64ToBuffer(dataUrl) {
   const bin = atob(dataUrl.slice(dataUrl.indexOf(',') + 1));
@@ -66,6 +83,10 @@ export class Sound {
     const Ctx = globalThis.AudioContext || globalThis.webkitAudioContext;
     this.ctx = Ctx ? new Ctx() : null;
     try { this.muted = localStorage.getItem(MUTE_KEY) === '1'; } catch { this.muted = false; }
+    try { this.musicOn = localStorage.getItem(MUSIC_KEY) === '1'; } catch { this.musicOn = false; }
+    this.music = null;             // the decoded loop, once wanted
+    this.musicNode = null;         // the loop while it plays
+    this.loadingMusic = null;
     // Respect the phone's silent switch and let the player's music keep going.
     try { if (navigator.audioSession) navigator.audioSession.type = 'ambient'; } catch { /* not supported */ }
   }
@@ -89,7 +110,55 @@ export class Sound {
   }
 
   unlock() {
-    if (this.ctx && this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
+    if (!this.ctx) return;
+    if (this.ctx.state === 'running') { this.startMusic(); return; }
+    this.ctx.resume().then(() => this.startMusic(), () => {});
+  }
+
+  // ------------------------------------------------------------------ music
+
+  /** Fetches and decodes the loop the first time music is wanted. */
+  loadMusic() {
+    if (!this.ctx) return Promise.resolve(null);
+    this.loadingMusic ??= fetchBytes(MUSIC_FILE)
+      .then((bytes) => new Promise((ok, fail) => this.ctx.decodeAudioData(bytes, ok, fail)))
+      .then((buffer) => {
+        this.music = buffer;
+        this.musicLoop = loopPoints(buffer.getChannelData(0), buffer.sampleRate);
+        return buffer;
+      })
+      .catch(() => null);          // no music is never a reason to stop the game
+    return this.loadingMusic;
+  }
+
+  setMusic(on) {
+    this.musicOn = on;
+    try { localStorage.setItem(MUSIC_KEY, on ? '1' : '0'); } catch { /* private mode */ }
+    if (on) this.startMusic();
+    else this.stopMusic();
+  }
+
+  /** Starts the loop if music is on and audio is unlocked. Safe to call often. */
+  startMusic() {
+    if (!this.musicOn || this.musicNode || !this.ctx) return;
+    if (!this.music) { this.loadMusic().then(() => this.startMusic()); return; }
+    if (this.ctx.state !== 'running') return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.music;
+    src.loop = true;
+    src.loopStart = this.musicLoop.start;
+    src.loopEnd = this.musicLoop.end;
+    const gain = this.ctx.createGain();
+    gain.gain.value = MUSIC_VOLUME;
+    src.connect(gain).connect(this.ctx.destination);
+    src.start(0, this.musicLoop.start);
+    this.musicNode = src;
+  }
+
+  stopMusic() {
+    if (!this.musicNode) return;
+    try { this.musicNode.stop(); } catch { /* already stopped */ }
+    this.musicNode = null;
   }
 
   setMuted(muted) {

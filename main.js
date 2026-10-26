@@ -10,6 +10,7 @@ import { createInput } from './input.js';
 import { Sound } from './sound.js';
 import { createUI } from './ui.js';
 import { Wallet, SAVE, ADMIN_SAVE, CATALOG } from './gear.js';
+import { ONCE } from './config.js';
 import { createSetup, createFace } from './setup.js';
 import { createTitleBalls } from './titleballs.js';
 import { createOrientation } from './orientation.js';
@@ -26,7 +27,7 @@ const isPreview = Boolean(globalThis.KLAYMAN_ASSETS);
 
 let mode = 'loading';            // loading | title | setup | playing | paused | over
 let touch = matchMedia('(pointer: coarse)').matches;
-let game, renderer, input, sound, ui, best, wallet, setup, face, titleBalls;
+let game, renderer, input, sound, ui, best, wallet, setup, face, titleBalls, sprites;
 const orientation = createOrientation();
 let overDelay = 0;
 let adminLevel = 1;              // admin mode can start a game further in
@@ -148,11 +149,19 @@ function start() {
   handleEvents(game.drainEvents());
 }
 
-/** Back into the same game after the sprout was lost: revived, or the backup takes over. */
+/** Back into the same game after the sprout was lost: revived (one bought
+ *  before is used first, otherwise it's paid for now), or the backup takes over. */
 function carryOn(how) {
-  const ok = how === 'revive' ? wallet.owns('revive') && game.revive() : game.useBackup();
-  if (!ok) return;
-  if (how === 'revive') wallet.use('revive');
+  if (how === 'revive') {
+    if (!game.canRevive) return;
+    if (wallet.owns('revive')) wallet.use('revive');
+    else if (!wallet.pay(ONCE.revive.price)) return;
+    game.revive();
+    ui.setCoins(wallet.coins);
+    sound.play('buy', { volume: 0.6 });
+  } else if (!game.useBackup()) {
+    return;
+  }
   sound.unlock();
   document.activeElement?.blur();
   input.clear();
@@ -184,6 +193,19 @@ function togglePause() {
   else if (mode === 'paused') resume();
 }
 
+/** A sprout's picture, for the summary's buttons. */
+const pictures = new Map();
+function sproutPicture(id) {
+  if (!pictures.has(id)) {
+    const c = document.createElement('canvas');
+    c.width = 32;
+    c.height = 37;
+    c.getContext('2d').drawImage(sprites.sprouts[id].sheet, 0, 0, 32, 37, 0, 0, 32, 37);
+    pictures.set(id, c.toDataURL());
+  }
+  return pictures.get(id);
+}
+
 function finish(score, level) {
   const isNewBest = score > best.score;
   if (isNewBest) {
@@ -192,11 +214,15 @@ function finish(score, level) {
     ui.setBest(best);
   }
   ui.hideBanner();                // a level banner shouldn't show through the summary
-  ui.setFinal({
-    score, level, best, isNewBest, earned: game.earned,
-    revive: wallet.owns('revive') ? game.reviveHearts : null,
-    backup: game.backupSprout,
-  });
+  const revive = game.canRevive ? {
+    hearts: game.reviveHearts,
+    price: ONCE.revive.price,
+    coins: wallet.coins,
+    have: wallet.owns('revive'),
+    picture: sproutPicture(game.gear.sprout),
+  } : null;
+  const backup = game.backupSprout ? { id: game.backupSprout, picture: sproutPicture(game.backupSprout) } : null;
+  ui.setFinal({ score, level, best, isNewBest, earned: game.earned, revive, backup });
   setMode('over');
   overDelay = 1.3;               // let the sprout wilt before the screen comes up
 }
@@ -399,8 +425,10 @@ async function boot() {
   sound = new Sound();
   sound.makeSynths();            // the gun, coin, shop and bling sounds
   ui.setSound(sound.muted);
+  ui.setMusic(sound.musicOn);
+  if (sound.musicOn) sound.loadMusic();   // ready for the first tap
 
-  const [sprites] = await Promise.all([
+  [sprites] = await Promise.all([
     loadSprites(),
     sound.load(['throw', 'hit', 'break']),
     document.fonts?.load('600 16px "Pixelify Sans"').catch(() => {}),
@@ -451,16 +479,29 @@ async function boot() {
       ui.setSound(sound.muted);
     });
   }
+  for (const b of document.querySelectorAll('[data-music]')) {
+    b.addEventListener('click', () => {
+      sound.setMusic(!sound.musicOn);
+      sound.unlock();
+      ui.setMusic(sound.musicOn);
+    });
+  }
 
   addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'touch' && !touch) { touch = true; layout(); }
   }, { capture: true });
   addEventListener('resize', layout);
   globalThis.visualViewport?.addEventListener('resize', layout);
-  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+  // Leaving the app pauses the game and the music; the next tap brings the music back.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) return;
+    pause();
+    sound.stopMusic();
+  });
+  addEventListener('pointerdown', () => sound.unlock(), { capture: true });
 
   if (new URLSearchParams(location.search).has('debug')) {
-    globalThis.klaymanDebug = { get game() { return game; }, get wallet() { return wallet; }, start, showSetup };
+    globalThis.klaymanDebug = { get game() { return game; }, get wallet() { return wallet; }, get sound() { return sound; }, start, showSetup };
   }
 
   layout();

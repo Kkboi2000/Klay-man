@@ -1,7 +1,8 @@
 // The setup page: pick tools and sprouts (buying them the first time), slots
-// and one-use items, switch auto throw, and see Klayman dressed for the game.
+// and level skips, switch auto throw, and see Klayman dressed for the game.
+// (Revive isn't sold here: the summary offers it when the sprout is lost.)
 import {
-  CATALOG, TOOL_IDS, SPROUT_IDS, SLOT_IDS, ONCE_IDS, priceOf, kindOf, formatK,
+  CATALOG, TOOL_IDS, SPROUT_IDS, SLOT_IDS, SKIP_IDS, priceOf, kindOf, formatK,
 } from './gear.js';
 import { Game, NO_INPUT } from './game.js';
 import { ITEMS } from './config.js';
@@ -136,7 +137,7 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
   el.tools.append(...['none', ...TOOL_IDS].map(makeRow));
   el.sprouts.append(...SPROUT_IDS.map(makeRow));
   el.slots.append(...SLOT_IDS.map(makeRow));
-  el.once.append(...ONCE_IDS.map(makeRow));
+  el.once.append(...SKIP_IDS.map(makeRow));
 
   function say(text) { el.news.textContent = text; }
 
@@ -146,7 +147,6 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     const kind = id === 'none' ? 'tool' : kindOf(id);
     if (id === 'none') { wallet.equip(null); return ''; }
     if (kind === 'slot') return `${name} is yours.`;
-    if (id === 'revive') return 'Revive is ready. It comes up when the sprout is lost.';
     wallet.equip(id, sproutSlot);
     if (kind === 'once') return wallet.skip === id ? `Your next game starts at level ${startLevel()}.` : '';
     return '';
@@ -156,7 +156,7 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     const name = CATALOG[id].name;
     if (id === 'toolSlot') return `Bought the ${name}. Tap two tools to wear both.`;
     if (id === 'sproutSlot') return `Bought the ${name}. Pick a 2nd sprout to take over if the 1st is lost.`;
-    if (kindOf(id) === 'once') return `Bought ${name}. ${id === 'revive' ? 'It comes up when the sprout is lost.' : 'Your next game starts there.'}`;
+    if (kindOf(id) === 'once') return `Bought ${name}. Your next game starts there.`;
     return `Bought ${name}. It’s yours to keep.`;
   }
 
@@ -189,7 +189,6 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
   function ownedTag(id) {
     const kind = kindOf(id);
     if (kind === 'slot') return { on: true, text: 'Yours' };
-    if (id === 'revive') return { on: true, text: 'Ready' };
     if (kind === 'sprout' && wallet.hasBackup) {
       const slots = wallet.sproutSlotsOf(id);
       return { on: slots.length > 0, text: slots.length ? slots.map((i) => SLOT_NAMES[i]).join(' & ') : 'Use' };

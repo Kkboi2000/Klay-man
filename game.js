@@ -59,7 +59,7 @@ export class Game {
     this.item = null;
     this.coins = [];
     this.lock = null;              // the dirt gun's target: the closest bacteria
-    this.nextBacteria = null;      // where the next one will appear (the glasses show it)
+    this.upcoming = [];            // where the next bacteria will appear, soonest first (the glasses show them)
     this.nextItem = null;          // ...and the next special item
     this.score = 0;
     this.earned = 0;               // coins (K) picked up this game
@@ -69,6 +69,7 @@ export class Game {
     this.coinTimer = COINS.every;
     this.over = false;
     this.resumeTo = null;
+    this.revivesLeft = REVIVE.perGame;
     this.events.length = 0;
     this.startLevel(level);
   }
@@ -114,6 +115,9 @@ export class Game {
     return (this.phase === 'banner' ? this.phaseT : 0) + this.spawnTimer;
   }
 
+  /** Seconds until the `i`th bacteria from now appears (0 is the next one). */
+  untilUpcoming(i) { return this.untilSpawn + i * this.spawnEvery; }
+
   levelSize(n) { return LEVELS.firstCount + LEVELS.extraPerLevel * (n - 1); }
 
   spawnEveryFor(n) {
@@ -141,7 +145,7 @@ export class Game {
     this.toSpawn = this.levelSize(n);
     this.spawnEvery = this.spawnEveryFor(n);
     this.spawnTimer = 0.4;
-    this.nextBacteria = null;
+    this.upcoming = [];
     this.phase = 'banner';
     this.phaseT = LEVELS.bannerTime;
     const unlocksItems = n === ITEMS.unlockLevel;
@@ -160,8 +164,7 @@ export class Game {
   }
 
   spawnOne() {
-    const p = this.nextBacteria ?? this.planBacteria();
-    this.nextBacteria = null;
+    const p = this.upcoming.shift() ?? this.planBacteria();
     const b = this.addBacteria(p.x, p.y);
     this.emit('spawn', { x: b.x, y: b.y });
   }
@@ -480,8 +483,14 @@ export class Game {
   updateSprout(dt) {
     const g = this.gear;
     const at = { x: this.tree.x, y: this.tree.y };
-    if (this.shield > 0) this.shield = Math.max(0, this.shield - dt);
-    if (this.hidden > 0) this.hidden = Math.max(0, this.hidden - dt);
+    if (this.shield > 0) {
+      this.shield = Math.max(0, this.shield - dt);
+      if (this.shield === 0) this.emit('unshield', at);
+    }
+    if (this.hidden > 0) {
+      this.hidden = Math.max(0, this.hidden - dt);
+      if (this.hidden === 0) this.emit('unhide', at);
+    }
 
     if (g.heal) {
       this.healTimer -= dt;
@@ -562,10 +571,11 @@ export class Game {
       this.phaseT -= dt;
       if (this.phaseT <= 0) this.startLevel(this.level + 1);
     }
-    // Decide where the next bacteria appears a little early, so the glasses can show it.
-    if (this.toSpawn > 0 && !this.nextBacteria && this.untilSpawn <= LOOKAHEAD
-      && (this.phase === 'banner' || this.phase === 'play')) {
-      this.nextBacteria = this.planBacteria();
+    // Decide where the next bacteria appear a little early, so the glasses can show them.
+    if (this.phase === 'banner' || this.phase === 'play') {
+      while (this.upcoming.length < this.toSpawn && this.untilUpcoming(this.upcoming.length) <= LOOKAHEAD) {
+        this.upcoming.push(this.planBacteria());
+      }
     }
   }
 
@@ -584,9 +594,13 @@ export class Game {
   /** Hearts a revive brings back: half the hearts the sprout could hold. */
   get reviveHearts() { return this.maxLives / 2; }
 
-  /** Brings the lost sprout back with half its hearts. */
+  /** A revive is on offer: the sprout is lost and this game hasn't used one. */
+  get canRevive() { return this.over && this.revivesLeft > 0; }
+
+  /** Brings the lost sprout back with half its hearts (once a game). */
   revive() {
-    if (!this.over) return false;
+    if (!this.canRevive) return false;
+    this.revivesLeft -= 1;
     this.lives = this.reviveHearts;
     this.carryOn('revive');
     return true;

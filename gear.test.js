@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game, NO_INPUT } from './game.js';
 import { BACTERIA, COINS, ITEMS, ONCE, REVIVE, SHOT, SLOTS, SPROUTS, TOOLS, TREE } from './config.js';
-import { Wallet, gearFor, formatK, SAVE, ADMIN_SAVE, TOOL_IDS, SPROUT_IDS, SLOT_IDS, ONCE_IDS } from './gear.js';
+import { Wallet, gearFor, formatK, SAVE, ADMIN_SAVE, TOOL_IDS, SPROUT_IDS, SLOT_IDS, ONCE_IDS, SKIP_IDS, CATALOG } from './gear.js';
 import { SOIL, TREE_SPOT, dist, insideRing, insideSoil } from './world.js';
 
 const STEP = 1 / 60;
@@ -123,7 +123,7 @@ test('gloves: 15% more throws, 15% farther', () => {
   assert.equal(quietGame(wearing('gloves')).shotRange, SHOT.range * 1.15);
 });
 
-test('lab coat: bacteria can’t get in, and one that touches him slows 15% for 5 seconds', () => {
+test('coat: bacteria can’t get in, and one that touches him slows 30% for 5 seconds', () => {
   const game = quietGame(wearing('coat'));
   const k = game.klay;
   k.x = game.tree.x + 90; k.y = game.tree.y;
@@ -132,7 +132,7 @@ test('lab coat: bacteria can’t get in, and one that touches him slows 15% for 
   run(game, 1.2);
   assert.equal(k.poisoned, false);
   assert.equal(b.slowed, true);
-  assert.equal(b.slowFactor, 0.85);
+  assert.equal(b.slowFactor, 0.7);
   assert.ok(game.drainEvents().some((e) => e.type === 'slowed'));
   b.x = game.tree.x - 160; b.y = game.tree.y;   // away from him now
   run(game, 4.6);
@@ -273,7 +273,9 @@ test('corn: 6 hearts, grows to 11, and its leaves keep bacteria out for 10 of ev
   assert.equal(game.lives, 6, 'nothing got in');
   assert.equal(b.crawling, true, 'it waits at the leaves');
   assert.ok(dist(b, game.tree) < 40);
+  game.drainEvents();
   run(game, 1.5);
+  assert.ok(game.drainEvents().some((e) => e.type === 'unshield'), 'it says when the leaves open');
   assert.equal(game.lives, 5, 'leaves open: it gets in');
   assert.ok(Math.abs(game.shieldTimer - (60 - 10.55)) < 0.1, 'next time a minute after the last');
 });
@@ -359,7 +361,7 @@ function lose(game) {
   }
 }
 
-test('revive: the sprout comes back with half the hearts it could hold', () => {
+test('revive: once a game, the sprout comes back with half the hearts it could hold', () => {
   for (const [stock, back] of [[5, 2.5], [3, 1.5], [7, 3.5]]) {
     const game = quietGame();
     game.maxLives = stock;
@@ -374,7 +376,19 @@ test('revive: the sprout comes back with half the hearts it could hold', () => {
     assert.ok(game.drainEvents().some((e) => e.type === 'revive'));
     run(game, 0.5);
     assert.ok(dist(near, game.tree) > 60 + REVIVE.push * 0.6, 'room cleared round it');
+    lose(game);
+    assert.equal(game.canRevive, false, 'not twice in one game');
+    assert.equal(game.revive(), false);
   }
+});
+
+test('revive is paid for on the summary: 49K, if you have it', () => {
+  const w = new Wallet(memory());
+  w.add(60);
+  assert.equal(w.pay(ONCE.revive.price), true);
+  assert.equal(w.coins, 11);
+  assert.equal(w.pay(ONCE.revive.price), false, 'not enough left');
+  assert.equal(w.coins, 11);
 });
 
 test('a half heart left takes one more hit to lose', () => {
@@ -402,7 +416,7 @@ test('backup sprout: when the first is lost, the second carries on with its own 
   assert.equal(game.backupSprout, null, 'only one backup');
   lose(game);
   assert.equal(game.useBackup(), false);
-  assert.equal(game.revive(), true, 'a revive still works on the backup');
+  assert.equal(game.revive(), true, 'this game’s revive still works on the backup');
   assert.equal(game.lives, 3);
 });
 
@@ -485,14 +499,9 @@ test('level skips: pick one for the next game; it is spent when used', () => {
   assert.equal(w.buy('skip7'), true, 'and can be bought again');
 });
 
-test('revive is held until it is used', () => {
-  const w = new Wallet(memory());
-  w.add(100);
-  w.buy('revive');
-  assert.equal(w.owns('revive'), true);
-  assert.equal(w.startLevel, 1, 'not a level skip');
-  assert.equal(w.use('revive'), true);
-  assert.equal(w.use('revive'), false);
+test('the setup page sells level skips but not Revive', () => {
+  assert.deepEqual(SKIP_IDS, ['skip3', 'skip7', 'skip10']);
+  assert.equal(CATALOG.coat.name, 'Coat');
 });
 
 test('a v13 save (one tool, one sprout) still loads', () => {

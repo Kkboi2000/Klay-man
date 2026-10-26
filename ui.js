@@ -27,9 +27,14 @@ export function createUI() {
     finalLevel: $('final-level'),
     chance: $('chance'),
     revive: $('revive'),
+    reviveNote: $('revive-note'),
+    revivePic: $('revive-pic'),
     backup: $('backup'),
+    backupName: $('backup-name'),
+    backupPic: $('backup-pic'),
     again: $('again'),
     soundButtons: [...document.querySelectorAll('[data-sound]')],
+    musicButtons: [...document.querySelectorAll('[data-music]')],
   };
 
   // The coin is drawn once and used as a CSS image everywhere it appears.
@@ -37,7 +42,9 @@ export function createUI() {
 
   const heartArtUrl = { full: heartArt('full').toDataURL(), half: heartArt('half').toDataURL(), empty: heartArt('empty').toDataURL() };
 
-  let shown = { score: -1, level: -1, hearts: '', left: '' };
+  // What's on screen now, so it's only rebuilt when it changes. `left` starts
+  // unknown, so a new game always shows or hides the glasses' count afresh.
+  let shown = { score: -1, level: -1, hearts: '', left: null };
   let bannerTimer = 0;
 
   function renderHearts(lives, maxLives) {
@@ -125,24 +132,42 @@ export function createUI() {
       el.coins.textContent = formatK(k);
     },
 
-    /** `revive`: hearts a revive would bring back (null if you have none).
-     *  `backup`: the backup sprout that can take over (null if none). */
+    /** `revive`: { hearts, price, coins, have, picture } when a revive is on
+     *  offer (`have`: one bought before, so it's free), else null.
+     *  `backup`: { id, picture } for the backup sprout that can take over, else null. */
     setFinal({ score, level, best, isNewBest, earned, revive = null, backup = null }) {
       el.finalScore.textContent = fmt(score);
       el.finalBest.textContent = isNewBest ? 'New best score!' : `Best ${fmt(best.score)}`;
       el.finalBest.classList.toggle('is-new', isNewBest);
       el.finalLevel.textContent = `You reached level ${level}.`;
       el.finalCoins.textContent = `+${formatK(earned)} coins`;
-      el.revive.hidden = revive === null;
-      if (revive !== null) el.revive.textContent = `Revive: ${hearts(revive)} back`;
-      el.backup.hidden = backup === null;
-      if (backup !== null) el.backup.textContent = `Carry on with the ${CATALOG[backup].name.toLowerCase()}`;
-      const chance = revive !== null || backup !== null;
-      el.chance.hidden = !chance;
-      // With a second chance on offer, that's the big button; Play again steps back.
-      el.again.className = chance ? 'btn-quiet' : 'btn';
+
+      const short = Boolean(revive) && !revive.have && revive.coins < revive.price;
+      el.revive.hidden = !revive;
+      el.revive.disabled = short;
+      if (revive) {
+        el.revivePic.src = revive.picture;
+        if (revive.have) el.reviveNote.textContent = `${hearts(revive.hearts)} back`;
+        else if (short) el.reviveNote.textContent = `Needs ${formatK(revive.price)}. You have ${formatK(revive.coins)}.`;
+        else {
+          // The price, with the coin before it, as everywhere else.
+          const coin = Object.assign(document.createElement('span'), { className: 'coin-icon' });
+          coin.setAttribute('aria-hidden', 'true');
+          el.reviveNote.replaceChildren(`${hearts(revive.hearts)} back for `, coin, formatK(revive.price));
+        }
+      }
+      el.backup.hidden = !backup;
+      if (backup) {
+        el.backupName.textContent = `Carry on with the ${CATALOG[backup.id].name.toLowerCase()}`;
+        el.backupPic.src = backup.picture;
+      }
+      el.chance.hidden = !revive && !backup;
+
+      // A second chance you can take is the big button; Play again steps back.
+      const first = revive && !short ? el.revive : backup ? el.backup : el.again;
+      el.again.className = first === el.again ? 'btn' : 'btn-quiet';
       for (const b of [el.revive, el.backup, el.again]) b.removeAttribute('data-autofocus');
-      (chance ? (revive !== null ? el.revive : el.backup) : el.again).setAttribute('data-autofocus', '');
+      first.setAttribute('data-autofocus', '');
     },
 
     setSound(muted) {
@@ -152,8 +177,15 @@ export function createUI() {
       }
     },
 
+    setMusic(on) {
+      for (const b of el.musicButtons) {
+        b.textContent = on ? 'Music on' : 'Music off';
+        b.setAttribute('aria-pressed', String(on));
+      }
+    },
+
     reset() {
-      shown = { score: -1, level: -1, hearts: '', left: '' };
+      shown = { score: -1, level: -1, hearts: '', left: null };
     },
   };
 }

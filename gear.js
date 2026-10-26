@@ -7,11 +7,13 @@ export const TOOL_IDS = ['shoes', 'gloves', 'coat', 'glasses', 'gun'];
 export const SPROUT_IDS = ['sprout', 'sunflower', 'rose', 'corn', 'lilies', 'mushroom'];
 export const SLOT_IDS = ['toolSlot', 'sproutSlot'];
 export const ONCE_IDS = ['skip3', 'skip7', 'skip10', 'revive'];
+// Sold on the setup page. Revive isn't: it's offered on the summary when the sprout is lost.
+export const SKIP_IDS = ['skip3', 'skip7', 'skip10'];
 
 export const CATALOG = {
   shoes: { name: 'Shoes', says: '15% faster. Walk right through the sprout.' },
   gloves: { name: 'Gloves', says: 'Throw 15% faster and 15% farther.' },
-  coat: { name: 'Lab coat', says: 'Bacteria can’t get into Klayman. One that touches him slows down for 5 seconds.' },
+  coat: { name: 'Coat', says: 'Bacteria can’t get into Klayman. One that touches him slows down 30% for 5 seconds.' },
   glasses: { name: 'Glasses', says: 'Points to bacteria and items, counts what’s left, and shows where the next ones appear.' },
   gun: { name: 'Dirt gun', says: 'Locks on to the closest bacteria. Throws, range and walking 5% up.' },
   sprout: { name: 'Sprout', says: '3 hearts, up to 7 with water.' },
@@ -25,7 +27,7 @@ export const CATALOG = {
   skip3: { name: 'Skip to level 3', says: 'Start a game at level 3. Used once.' },
   skip7: { name: 'Skip to level 7', says: 'Start a game at level 7. Used once.' },
   skip10: { name: 'Skip to level 10', says: 'Start a game at level 10. Used once.' },
-  revive: { name: 'Revive', says: 'When the sprout is lost, bring it back with half its hearts. Used once.' },
+  revive: { name: 'Revive', says: 'Bring a lost sprout back with half its hearts.' },
 };
 
 const SHOP = { ...TOOLS, ...SPROUTS, ...SLOTS, ...ONCE };
@@ -154,6 +156,14 @@ export class Wallet {
   add(k) {
     this.coins += k;
     this.save();
+  }
+
+  /** Pays `k` coins for something used on the spot. Returns false if you can't. */
+  pay(k) {
+    if (this.coins < k) return false;
+    this.coins -= k;
+    this.save();
+    return true;
   }
 
   /** Buys it and puts it to use. Returns false if it's already yours or too dear. */

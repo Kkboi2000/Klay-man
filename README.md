@@ -24,7 +24,7 @@ Every file sits in one folder, with no subfolders, so uploading is simple.
 ### Updating
 
 Upload the changed files the same way. Also open `sw.js` and bump `VERSION`
-(`klayman-v14` → `klayman-v15`): phones keep an offline copy, and this is how
+(`klayman-v15` → `klayman-v16`): phones keep an offline copy, and this is how
 they know to fetch the new one.
 
 ## Pages
@@ -34,8 +34,12 @@ they know to fetch the new one.
 2. **Setup:** pick tools and a sprout, buy things, switch **Auto throw**, then
    **Start**. The window at the top shows Klayman dressed for the game.
 3. **Game:** when the sprout is gone you see your score and the coins you
-   picked up. With a Revive or a backup sprout you can carry on from there;
-   otherwise **Play again** or go back to **Setup**. Pause has **Setup** too.
+   picked up. Once a game you can revive the sprout there for 49K (half its
+   hearts back), and with a backup sprout you can carry on with it; otherwise
+   **Play again** or go back to **Setup**. Pause has **Setup** too.
+
+**Music** is off until you switch it on (title page or pause). It has its own
+switch, apart from **Sound**, and is remembered between visits.
 
 The title and setup pages open upright and a game opens sideways; turn the
 phone and the screen follows. Only the installed app on Android can turn the
@@ -46,17 +50,18 @@ phone, and every page works either way.
 
 Coins are counted in K. A 1K coin appears somewhere on the soil every 30
 seconds. Each bacteria you kill has a 4.5% chance to drop a 5K coin. Every coin
-lasts 18 seconds and blinks for its last 3; arrows at the screen edge point to
-coins you can’t see. Coins are saved the moment you pick them up.
+lasts 18 seconds and blinks for its last 3; with the glasses on, arrows at the
+screen edge point to coins you can’t see. Coins are saved the moment you pick
+them up.
 
 On the setup page, tap something you don’t own, then tap again to buy it.
 
 | Tool | Price | What it does |
 | --- | --- | --- |
 | Shoes | 29K | 15% faster; walks through the sprout |
-| Gloves | 29K | Throws 15% faster and 15% farther, with a pixel gust at the arm |
-| Lab coat | 49K | Bacteria can’t get into Klayman; one that touches him crawls 15% slower for 5 s |
-| Glasses | 49K | A light-blue visor: arrows to bacteria and items off-screen, an item’s seconds left, bacteria left this level, and a ring where the next bacteria or item appears, 1.5 s early |
+| Gloves | 29K | Throws 15% faster and 15% farther, with three pixel streaks off the hand |
+| Coat | 49K | Bacteria can’t get into Klayman; one that touches him crawls 30% slower for 5 s |
+| Glasses | 49K | A light-blue visor: arrows to bacteria, items and coins off-screen, an item’s seconds left, bacteria left this level, and a ring wherever bacteria or an item will appear in the next 3 s |
 | Dirt gun | 99K | Locks on to the closest bacteria (red brackets) and keeps Klayman facing it; throws, range and walking 5% up |
 
 | Sprout | Price | What it does |
@@ -64,8 +69,8 @@ On the setup page, tap something you don’t own, then tap again to buy it.
 | Sprout | free | 3 hearts, up to 7 with water drops (so can sunflower, rose and lilies) |
 | Sunflower | 149K | Every 35 s a special item pops out of the flower and lands nearby |
 | Rose | 199K | Starts with 4 hearts; heals 1 heart every 15 s |
-| Corn | 249K | 6 hearts, up to 11; every 60 s its leaves close for 10 s and bacteria can’t get in |
-| Lilies | 249K | Every 60 s it closes for 10 s; bacteria lose sight of it and wander |
+| Corn | 249K | 6 hearts, up to 11; every 60 s its leaves snap shut for 10 s (it darkens) and bacteria can’t get in |
+| Lilies | 249K | Every 60 s its petals roll up into a bud for 10 s; bacteria lose sight of it and wander |
 | Mushroom | 299K | Every 25 s spores push nearby bacteria 60 back and slow them; heals half a heart every 30 s; grows 1 heart every 50 s, up to 9 |
 
 | Slot | Price | What it does |
@@ -73,15 +78,18 @@ On the setup page, tap something you don’t own, then tap again to buy it.
 | 2nd tool slot | 499K | Wear two tools. Tap a tool to put it on or take it off; a third swaps out the oldest |
 | 2nd sprout slot | 999K | Pick a 1st and a 2nd sprout (the **1st / 2nd** buttons). When the 1st is lost, carry on with the 2nd |
 
-| Used once | Price | What it does |
+| Level skip | Price | What it does |
 | --- | --- | --- |
 | Skip to level 3 / 7 / 10 | 29K / 74K / 99K | The next game starts there. Tap it to pick or unpick it; it’s spent when the game starts |
-| Revive | 49K | When the sprout is lost, bring it back with half the hearts it could hold (5 → 2.5) |
 
-You hold one of each used-once item at a time, and can buy it again after
-using it. Tools, sprouts and slots are yours for good.
+You hold one of each level skip at a time, and can buy it again after using
+it. Tools, sprouts and slots are yours for good.
 
-All these numbers are in `config.js` (`COINS`, `TOOLS`, `SPROUTS`, `SLOTS`, `ONCE`).
+**Revive** isn’t on the setup page. When the sprout is lost, the summary
+offers it for 49K: the sprout comes back with half the hearts it could hold
+(5 → 2.5). Once a game.
+
+All these numbers are in `config.js` (`COINS`, `TOOLS`, `SPROUTS`, `SLOTS`, `ONCE`, `REVIVE`).
 
 ## Admin mode (for testing)
 
@@ -116,9 +124,9 @@ Bacteria are 5% faster than before and every level spawns them 10% more often
 Every gameplay number is in `config.js`, with your original Godot values
 noted. `FEEL` scales Klayman’s speed, his shots and dirtballs (1 = your exact
 Godot numbers); bacteria use your original speed. `POT_SCALE` sets how big the
-pot is: the camera follows Klayman, so you only see part of it. Arrows at the
-screen edge point to the sprout and coins off-screen (and, with the glasses,
-bacteria and items).
+pot is: the camera follows Klayman, so you only see part of it. An arrow at the
+screen edge points to the sprout when it’s off-screen (and, with the glasses,
+to bacteria, items and coins).
 
 ## Files
 
@@ -142,7 +150,9 @@ bacteria and items).
 
 The sound effects were trimmed to remove the silence at the start of each
 file, so they play the moment something happens. The gun, coin, shop and
-sunflower sounds are made in code (`sound.js`), so there are no new sound files.
+sunflower sounds are made in code (`sound.js`). The music is `music.mp3`, an
+8.8-second loop; `sound.js` finds where it really starts and ends, so it
+loops without a click.
 
 The app icon is Klayman’s head, cut from the same frame as the title face.
 

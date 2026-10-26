@@ -266,34 +266,42 @@ test('bacteria left counts the ones to come, the ones out, and the ones in dirtb
   assert.equal(game.bacteriaLeft, 4, 'a breaking dirtball no longer counts');
 });
 
-test('the next bacteria is placed 1.5 seconds early, and appears right there', () => {
+test('the glasses know every bacteria due in the next 3 seconds, and each appears right there', () => {
   const game = new Game({ rng: () => 0.3 });
   game.klay.x = SOIL.cx - 300;                   // away from the rim spot
-  assert.equal(game.nextBacteria, null);
-  run(game, LEVELS.bannerTime + 0.4 - LOOKAHEAD - 0.1);
-  assert.equal(game.nextBacteria, null, 'not yet');
-  run(game, 0.2);
-  const planned = game.nextBacteria;
-  assert.ok(planned, 'planned 1.5s ahead');
-  assert.equal(game.bacteria.length, 0);
+  game.update(STEP);
+  // Level 1: the first is 2.2s off (banner, then 0.4s), the second 1.36s after.
+  assert.equal(LOOKAHEAD, 3);
+  assert.equal(game.upcoming.length, 1, 'only the first is within 3s');
+  run(game, 0.6);
+  assert.equal(game.upcoming.length, 2, 'now the second is too');
+  for (let i = 0; i < game.upcoming.length; i++) assert.ok(game.untilUpcoming(i) <= LOOKAHEAD);
+  const planned = [...game.upcoming];
   game.drainEvents();
-  run(game, LOOKAHEAD);
-  const spawn = game.drainEvents().find((e) => e.type === 'spawn');
-  assert.deepEqual({ x: spawn.x, y: spawn.y }, { x: planned.x, y: planned.y });
+  run(game, 3);
+  const spawns = game.drainEvents().filter((e) => e.type === 'spawn').map((e) => ({ x: e.x, y: e.y }));
+  assert.deepEqual(spawns.slice(0, 2), planned);
 });
 
-test('the next special item is placed 1.5 seconds early, and lands right there', () => {
+test('nothing is planned past the end of the level', () => {
+  const game = new Game({ rng: () => 0.3 });
+  game.toSpawn = 1;
+  run(game, 0.6);
+  assert.equal(game.upcoming.length, 1);
+});
+
+test('the next special item is placed 3 seconds early, and lands right there', () => {
   const game = quietGame();
   game.startLevel(ITEMS.unlockLevel);
   game.phase = 'test';
   game.toSpawn = 0;
-  game.itemTimer = 2;
+  game.itemTimer = 3.5;
   run(game, 0.4);
   assert.equal(game.nextItem, null);
   run(game, 0.2);
   const planned = game.nextItem;
   assert.ok(planned);
-  run(game, 1.5);
+  run(game, 3);
   assert.ok(game.item);
   assert.deepEqual({ x: game.item.x, y: game.item.y }, planned);
 });

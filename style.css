@@ -505,10 +505,25 @@ body {
 }
 .final-coins .coin-icon { width: 1.2em; height: 1.2em; }
 
-/* A revive, or the backup sprout: the way to keep this game going. */
-.chance { display: grid; gap: 0.6rem; justify-items: center; }
+/* A revive, or the backup sprout: the way to keep this game going. Each
+   shows the sprout it brings back. */
+.chance { display: grid; gap: 0.6rem; justify-items: stretch; width: min(22rem, 100%); }
 .chance[hidden], .chance .btn[hidden] { display: none; }
-.chance .btn { padding-inline: 1.4em; font-size: 1.2rem; }
+.btn-chance {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0;
+  padding: 0.35em 1em 0.45em 0.6em;
+  font-size: 1.15rem;
+  text-align: left;
+}
+.btn-chance:disabled { cursor: default; filter: grayscale(0.85) brightness(0.75); }
+.btn-chance:disabled:active { transform: none; }
+.chance-pic { flex: none; width: 2.6rem; height: 3rem; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(0 2px 0 var(--clay-deep)); }
+.chance-text { display: grid; gap: 0.1rem; }
+.chance-note { font-size: 0.85rem; font-weight: 600; text-shadow: none; color: rgba(255, 244, 227, 0.85); }
+.chance-note .coin-icon { margin: 0 0.2em 0 0.1em; vertical-align: -0.15em; }
 
 /* ------------------------------------------------------------- setup */
 
@@ -786,7 +801,8 @@ body {
   #over .final { font-size: 1.05rem; }
   #over #final-score { display: inline; font-size: 1.9rem; margin-left: 0.25em; vertical-align: -0.1em; }
   #over .final-best, #over .final-level, #over .final-coins { font-size: 0.95rem; }
-  #over .chance { grid-auto-flow: column; }
+  #over .chance { grid-auto-flow: column; width: min(36rem, 100%); }
   #over .btn { min-height: 2.6rem; margin-top: 0.2rem; padding: 0.35em 1.4em 0.45em; font-size: 1.1rem; }
-  #over .chance .btn { font-size: 1rem; }
+  #over .btn-chance { font-size: 1rem; padding: 0.25em 0.9em 0.3em 0.5em; }
+  #over .chance-pic { width: 2rem; height: 2.3rem; }
 }

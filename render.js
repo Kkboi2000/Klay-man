@@ -19,6 +19,7 @@ const GOLD = '#ffd25a';
 const LEAF = ['#668543', '#54762f', '#cfe39a'];
 const LILY = ['#fff4e3', '#efe0c4', '#ff8593'];
 const COAT = ['#eef2f5', '#9fb4c4'];
+const ROLL = 0.5;                 // seconds a corn or lily takes to close up or open
 const VISOR = '#7fdcff';          // everything the glasses show
 const VISOR_INK = '#0c2b3a';
 
@@ -53,6 +54,7 @@ export class Renderer {
     this.floaters = [];            // hearts rising from the sprout
     this.sparkles = [];            // a sunflower's bling
     this.bloom = 0;                // seconds the sunflower stays lit up
+    this.kick = 0;                 // seconds the corn still shudders from closing
     this.shake = 0;
   }
 
@@ -136,8 +138,16 @@ export class Renderer {
           this.ring(e.x, e.y - 6, e.reach, 0.7, '#b06ed6', '#f0d4ff');
           this.burst(e.x, e.y - 30, 18, SPORE, 160, -20);
           break;
-        case 'shield': this.burst(top.x + 8, top.y, 14, LEAF, 70, -30); break;
-        case 'hide': this.burst(top.x, top.y - 10, 10, LILY, 60, -20); break;
+        case 'shield':
+          // Corn snaps its leaves shut: a shudder, a green ring, leaves flying.
+          this.kick = 0.45;
+          this.ring(TREE_SPOT.x, TREE_SPOT.y - 6, 110, 0.5, '#54762f', '#cfe39a');
+          this.burst(top.x + 8, top.y - 10, 26, LEAF, 140, -40);
+          this.burst(top.x + 8, top.y - 30, 10, LEAF, 60, -70);
+          break;
+        case 'unshield': this.burst(top.x + 8, top.y - 10, 16, LEAF, 100, -50); break;
+        case 'hide': this.burst(top.x, top.y - 30, 8, LILY, 40, -20); break;
+        case 'unhide': this.burst(top.x, top.y - 34, 12, LILY, 70, -40); break;
         case 'revive':
         case 'backup':
           this.ring(e.x, e.y - 6, e.reach, 0.8, GOLD, '#fff2b8');
@@ -194,6 +204,7 @@ export class Renderer {
   draw(game, dt, focus = game.klay) {
     this.time += dt;
     if (this.bloom > 0) this.bloom = Math.max(0, this.bloom - dt);
+    if (this.kick > 0) this.kick = Math.max(0, this.kick - dt);
     const { ctx } = this;
     const s = this.zoom * this.dpr;
     this.follow(focus, dt);
@@ -248,11 +259,10 @@ export class Renderer {
   // ------------------------------------------------- off-screen pointers
 
   /** Arrows at the screen edge pointing at things the camera can't see:
-   *  coins and the sprout always; bacteria and items only through the glasses. */
+   *  the sprout always; bacteria, items and coins only through the glasses. */
   drawMarkers(game) {
     const marks = [];
-    const glasses = game.gear.glasses;
-    if (glasses) {
+    if (game.gear.glasses) {
       for (const b of game.bacteria) {
         if (b.crawling) marks.push({ x: b.x, y: b.y - 12, color: '#5aa266', size: 7 });
       }
@@ -260,10 +270,10 @@ export class Renderer {
       if (item && !(item.blinking && Math.floor(item.t * 8) % 2 === 0)) {
         marks.push({ x: item.x, y: item.y - 16, color: GOLD, size: 10, icon: item.type, secs: item.landed ? Math.ceil(item.life) : null });
       }
-    }
-    for (const c of game.coins) {
-      if (c.blinking && Math.floor(c.t * 10) % 2 === 0) continue;
-      marks.push({ x: c.x, y: c.y - 12, color: GOLD, size: 8, icon: 'coin' });
+      for (const c of game.coins) {
+        if (c.blinking && Math.floor(c.t * 10) % 2 === 0) continue;
+        marks.push({ x: c.x, y: c.y - 12, color: GOLD, size: 8, icon: 'coin' });
+      }
     }
     if (!game.over) marks.push({ x: TREE_SPOT.x, y: TREE_SPOT.y - 30, color: '#8cc152', size: 10, icon: 'heart' });
 
@@ -340,16 +350,14 @@ export class Renderer {
       this.sprite(sprout.wilted, frame * 32, 0, 32, 48, x, y, a.x, a.y, { scale: scale * 0.9 });
       return;
     }
-    // Corn's leaves closed, or a lily shut: drawn closed. In the last moment
-    // it flickers open, so you can see it's about to open.
-    const shutFor = Math.max(game.shield, game.hidden);
-    const opening = shutFor > 0 && shutFor < 0.6 && !this.calm && Math.floor(this.time * 12) % 2 === 0;
-    const look = sprout.shut && shutFor > 0 && !opening ? sprout.shut : sprout;
+    const look = this.closingLook(game, sprout);
     // A mushroom about to release its spores swells a little.
     if (game.gear.spores && game.sporeTimer < 0.8 && !this.calm) {
       scale *= 1 + 0.06 * Math.abs(Math.sin(this.time * 18));
     }
-    this.sprite(look.sheet, frame * 32, 0, 32, 48, x, y, a.x, a.y, { scale });
+    // Corn shudders as its leaves snap shut.
+    const sx = this.kick > 0 && !this.calm ? Math.round(Math.sin(this.time * 60) * this.kick * 6) : 0;
+    this.sprite(look.sheet, frame * 32, 0, 32, 48, x + sx, y, a.x, a.y, { scale });
     if (this.bloom > 0) {
       const flash = this.calm ? 0.5 : 0.35 + 0.35 * Math.abs(Math.sin(this.time * 24));
       this.sprite(look.glow, frame * 32, 0, 32, 48, x, y, a.x, a.y, { scale, alpha: flash * Math.min(1, this.bloom / 0.3) });
@@ -357,6 +365,18 @@ export class Renderer {
     if (game.treeHurt > 0) {
       this.sprite(look.hurt, frame * 32, 0, 32, 48, x, y, a.x, a.y, { scale, alpha: game.treeHurt / 0.5 });
     }
+  }
+
+  /** Corn and lilies close up step by step over ROLL seconds, and open the
+   *  same way back: a lily's petals curl up into a bud and unroll again. */
+  closingLook(game, sprout) {
+    const steps = sprout.steps;
+    const g = game.gear;
+    const power = g.shield ?? g.hide;
+    const left = g.shield ? game.shield : g.hide ? game.hidden : 0;
+    if (!steps || !power || left <= 0) return sprout;
+    const p = this.calm ? 1 : Math.min(1, (power.time - left) / ROLL, left / ROLL);
+    return steps[Math.round(p * (steps.length - 1))];
   }
 
   drawBacteria(b, frozen) {
@@ -551,33 +571,21 @@ export class Renderer {
     ctx.restore();
   }
 
-  /** Gloves: a pixel gust sweeps round the throwing arm, and three streaks
-   *  shoot off the way the dirt flies. Every speck sits on the art's 2-unit
-   *  pixel grid, so it looks drawn rather than painted. */
+  /** Gloves: three short pixel streaks shoot off the way the dirt flies.
+   *  Every speck sits on the art's 2-unit pixel grid. */
   drawWind(k) {
     const p = Math.min(1, k.action.t / KLAYMAN.actionTime);
     const turn = { side: 0, front: Math.PI / 2, back: -Math.PI / 2 }[k.facing];
     const { ctx } = this;
     const dot = (x, y) => ctx.fillRect(Math.round(x / 2) * 2 - 1, Math.round(y / 2) * 2 - 1, 2, 2);
-    const fade = (a) => Math.ceil(Math.max(0, a) * 4) / 4;     // alpha in steps, not a smooth fade
     ctx.save();
     ctx.translate(Math.round(k.x), Math.round(k.y - 18));
     if (k.facing === 'side' && k.flip) ctx.scale(-1, 1);
     ctx.rotate(turn);
-    // The swirl round the arm.
-    for (let i = 0; i < 3; i++) {
-      const r = 10 + i * 6;
-      const end = 0.4 - i * 0.14;
-      const sweep = 0.5 + 1.4 * Math.min(1, p * 1.8);
-      ctx.fillStyle = i === 1 ? '#d8f3ff' : '#ffffff';
-      ctx.globalAlpha = fade((1 - p) * (1 - i * 0.22));
-      for (let a = end - sweep; a <= end; a += 2.2 / r) dot(Math.cos(a) * r, Math.sin(a) * r);
-    }
-    // Streaks flying forward.
     ctx.fillStyle = '#ffffff';
+    ctx.globalAlpha = Math.ceil((1 - p * 0.9) * 4) / 4;   // fades in steps, not smoothly
     for (const [lane, len] of [[-7, 8], [0, 14], [7, 8]]) {
       const from = 12 + p * 34;
-      ctx.globalAlpha = fade(1 - p * 0.9);
       for (let d = 0; d < len * (1 - p * 0.5); d += 2) dot(from + d, lane);
     }
     ctx.restore();
@@ -644,13 +652,12 @@ export class Renderer {
 
   // ------------------------------------------------------------- glasses
 
-  /** What the glasses add to the pot: where the next bacteria and item are
-   *  about to appear, and how long the item on the ground will wait. */
+  /** What the glasses add to the pot: where the next bacteria and item will
+   *  appear (up to 3 seconds ahead), and how long the item on the ground will wait. */
   drawGuides(game) {
-    if (game.nextBacteria) {
-      const k = 1 - Math.min(1, game.untilSpawn / LOOKAHEAD);
-      this.target(game.nextBacteria, k, false);
-    }
+    game.upcoming.forEach((p, i) => {
+      this.target(p, 1 - Math.min(1, game.untilUpcoming(i) / LOOKAHEAD), false);
+    });
     if (game.nextItem) {
       const k = 1 - Math.min(1, game.itemTimer / LOOKAHEAD);
       this.target(game.nextItem, k, true);
