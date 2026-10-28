@@ -230,6 +230,17 @@ export const GADGETS = {
     time: 0.75,              // he stands and digs this long
     cooldown: 20,
   },
+  syringe: {
+    price: 39,
+    // A shot of something: red, a little bigger and glowing, he throws twice
+    // as fast and twice as far, and his dirt counts double...
+    boost: { time: 5, fireRate: 2, range: 2, dirt: 2 },
+    // ...then it wears off: grey, he throws at half the speed and half the
+    // distance for 2 seconds.
+    crash: { time: 2, fireRate: 0.5, range: 0.5 },
+    time: 5 + 2,
+    cooldown: 20,            // counted from when he's himself again
+  },
   fertilizer: {
     price: 39,
     slowFactor: 0.3,         // every bacteria crawls 70% slower...

@@ -5,7 +5,7 @@ import { GADGETS, ONCE, SLOTS, SPROUTS, TOOLS, TREE } from './config.js';
 
 export const TOOL_IDS = ['backpack', 'shoes', 'gloves', 'coat', 'glasses', 'gun'];
 export const SPROUT_IDS = ['sprout', 'daisy', 'sunflower', 'rose', 'corn', 'lilies', 'mushroom'];
-export const GADGET_IDS = ['leaf', 'spray', 'fertilizer', 'shovel'];
+export const GADGET_IDS = ['leaf', 'spray', 'fertilizer', 'shovel', 'syringe'];
 export const SLOT_IDS = ['toolSlot', 'sproutSlot', 'gadgetSlot'];
 export const ONCE_IDS = ['skip3', 'skip7', 'skip10', 'revive'];
 // Sold on the setup page. Revive isn't: it's offered on the summary when the sprout is lost.
@@ -29,6 +29,7 @@ export const CATALOG = {
   spray: { name: 'Mist spray', says: 'Sprays the sprout twice: half a heart back.' },
   fertilizer: { name: 'Fertilizer', says: 'Every bacteria crawls 70% slower for 5 seconds.' },
   shovel: { name: 'Shovel', says: 'Klayman digs and throws dirt all round him: every bacteria near him gets a layer of dirt.' },
+  syringe: { name: 'Hypodermic syringe', says: 'For 5 seconds Klayman throws twice as fast and twice as far, and his dirt counts double. Then 2 seconds at half speed and half distance.' },
   toolSlot: { name: '2nd tool slot', says: 'Wear two tools at once.' },
   sproutSlot: { name: '2nd sprout slot', says: 'Pick a backup sprout. When the first is lost, carry on with it.' },
   gadgetSlot: { name: '2nd gadget slot', says: 'Take two gadgets into a game.' },

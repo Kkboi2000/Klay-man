@@ -26,6 +26,9 @@ const SWEAT = ['#8fe3ff', '#d4f0ff'];
 const HP = { full: '#6aa84f', half: '#ffd25a', low: '#d9483b' };
 const LEAF_SPIN = 2.8;            // the gadget leaves, radians a second round Klayman
 const DUG = ['#c9a46a', '#e0c08a', '#a07c45'];   // the shovel's light-brown dirt
+const RUSH = ['#ff5a4a', '#ffb070', '#ffe9a8'];   // the syringe: red sparks
+const DULL = ['#8a8a8a', '#b0b0b0'];              // ...and grey once it wears off
+const BIG = 1.2;                  // how much bigger the syringe makes him
 // What the glasses call each of a sprout's powers, above the sprout.
 const POWER_WORDS = { coin: 'coin', item: 'item', closes: 'closes', opens: 'opens', spores: 'spores', heal: 'heal', grow: 'grow' };
 const ROLL = 0.5;                 // seconds a corn or lily takes to close up or open
@@ -225,12 +228,20 @@ export class Renderer {
         // -------------------------------------------------------- gadgets
         case 'gadget':
           if (e.id === 'leaf') this.burst(e.x, e.y - 18, 16, LEAF, 120, -30);
+          if (e.id === 'syringe') {
+            this.ring(e.x, e.y - 4, 70, 0.4, '#ff5a4a', '#ffd0c0');
+            this.burst(e.x, e.y - 22, 18, RUSH, 130, -40);
+          }
           if (e.id === 'fertilizer') {
             this.feed = 0.9;
             this.popup('Fertilizer!', e.x, e.y - 60, 1.4);
           }
           break;
         case 'mist': this.mist(); break;
+        case 'syringeCrash':
+          this.burst(e.x, e.y - 22, 14, DULL, 70, -10);
+          this.popup('Worn off', e.x, e.y - 58, 1.1, '#c8c8c8');
+          break;
         case 'dig':
           // Light-brown dirt flies out over the ring round him, settling as it goes.
           this.ring(e.x, e.y - 4, e.reach, 0.7, '#c9a46a', '#f0dcb0');
@@ -684,6 +695,28 @@ export class Renderer {
     const a = KLAY.anchor;
     const flip = k.facing === 'side' && k.flip;
     const jitter = k.stun > 0 && !this.calm ? Math.sin(this.time * 70) * 1.5 : 0;
+    const { ctx } = this;
+
+    // The syringe: red, bigger and glowing for its boost, then grey.
+    const shot = game.gadgets.find((g) => g.id === 'syringe' && g.active);
+    const phase = game.syringe;
+    let grow = 1;
+    let red = 0;
+    let grey = 0;
+    if (shot && phase === 'boost') {
+      const { time } = shot.spec.boost;
+      const k01 = Math.min(1, shot.t / 0.2, (time - shot.t) / 0.2);
+      grow = 1 + (BIG - 1) * k01;
+      red = k01 * (this.calm ? 0.6 : 0.5 + 0.2 * Math.sin(this.time * 12));
+    } else if (shot && phase === 'crash') {
+      grey = Math.min(1, (shot.t - shot.spec.boost.time) / 0.25, shot.on / 0.3);
+    }
+    ctx.save();
+    ctx.translate(k.x, k.y);
+    ctx.scale(grow, grow);
+    ctx.translate(-k.x, -k.y);
+    if (red > 0) this.glow(k, red);
+    if (grey > 0 && !this.calm && Math.random() < 0.1) this.burst(k.x, k.y - 30, 1, DULL, 20, 30);
 
     if (game.boost > 0) {
       const pulse = 0.25 + 0.12 * Math.sin(this.time * 10);
@@ -709,8 +742,30 @@ export class Renderer {
         alpha: green * 0.55, // "turn green a bit"
       });
     }
+    for (const [sheet, alpha] of [[look.red, red], [look.grey, grey]]) {
+      if (alpha > 0) this.sprite(sheet, col * size, row * size, size, size, k.x + jitter, k.y, a.x, a.y, { flip, alpha });
+    }
     if (gun && k.facing !== 'back') gun();
     if (tools.includes('gloves') && k.action?.kind === 'attack') this.drawStreaks(k);
+    ctx.restore();
+  }
+
+  /** The syringe's glow round Klayman: red rings, pulsing, and sparks rising. */
+  glow(k, strength) {
+    const { ctx } = this;
+    const pulse = this.calm ? 0.5 : 0.5 + 0.5 * Math.sin(this.time * 9);
+    ctx.save();
+    for (const [r, a] of [[30, 0.1], [24, 0.16], [18, 0.22]]) {
+      ctx.globalAlpha = a * strength * (0.8 + 0.4 * pulse);
+      ctx.fillStyle = '#ff4a3a';
+      ctx.beginPath();
+      ctx.ellipse(Math.round(k.x), Math.round(k.y - 19), r + pulse * 2, r * 1.15 + pulse * 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    if (!this.calm && Math.random() < 0.35) {
+      this.burst(k.x + (Math.random() * 2 - 1) * 12, k.y - 10 - Math.random() * 26, 1, RUSH, 30, -60);
+    }
   }
 
   /** The shovel in his front hand: out it comes, the blade goes in, comes up

@@ -24,7 +24,7 @@ Every file sits in one folder, with no subfolders, so uploading is simple.
 ### Updating
 
 Upload the changed files the same way. Also open `sw.js` and bump `VERSION`
-(`klayman-v19` → `klayman-v20`): phones keep an offline copy, and this is how
+(`klayman-v20` → `klayman-v21`): phones keep an offline copy, and this is how
 they know to fetch the new one.
 
 ## Pages
@@ -85,6 +85,7 @@ On the setup page, tap something you don’t own, then tap again to buy it.
 | Mist spray | 39K | A bottle by the sprout sprays it twice in 0.75 s: half a heart back. Then 20 s to recharge |
 | Fertilizer | 39K | Every bacteria crawls 70% slower for 5 s. Then 20 s to recharge |
 | Shovel | 39K | Klayman stops and digs for 0.75 s; light-brown dirt flies over a ring 180 round him (the brief’s 30 units), and every bacteria in it gets one more layer of dirt (one on its third becomes a dirtball). Dirtballs don’t mind. Then 20 s to recharge |
+| Hypodermic syringe | 39K | For 5 s Klayman turns red, a little bigger and glowing: he throws twice as fast and twice as far, and his dirt counts double (three throws to a dirtball; double on a boss too). Then he turns grey for 2 s: half as fast, half as far. Then 20 s to recharge. It stacks with gloves and the bag |
 
 In a game, a gadget’s button sits bottom-left (of the game on a computer, of
 the joystick pad on a phone). It fills up as the gadget recharges and turns

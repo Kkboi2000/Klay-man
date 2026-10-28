@@ -312,7 +312,9 @@ function handleEvents(events) {
         if (e.id === 'leaf') sound.play('throw', { volume: 0.6, rate: 1.4 });
         if (e.id === 'fertilizer') sound.play('break', { volume: 0.4, rate: 1.4 });
         if (e.id === 'shovel') sound.play('throw', { volume: 0.45, rate: 0.8 });
+        if (e.id === 'syringe') sound.play('buy', { volume: 0.55, rate: 1.6 });
         break;
+      case 'syringeCrash': sound.play('hit', { volume: 0.5, rate: 0.5 }); break;
       case 'dig':
         sound.play('break', { volume: 0.7, rate: 0.85 });
         sound.buzz(25);

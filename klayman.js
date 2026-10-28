@@ -2,7 +2,8 @@
 // is touching. One button does both (the K button on a phone, Space or a
 // click on a computer): it pushes when he's touching a dirtball and throws
 // otherwise. Auto throw does both by itself. His tools (game.gear) make him
-// faster, throw quicker and farther, or aim the dirt gun for him.
+// faster, throw quicker and farther, or aim the dirt gun for him; the
+// syringe (game.fireRate) speeds his throws up, then slows them down.
 //
 // He aims all the way round, not just four ways: at the dirt gun's target,
 // else at the mouse (on a computer), else the way he last walked (a phone's
@@ -129,7 +130,7 @@ export class Klayman {
       if (ball) dir = this.heading;
     }
 
-    this.cooldown = (KLAYMAN.attackCooldown / boost / gear.fireRate) / slowFactor;
+    this.cooldown = (KLAYMAN.attackCooldown / boost / game.fireRate) / slowFactor;
     this.tapBuffer = 0;
     if (ball) {
       ball.push(dir);

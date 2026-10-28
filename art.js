@@ -526,6 +526,24 @@ export const GADGET_ICON_ROWS = {
     '.kmmk..kkkkkkk..',
     '..kk............',
   ],
+  syringe: [
+    '...........kk...',
+    '..........kSSk..',
+    '...........kSSk.',
+    '.........kkllSSk',
+    '........kSlllkSk',
+    '.......kRhSlk.k.',
+    '......kRrhhSk...',
+    '.....kRrrrWk....',
+    '....kRrrrWk.....',
+    '...kRrrrWk......',
+    '...kmrrWk.......',
+    '...klmWk........',
+    '..klkkk.........',
+    '.klk............',
+    '..k.............',
+    '................',
+  ],
 };
 
 // 16 x 16 icons for the slots and the one-use items.

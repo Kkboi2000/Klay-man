@@ -123,6 +123,19 @@ export class Game {
   // ---------------------------------------------------------------- state
 
   get boostFactor() { return this.boost > 0 ? ITEMS.bagBoost : 1; }
+
+  /** The syringe: 'boost' for its first 5 seconds, 'crash' for the 2 after, else null. */
+  get syringe() {
+    const g = this.gadgets.find((x) => x.id === 'syringe' && x.active);
+    if (!g) return null;
+    return g.t < g.spec.boost.time ? 'boost' : 'crash';
+  }
+  /** What the syringe does to his throws right now (nothing, when it isn't working). */
+  get syringeEffect() { return GADGETS.syringe[this.syringe] ?? {}; }
+  /** How much quicker than plain he throws: his tools, and the syringe. */
+  get fireRate() { return this.gear.fireRate * (this.syringeEffect.fireRate ?? 1); }
+  /** How much dirt a throw puts on: the bag, and the syringe. */
+  get dirtPower() { return this.boostFactor * (this.syringeEffect.dirt ?? 1); }
   get frozen() { return this.freeze > 0; }
   get itemsUnlocked() { return this.level >= ITEMS.unlockLevel; }
   /** Level 7 skill: dirt thrown from a distance breaks a dirtball. */
@@ -354,7 +367,7 @@ export class Game {
     return best;
   }
 
-  get shotRange() { return SHOT.range * this.gear.range; }
+  get shotRange() { return SHOT.range * this.gear.range * (this.syringeEffect.range ?? 1); }
 
   spawnShot(x, y, dir, target = null) {
     const shot = new DirtShot(x, y, dir, { range: this.shotRange, target });
@@ -416,7 +429,7 @@ export class Game {
         if (dist(b, s) < BACTERIA.radius + SHOT.radius) {
           s.dead = true;
           this.emit('hit', { x: b.x, y: b.y });
-          if (b.addDirt(this.boostFactor)) this.turnIntoDirtball(b);
+          if (b.addDirt(this.dirtPower)) this.turnIntoDirtball(b);
           break;
         }
       }
@@ -424,7 +437,7 @@ export class Game {
       // Dirt splats on the boss; while it's still fighting, it wears it down.
       if (boss?.solid && boss.touches(s, SHOT.radius)) {
         s.dead = true;
-        if (boss.alive) this.hitBoss(BOSS.shotDamage * this.boostFactor, s);
+        if (boss.alive) this.hitBoss(BOSS.shotDamage * this.dirtPower, s);
         else this.emit('hit', { x: s.x, y: s.y });
         continue;
       }
@@ -735,6 +748,9 @@ export class Game {
       }
       // The shovel: the moment the blade comes up full, dirt flies all round him.
       if (running && g.id === 'shovel' && before < g.spec.dig && g.t >= g.spec.dig) this.dig(g.spec);
+      // The syringe wears off: he goes grey.
+      const peak = g.spec.boost?.time;
+      if (running && g.id === 'syringe' && before < peak && g.t >= peak) this.emit('syringeCrash', { x: this.klay.x, y: this.klay.y });
       if (news) this.emit(news === 'end' ? 'gadgetEnds' : 'gadgetReady', { id: g.id, index });
     });
   }

@@ -569,7 +569,7 @@ test('prices match the brief', () => {
     {
       backpack: 19, shoes: 29, gloves: 29, coat: 49, glasses: 69, gun: 99,
       sprout: 0, daisy: 99, sunflower: 149, rose: 199, corn: 249, lilies: 249, mushroom: 299,
-      leaf: 39, spray: 39, fertilizer: 39, shovel: 39,
+      leaf: 39, spray: 39, fertilizer: 39, shovel: 39, syringe: 39,
       toolSlot: 199, sproutSlot: 399, gadgetSlot: 99,
       skip3: 29, skip7: 74, skip10: 99, revive: 49,
     },
@@ -713,7 +713,7 @@ const withGadgets = (...gadgets) => ({ gadgets });
 const press = (i) => ({ ...NO_INPUT, gadget: i });
 
 test('gadgets cost 39K; the 2nd gadget slot 99K; the 2nd tool slot 199K; the 2nd sprout slot 399K', () => {
-  assert.deepEqual(GADGET_IDS.map((id) => GADGETS[id].price), [39, 39, 39, 39]);
+  assert.deepEqual(GADGET_IDS.map((id) => GADGETS[id].price), [39, 39, 39, 39, 39]);
   assert.equal(SLOTS.gadgetSlot.price, 99);
   assert.equal(SLOTS.toolSlot.price, 199);
   assert.equal(SLOTS.sproutSlot.price, 399);
@@ -862,4 +862,70 @@ test('the glasses’ sprout clocks: what comes next, and when', () => {
   assert.deepEqual(clocks('lilies', (g) => { g.hidden = 4.2; }), ['opens 5']);
   assert.deepEqual(clocks('mushroom'), ['spores 25', 'heal 30', 'grow 50']);
   assert.deepEqual(clocks('mushroom', (g) => { g.maxLives = 9; }), ['spores 25', 'heal 30'], 'fully grown: no more growing');
+});
+
+// ---------------------------------------------------------------- syringe
+
+/** Throws in `seconds` of auto throw, and how far the gun can reach meanwhile. */
+function throwsIn(game, seconds) {
+  game.drainEvents();
+  run(game, seconds, { ...NO_INPUT, auto: true });
+  return game.drainEvents().filter((e) => e.type === 'throw').length;
+}
+
+test('syringe: 5 seconds red, throwing twice as fast and twice as far', () => {
+  const plain = throwsIn(quietGame(), 4.8);
+  const game = quietGame(withGadgets('syringe'));
+  game.update(STEP, press(0));
+  assert.equal(game.syringe, 'boost');
+  assert.equal(game.shotRange, SHOT.range * 2);
+  const boosted = throwsIn(game, 4.8);
+  // Throws land on whole 1/60s steps, so the ratio is close to 2, not exactly (as with the gloves).
+  assert.ok(boosted / plain > 1.75 && boosted / plain < 2.1, `${boosted} throws against ${plain}`);
+});
+
+test('syringe: while it works, bacteria turn into dirtballs twice as fast', () => {
+  const throwsToBall = (gadgets) => {
+    const game = quietGame(withGadgets(...gadgets));
+    if (gadgets.length) game.update(STEP, press(0));
+    const b = game.addBacteria(0, 0);
+    let n = 0;
+    while (!b.addDirt(game.dirtPower)) n += 1;
+    return n + 1;
+  };
+  assert.equal(throwsToBall([]), 5);
+  assert.equal(throwsToBall(['syringe']), 3, 'double dirt: 2 + 2 + 2 (whole throws, so 3 rather than 2.5)');
+  const game = quietGame(withGadgets('syringe'));
+  game.update(STEP, press(0));
+  game.boost = ITEMS.bagTime;
+  assert.equal(game.dirtPower, ITEMS.bagBoost * 2, 'the bag on top: they stack');
+});
+
+test('syringe: then 2 seconds grey, at half speed and half distance; then himself, and 20 seconds to recharge', () => {
+  const plain = throwsIn(quietGame(), 1.9);
+  const game = quietGame(withGadgets('syringe'));
+  game.update(STEP, press(0));
+  game.drainEvents();
+  run(game, 5);
+  assert.equal(game.syringe, 'crash');
+  assert.ok(game.drainEvents().some((e) => e.type === 'syringeCrash'), 'it says when it wears off');
+  assert.equal(game.shotRange, SHOT.range * 0.5);
+  assert.equal(game.dirtPower, 1, 'his dirt is back to normal');
+  game.klay.cooldown = 0;
+  const crashed = throwsIn(game, 1.9);
+  assert.ok(crashed <= Math.ceil(plain / 2) && crashed >= Math.floor(plain / 2) - 1, `${crashed} throws against ${plain}`);
+  run(game, 0.2);
+  assert.equal(game.syringe, null, 'after 7 seconds in all');
+  assert.equal(game.shotRange, SHOT.range);
+  const g = game.gadgets[0];
+  assert.ok(g.wait > 19.5, 'then the 20 seconds start');
+  game.update(STEP, press(0));
+  assert.equal(game.syringe, null, 'not ready yet');
+});
+
+test('syringe: with gloves, both count', () => {
+  const game = quietGame({ tools: ['gloves'], gadgets: ['syringe'] });
+  game.update(STEP, press(0));
+  assert.ok(Math.abs(game.fireRate - 1.15 * 2) < 1e-9);
+  assert.ok(Math.abs(game.shotRange - SHOT.range * 1.15 * 2) < 1e-9);
 });

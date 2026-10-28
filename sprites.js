@@ -28,6 +28,19 @@ function makeCanvas(w, h) {
   return c;
 }
 
+/** A grey copy of an image: its colours drained, its shading kept. */
+function greyed(img) {
+  const c = makeCanvas(img.width, img.height);
+  const g = c.getContext('2d');
+  g.drawImage(img, 0, 0);
+  g.globalCompositeOperation = 'saturation';
+  g.fillStyle = 'hsl(0, 0%, 50%)';
+  g.fillRect(0, 0, c.width, c.height);
+  g.globalCompositeOperation = 'destination-in';   // back to the image's own shape
+  g.drawImage(img, 0, 0);
+  return c;
+}
+
 /** A copy of an image washed with a colour (poison green, frozen blue...). */
 function tinted(img, color) {
   const c = makeCanvas(img.width, img.height);
@@ -452,14 +465,20 @@ export async function loadSprites() {
     loadImage('boss.png'),
   ]);
   const info = readKlay(klay);
-  // Klayman in any mix of tools, painted the first time it's needed.
+  // Klayman in any mix of tools, painted the first time it's needed: as he
+  // is, poisoned green, and (the syringe) red with power, then grey.
   const looks = new Map();
   const lookFor = (tools = []) => {
     const wear = DRESSABLE.filter((t) => tools.includes(t));
     const key = wear.join('+') || 'none';
     if (!looks.has(key)) {
       const sheet = wear.length ? dressKlay(klay, info, wear) : klay;
-      looks.set(key, { sheet, green: tinted(sheet, 'rgba(96, 196, 72, 0.55)') });
+      looks.set(key, {
+        sheet,
+        green: tinted(sheet, 'rgba(96, 196, 72, 0.55)'),
+        red: tinted(sheet, 'rgba(236, 52, 40, 0.62)'),
+        grey: greyed(sheet),
+      });
     }
     return looks.get(key);
   };
