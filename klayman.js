@@ -1,23 +1,22 @@
-// Ported from klayman.gd: moves, faces front/back/side, throws dirt, and
-// pushes a dirtball he is touching. One button does both (the K button on a
-// phone, Space on a computer): it pushes when he's touching a dirtball and
-// throws otherwise. Auto throw does both by itself. His tools (game.gear)
-// make him faster, throw quicker and farther, or aim the dirt gun for him.
+// Ported from klayman.gd: moves, aims, throws dirt, and pushes a dirtball he
+// is touching. One button does both (the K button on a phone, Space or a
+// click on a computer): it pushes when he's touching a dirtball and throws
+// otherwise. Auto throw does both by itself. His tools (game.gear) make him
+// faster, throw quicker and farther, or aim the dirt gun for him.
+//
+// He aims all the way round, not just four ways: at the dirt gun's target,
+// else at the mouse (on a computer), else the way he last walked (a phone's
+// joystick). His picture turns to the nearest of front, back and side.
 import { KLAYMAN, POISON } from './config.js';
 import { keepOnSoil } from './world.js';
 
 const BUFFER = 0.3;              // seconds a press waits for the cooldown
 
-const FACING_DIR = {
-  front: { x: 0, y: 1 },
-  back: { x: 0, y: -1 },
-};
-
 export class Klayman {
   constructor(x, y) {
     this.x = x;
     this.y = y;
-    this.facing = 'front';
+    this.facing = 'front';       // which picture: front, back or side
     this.flip = false;           // side frames face right; flip to face left
     this.moving = false;
     this.cooldown = 0;
@@ -26,7 +25,8 @@ export class Klayman {
     this.slow = 0;
     this.t = 0;
     this.tapBuffer = 0;          // a press during the cooldown still counts
-    this.heading = { x: 0, y: 1 }; // the way he last walked: up, down, left or right
+    this.heading = { x: 0, y: 1 }; // the way he last walked, any angle
+    this.aim = { x: 0, y: 1 };   // the way he throws, any angle
   }
 
   get poisoned() { return this.stun > 0 || this.slow > 0; }
@@ -45,15 +45,14 @@ export class Klayman {
     return true;
   }
 
+  /** The way his picture faces, as a step: right, left, down or up. */
   facingDir() {
     if (this.facing === 'side') return { x: this.flip ? -1 : 1, y: 0 };
-    return FACING_DIR[this.facing];
+    return this.facing === 'back' ? { x: 0, y: -1 } : { x: 0, y: 1 };
   }
 
-  /** Turns to look at a point: side, front or back, whichever is closest. */
-  faceToward(p) {
-    const dx = p.x - this.x;
-    const dy = p.y - this.y;
+  /** Turns his picture toward a direction: side, front or back, whichever is closest. */
+  turnTo(dx, dy) {
     if (Math.abs(dx) > Math.abs(dy)) {
       this.facing = 'side';
       this.flip = dx < 0;
@@ -61,6 +60,22 @@ export class Klayman {
       this.facing = dy < 0 ? 'back' : 'front';
       this.flip = false;
     }
+  }
+
+  /** Aims along `dir` (any length) and turns to it. */
+  lookAlong(dir) {
+    const d = Math.hypot(dir.x, dir.y);
+    if (d < 0.001) return;
+    this.aim = { x: dir.x / d, y: dir.y / d };
+    this.turnTo(dir.x, dir.y);
+  }
+
+  /** Aims at a point in the pot. */
+  lookAt(p) {
+    const dx = p.x - this.x;
+    const dy = p.y - this.y;
+    if (Math.hypot(dx, dy) < 1) return;
+    this.lookAlong({ x: dx, y: dy });
   }
 
   update(dt, input, game) {
@@ -92,22 +107,24 @@ export class Klayman {
       const speed = KLAYMAN.speed * slowFactor * boost * gear.speed;
       this.x += dx * speed * dt;
       this.y += dy * speed * dt;
-      this.heading = Math.abs(dx) > Math.abs(dy) ? { x: Math.sign(dx), y: 0 } : { x: 0, y: Math.sign(dy) };
-      this.faceToward({ x: this.x + dx, y: this.y + dy });
+      this.heading = { x: dx, y: dy };
     }
     keepOnSoil(this, 14);
     game.pushOutOfObstacles(this, KLAYMAN.radius, !gear.passSprout);
 
-    // The dirt gun keeps him facing the closest bacteria, walking or not.
+    // The dirt gun keeps him on its target, walking or not; otherwise the
+    // mouse does (on a computer), or he aims the way he walks.
     const target = game.lock;
-    if (target) this.faceToward(target);
+    const point = target ? (target.aimPoint ?? target) : input.aim;
+    if (point) this.lookAt(point);
+    else if (this.moving) this.lookAlong(this.heading);
     if (this.cooldown > 0 || !(this.tapBuffer > 0 || input.held || input.auto)) return;
 
-    // Only a dirtball he is touching can be pushed: the one he faces, or
-    // (aiming the gun elsewhere) the one he walked into.
-    let dir = this.facingDir();
+    // Only a dirtball he is touching can be pushed: the one he aims at, or
+    // (aiming elsewhere) the one he walked into.
+    let dir = this.aim;
     let ball = game.dirtballTouching(this, dir);
-    if (!ball && target) {
+    if (!ball && point) {
       ball = game.dirtballTouching(this, this.heading);
       if (ball) dir = this.heading;
     }
@@ -120,16 +137,16 @@ export class Klayman {
       game.emit('push', { x: ball.x, y: ball.y });
       return;
     }
-    const hand = this.facingDir();
-    const from = { x: this.x + hand.x * 12, y: this.y + hand.y * 12 + (hand.y < 0 ? -2 : 0) };
-    let aim = hand;
+    const a = this.aim;
+    const from = { x: this.x + a.x * 12, y: this.y + a.y * 12 + (a.y < -0.5 ? -2 : 0) };
+    let shot = a;
     if (target) {
-      const ax = target.x - from.x;
-      const ay = target.y - from.y;
+      const ax = point.x - from.x;
+      const ay = point.y - from.y;
       const d = Math.hypot(ax, ay) || 1;
-      aim = { x: ax / d, y: ay / d };
+      shot = { x: ax / d, y: ay / d };
     }
     this.action = { kind: 'attack', t: 0 };
-    game.spawnShot(from.x, from.y, aim, target);
+    game.spawnShot(from.x, from.y, shot, target);
   }
 }

@@ -1,6 +1,6 @@
 // Boots Klayman: loads assets, lays out the screen for the device, runs the loop.
 // Three pages: the title (Klayman's face over rolling dirtballs), setup
-// (tools, sprouts, the shop, auto throw), and the game itself, which ends
+// (tools, sprouts, gadgets, the shop, auto throw), and the game itself, which ends
 // with a score summary: a revive or the backup sprout can carry it on, or
 // play again, or go back to setup.
 import { Game } from './game.js';
@@ -96,6 +96,7 @@ function layout() {
   const h = Math.floor(stage.height);
   if (!renderer) return;
   renderer.resize(w, h, Math.min(3, devicePixelRatio || 1));
+  renderer.markerBottom = app.dataset.layout === 'desk' ? 70 : 0;   // the gadget buttons sit there
   app.style.setProperty('--u', String(renderer.zoom));
   if (mode === 'setup') setup.resize();
 }
@@ -246,7 +247,11 @@ function handleEvents(events) {
         ui.setCoins(wallet.coins);
         sound.play('coin', { volume: e.value > 1 ? 0.7 : 0.5, rate: e.value > 1 ? 0.85 : 1 });
         break;
-      case 'coinAppears': sound.play('coin', { volume: 0.12, rate: 1.5 }); break;
+      case 'coinAppears':
+        if (e.value >= 10) sound.play('bling', { volume: 0.7, rate: 0.8 });
+        else if (e.from) sound.play('bling', { volume: 0.45, rate: 1.15 });
+        else sound.play('coin', { volume: 0.12, rate: 1.5 });
+        break;
       case 'heal': sound.play('buy', { volume: 0.45, rate: 1.35 }); break;
       case 'grow': sound.play('buy', { volume: 0.4, rate: 1.2 }); break;
       case 'revive':
@@ -282,9 +287,34 @@ function handleEvents(events) {
         let news = '';
         if (e.unlocksItems) news = 'From now on, special items will appear near the sprout.';
         if (e.unlocksSkill) news = 'New skill: throw dirt at a dirtball from afar to break it. Up close, you still push it.';
+        if (e.boss) news = e.firstBoss
+          ? 'A boss bacteria waits at the end of this level. Wear it down with dirt, and roll dirtballs into it.'
+          : 'A boss bacteria waits at the end of this level.';
         ui.banner(`Level ${e.level}`, news, news ? 4.5 : 1.8);
         break;
       }
+      // The boss.
+      case 'bossComing':
+        ui.banner('Boss bacteria!', '', 1.8);
+        sound.play('break', { volume: 0.9, rate: 0.4 });
+        sound.buzz(120);
+        break;
+      case 'bossRises': sound.play('break', { volume: 1, rate: 0.5 }); break;
+      case 'bossHit': sound.play('hit', { volume: 0.5, rate: e.damage >= 5 ? 0.5 : 0.75 }); break;
+      case 'bossSpawn': sound.play('hit', { volume: 0.3, rate: 1.3 }); break;
+      case 'bossDown': sound.play('buy', { volume: 0.6, rate: 0.7 }); break;
+      case 'bossBurrows':
+        sound.play('break', { volume: 0.9, rate: 0.45 });
+        sound.buzz(60);
+        break;
+      // Gadgets.
+      case 'gadget':
+        if (e.id === 'leaf') sound.play('throw', { volume: 0.6, rate: 1.4 });
+        if (e.id === 'fertilizer') sound.play('break', { volume: 0.4, rate: 1.4 });
+        break;
+      case 'mist': sound.play('throw', { volume: 0.4, rate: 2.2 }); break;
+      case 'sprayHeal': sound.play('buy', { volume: 0.4, rate: 1.35 }); break;
+      case 'gadgetReady': sound.play('coin', { volume: 0.18, rate: 2 }); break;
       case 'gameover': finish(e.score, e.level); break;
     }
   }
@@ -302,7 +332,10 @@ function loop(now) {
     acc += dt;
     let steps = 0;
     while (acc >= STEP && steps < 6) {
-      game.update(STEP, input.read());
+      const step = input.read();
+      // The mouse is on the screen; Klayman aims at that spot in the pot.
+      if (step.aim) step.aim = renderer.toWorld(step.aim.x, step.aim.y);
+      game.update(STEP, step);
       acc -= STEP;
       steps++;
     }
@@ -442,7 +475,10 @@ async function boot() {
   face = createFace($('face'), sprites.klay);
   titleBalls = createTitleBalls($('title-balls'), sprites.bac);
 
+  ui.setGadgetIcons(sprites.gadgetIcons);
   input = createInput({
+    stage: $('stage'),
+    gadgetButtons: [...document.querySelectorAll('[data-gadget]')],
     stickZone: $('stick-zone'),
     stickBase: $('stick-base'),
     stickKnob: $('stick-knob'),

@@ -1,6 +1,8 @@
-// Keyboard on a computer; a floating joystick, the K button and an
-// auto-throw switch on a phone. read() returns the step's input once per
-// game step (see NO_INPUT in game.js). The K button and Space do the same:
+// On a computer: WASD or the arrow keys walk, the mouse aims, a click or
+// Space throws, G and H use the gadgets. On a phone: a floating joystick
+// (Klayman aims the way it points), the K button, an auto-throw switch and
+// the gadget buttons. read() returns the step's input once per game step
+// (see NO_INPUT in game.js). The K button, Space and a click do the same:
 // push a dirtball Klayman is touching, throw otherwise.
 
 const MOVE_KEYS = {
@@ -10,12 +12,18 @@ const MOVE_KEYS = {
   ArrowDown: [0, 1], KeyS: [0, 1],
 };
 const ACTION_KEY = 'Space';
+const GADGET_KEYS = { KeyG: 0, KeyH: 1 };
 const DEAD_ZONE = 0.22;
 const AUTO_KEY = 'klayman.autoThrow';
 
-export function createInput({ stickZone, stickBase, stickKnob, throwZone, throwButton, autoButton, onPause }) {
+export function createInput({
+  stage, stickZone, stickBase, stickKnob, throwZone, throwButton, autoButton, gadgetButtons = [], onPause,
+}) {
   const keys = new Set();
   let spaceDown = false;
+  let mouseDown = false;
+  let mouse = null;                // where the mouse is over the game, in CSS pixels
+  let gadget = -1;                 // a gadget asked for since the last read
   let pressed = false;
   let btnPointer = null;
   let auto = false;
@@ -28,6 +36,7 @@ export function createInput({ stickZone, stickBase, stickKnob, throwZone, throwB
     // On a focused button or link, Enter and Space press it rather than throw.
     if (e.target instanceof Element && e.target.closest('button, a, summary, input')) return;
     if (MOVE_KEYS[e.code]) { keys.add(e.code); e.preventDefault(); }
+    if (e.code in GADGET_KEYS && !e.repeat) { gadget = GADGET_KEYS[e.code]; e.preventDefault(); }
     if (e.code === ACTION_KEY) {
       if (!e.repeat) { pressed = true; spaceDown = true; }
       e.preventDefault();
@@ -37,7 +46,37 @@ export function createInput({ stickZone, stickBase, stickKnob, throwZone, throwB
     keys.delete(e.code);
     if (e.code === ACTION_KEY) spaceDown = false;
   });
-  addEventListener('blur', () => { keys.clear(); spaceDown = false; releaseStick(); releaseButton(); });
+  addEventListener('blur', () => { keys.clear(); spaceDown = false; mouseDown = false; releaseStick(); releaseButton(); });
+
+  // --------------------------------------------------------------- mouse
+  // Klayman aims at the mouse; a click throws (hold to keep throwing).
+  function placeMouse(e) {
+    const r = stage.getBoundingClientRect();
+    mouse = { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+  stage.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') placeMouse(e); });
+  stage.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0 || e.target.closest('button')) return;
+    placeMouse(e);
+    pressed = true;
+    mouseDown = true;
+    stage.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    stage.addEventListener(type, (e) => { if (e.pointerType === 'mouse') mouseDown = false; });
+  }
+  stage.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  // ------------------------------------------------------------- gadgets
+  gadgetButtons.forEach((b, i) => {
+    b.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      gadget = i;
+    });
+    b.addEventListener('click', (e) => { if (e.detail === 0) gadget = i; });   // Enter on a focused button
+  });
 
   // ------------------------------------------------------------ joystick
   function baseRadius() { return stickBase.offsetWidth / 2 || 56; }
@@ -141,14 +180,17 @@ export function createInput({ stickZone, stickBase, stickKnob, throwZone, throwB
         x += MOVE_KEYS[code][0];
         y += MOVE_KEYS[code][1];
       }
-      const out = { x, y, pressed, held: spaceDown || btnPointer !== null, auto };
+      const out = { x, y, pressed, held: spaceDown || mouseDown || btnPointer !== null, auto, aim: mouse, gadget };
       pressed = false;
+      gadget = -1;
       return out;
     },
     clear() {
       pressed = false;
+      gadget = -1;
       keys.clear();
       spaceDown = false;
+      mouseDown = false;
       releaseStick();
       releaseButton();
     },

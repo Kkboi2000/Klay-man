@@ -1,9 +1,9 @@
 // Loads the sprite sheets and describes where each animation lives on them.
-// Also dresses Klayman in his tools and builds the bought sprouts, coins and
-// icons from the pixel art in art.js.
+// Also dresses Klayman in his tools and builds the bought sprouts, coins,
+// icons and gadget props from the pixel art in art.js.
 import {
   SPROUT_PALETTE, SPROUT_ROWS, CLOSING_ROWS, SPROUT_SWAY, ART_PALETTE, TOOL_ICON_ROWS, SHOP_ICON_ROWS,
-  COIN_ROWS, GUN_ART, GUN_ART_SMALL,
+  GADGET_ICON_ROWS, COIN_ROWS, GUN_ART, GUN_ART_SMALL, PACK_ART, LEAF_ROWS, BOTTLE_ROWS,
 } from './art.js';
 
 /** In the single-file preview build, assets arrive inline as data URLs. */
@@ -292,7 +292,12 @@ function readFrame(img, fx, fy) {
   });
   const eyes = [];
   roles.forEach((r, i) => { if (r === ROLE.eye) eyes.push(i); });
-  return { hands: hands.flatMap((g) => g.px), handSpots, shirt, feet, soles, eyes, roles, lum };
+  const shirtBox = shirt.length ? {
+    x0: Math.min(...shirt.map((i) => i % size)),
+    x1: Math.max(...shirt.map((i) => i % size)),
+    y0: Math.min(...shirt.map((i) => Math.floor(i / size))),
+  } : null;
+  return { hands: hands.flatMap((g) => g.px), handSpots, shirt, shirtBox, feet, soles, eyes, roles, lum };
 }
 
 const DRESS = {
@@ -399,6 +404,11 @@ function gunSpots(info) {
   }));
 }
 
+/** Where the backpack sits: the top and sides of his shirt, in frame pixels. */
+function packSpots(info) {
+  return info.frames.map((cols) => cols.map((f) => f.shirtBox ?? { x0: 20, x1: 28, y0: 33 }));
+}
+
 // --- Sprouts --------------------------------------------------------------------
 
 /** Two frames side by side, like tree.png: frame 2 leans 1px above `sway`. */
@@ -427,6 +437,7 @@ const withTop = (name, top) => top.concat(SPROUT_ROWS[name].slice(top.length));
 export const coinArt = () => pixelArt(COIN_ROWS, ART_PALETTE);
 export const toolIconArt = (id) => pixelArt(TOOL_ICON_ROWS[id], ART_PALETTE);
 export const shopIconArt = (id) => pixelArt(SHOP_ICON_ROWS[id], ART_PALETTE);
+export const gadgetIconArt = (id) => pixelArt(GADGET_ICON_ROWS[id], ART_PALETTE);
 
 export async function loadSprites() {
   const [bg, klay, bac, tree] = await Promise.all([
@@ -461,6 +472,12 @@ export async function loadSprites() {
       })];
     }
   }
+  const icons = {
+    plus: iconArt('plus'),
+    bag: iconArt('bag'),
+    water: iconArt('water'),
+    sandclock: iconArt('sandclock'),
+  };
   const gunFrom = (arts) => Object.fromEntries(
     Object.entries(arts).map(([facing, art]) => [facing, { ...art, img: pixelArt(art.rows, ART_PALETTE) }]),
   );
@@ -476,16 +493,20 @@ export async function loadSprites() {
     coin: coinArt(),
     toolIcons: Object.fromEntries(Object.keys(TOOL_ICON_ROWS).map((id) => [id, toolIconArt(id)])),
     shopIcons: Object.fromEntries(Object.keys(SHOP_ICON_ROWS).map((id) => [id, shopIconArt(id)])),
+    gadgetIcons: Object.fromEntries(Object.keys(GADGET_ICON_ROWS).map((id) => [id, gadgetIconArt(id)])),
+    pack: Object.fromEntries(Object.entries(PACK_ART).map(([side, rows]) => [side, pixelArt(rows, ART_PALETTE)])),
+    packSpots: packSpots(info),
+    leaf: pixelArt(LEAF_ROWS, ART_PALETTE),
+    bottle: pixelArt(BOTTLE_ROWS, ART_PALETTE),
     bacSlow: tinted(bac, 'rgba(176, 110, 214, 0.5)'),
     bac,
     bacFrozen: tinted(bac, 'rgba(150, 215, 255, 0.55)'),
+    bacHit: tinted(bac, 'rgba(255, 255, 255, 0.75)'),      // a boss taking a hit
+    bacTired: tinted(bac, 'rgba(120, 104, 80, 0.45)'),     // a boss worn out
     heart: heartArt('full'),
     halfHeart: heartArt('half'),
-    icons: {
-      plus: iconArt('plus'),
-      bag: iconArt('bag'),
-      water: iconArt('water'),
-      sandclock: iconArt('sandclock'),
-    },
+    icons,
+    // A sunflower's items, lit up: they glow, so you know they're the flower's.
+    iconsGlow: Object.fromEntries(Object.entries(icons).map(([id, img]) => [id, tinted(img, 'rgba(255, 246, 190, 0.85)')])),
   };
 }

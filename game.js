@@ -1,25 +1,33 @@
 // The rules of Klayman. No drawing, no sound, no DOM: the game only changes
 // numbers and announces what happened through events, so it can be tested.
 import {
-  BACTERIA, COINS, DIRTBALL, ITEMS, KLAYMAN, LEVELS, LOOKAHEAD, REVIVE, SCORE, SHOT, TOOLS, TREE,
+  BACTERIA, BOSS, COINS, DIRTBALL, GADGETS, ITEMS, KLAYMAN, LEVELS, LOOKAHEAD, REVIVE, SCORE, SHOT, TOOLS, TREE,
 } from './config.js';
 import {
-  TREE_SPOT, dist, insideRing, insideSoil, keepOnSoil, randomSpotNear, randomSpotOnSoil, rimPoint,
+  RING_SQUASH, TREE_SPOT, dist, insideRing, insideSoil, keepOnSoil, randomSpotNear, randomSpotOnSoil, rimPoint,
 } from './world.js';
 import { Klayman } from './klayman.js';
 import { Bacteria } from './bacteria.js';
 import { Dirtball } from './dirtball.js';
 import { DirtShot } from './dirtshot.js';
+import { Boss, bossHp, bossSpawnEvery, isBossLevel } from './boss.js';
+import { Gadget } from './gadgets.js';
 import { Coin, Item, pickItem } from './items.js';
 import { gearFor } from './gear.js';
 
 /** x, y: which way to walk. pressed/held: the action button (the K button on
- *  a phone, Space on a computer): it pushes a dirtball Klayman is touching,
- *  and throws otherwise. auto: auto throw (and push). */
-export const NO_INPUT = Object.freeze({ x: 0, y: 0, pressed: false, held: false, auto: false });
+ *  a phone, Space or a click on a computer): it pushes a dirtball Klayman is
+ *  touching, and throws otherwise. auto: auto throw (and push). aim: a point
+ *  in the pot to aim at (the mouse, on a computer), or null to aim the way
+ *  he walks. gadget: which gadget to use this step (0 or 1), or -1. */
+export const NO_INPUT = Object.freeze({ x: 0, y: 0, pressed: false, held: false, auto: false, aim: null, gadget: -1 });
 
-// Where the sunflower's head is, above the spot it's rooted in (unscaled).
-const FLOWER_TOP = 54;
+// Where a flower's head is, above the spot it's rooted in (unscaled).
+const FLOWER_TOP = { sunflower: 54, daisy: 50 };
+
+// A boss rises this far in from the rim, at one of the pot's four corners.
+const BOSS_INSET = 150;
+const BOSS_CORNERS = [-3, -1, 1, 3].map((k) => (k * Math.PI) / 4);
 
 /** Moves `a` out of `b` until they are at least `minD` apart. */
 function separate(a, b, minD, share = 1) {
@@ -33,9 +41,29 @@ function separate(a, b, minD, share = 1) {
   a.y += (dy / d) * push;
 }
 
+/** Moves `p` out of a flat oval round `c` (rx across, ry deep). */
+function pushOutOfOval(p, c, rx, ry) {
+  let dx = p.x - c.x;
+  let dy = p.y - c.y;
+  const k = Math.hypot(dx / rx, dy / ry);
+  if (k >= 1) return false;
+  if (k < 0.001) { dx = 0; dy = ry; }
+  const edge = Math.hypot(dx / rx, dy / ry);
+  p.x = c.x + dx / edge;
+  p.y = c.y + dy / edge;
+  return true;
+}
+
+/** A place special items come from: the pot (near the sprout, from level
+ *  3) or a sunflower (out of its flower, from level 1). Each keeps one item
+ *  out at a time, and knows the next one a little early, for the glasses. */
+function itemSource(kind, every) {
+  return { kind, every, timer: every, next: null, out: null };
+}
+
 export class Game {
-  /** `loadout` is { tools, sprouts }: what the player picked on the setup
-   *  page. sprouts[1], if there is one, is the backup. */
+  /** `loadout` is { tools, sprouts, gadgets }: what the player picked on the
+   *  setup page. sprouts[1], if there is one, is the backup. */
   constructor({ rng = Math.random, loadout } = {}) {
     this.rng = rng;
     this.events = [];
@@ -47,7 +75,10 @@ export class Game {
     this.loadout = {
       tools: [...(loadout?.tools ?? [])],
       sprouts: loadout?.sprouts?.length ? [...loadout.sprouts] : ['sprout'],
+      gadgets: [...new Set(loadout?.gadgets ?? [])].filter((id) => GADGETS[id]),
     };
+    this.items = [];               // special items out on the soil (or flying)
+    this.potItems = itemSource('pot', ITEMS.every);
     this.sproutIndex = 0;
     this.plant(this.loadout.sprouts[0]);
     this.klay = new Klayman(TREE_SPOT.x, TREE_SPOT.y + 62);
@@ -55,17 +86,15 @@ export class Game {
     this.bacteria = [];
     this.dirtballs = [];
     this.shots = [];
-    this.item = null;
     this.coins = [];
-    this.lock = null;              // the dirt gun's target: the closest bacteria
+    this.gadgets = this.loadout.gadgets.map((id) => new Gadget(id));
+    this.lock = null;              // the dirt gun's target: the closest thing it can hit
     this.upcoming = [];            // where the next bacteria will appear, soonest first (the glasses show them)
-    this.nextItem = null;          // ...the next special item...
     this.nextCoin = null;          // ...and the next 1K coin
     this.score = 0;
     this.earned = 0;               // coins (K) picked up this game
     this.boost = 0;
     this.freeze = 0;
-    this.itemTimer = this.itemEvery;
     this.coinTimer = COINS.every;
     this.over = false;
     this.resumeTo = null;
@@ -81,7 +110,8 @@ export class Game {
     this.lives = g.lives;
     this.maxLives = g.lives;
     this.treeHurt = 0;
-    this.itemEvery = g.itemEvery ?? ITEMS.every;
+    this.flowerItems = g.itemEvery ? itemSource('flower', g.itemEvery) : null;
+    this.flowerCoins = g.coinEvery ? { every: g.coinEvery, timer: g.coinEvery, next: null } : null;
     this.healTimer = g.heal?.every;
     this.sporeTimer = g.spores?.every;
     this.growTimer = g.growEvery;
@@ -102,12 +132,16 @@ export class Game {
   get treeScale() { return 1 + TREE.growPerWater * (this.maxLives - this.gear.lives); }
   /** Bacteria can't get into the sprout: corn's leaves are closed, or a lily is. */
   get sproutClosed() { return this.shield > 0 || this.hidden > 0; }
+  /** This level ends with a boss bacteria. */
+  get bossLevel() { return isBossLevel(this.level); }
 
-  /** Bacteria still to beat this level: to come, crawling or dirty, or inside a dirtball. */
+  /** Bacteria still to beat this level: to come, crawling or dirty, inside
+   *  a dirtball, and the boss until it's worn out. */
   get bacteriaLeft() {
     const alive = this.bacteria.filter((b) => b.alive).length;
     const balls = this.dirtballs.filter((d) => d.state !== 'breaking').length;
-    return this.toSpawn + alive + balls;
+    const boss = this.bossLevel && !this.bossBeaten && !(this.boss && !this.boss.alive) ? 1 : 0;
+    return this.toSpawn + alive + balls + boss;
   }
 
   /** Seconds until the next bacteria appears (the level banner counts too). */
@@ -130,6 +164,24 @@ export class Game {
     return BACTERIA.speed * factor;
   }
 
+  /** Where special items come from right now: the pot (from level 3) and a sunflower. */
+  get itemSources() {
+    return [this.itemsUnlocked ? this.potItems : null, this.flowerItems].filter(Boolean);
+  }
+
+  /** How far the leaf's wind reaches round Klayman now (0 when it's not blowing). */
+  get windReach() {
+    const g = this.gadgets.find((x) => x.id === 'leaf' && x.active);
+    if (!g) return 0;
+    return g.spec.reach * Math.min(1, g.t / g.spec.grow, g.on / 0.25);
+  }
+
+  /** Every bacteria's speed, now: slower while the fertilizer works. */
+  get pace() {
+    const fed = this.gadgets.some((g) => g.id === 'fertilizer' && g.active);
+    return fed ? GADGETS.fertilizer.slowFactor : 1;
+  }
+
   emit(type, data = {}) { this.events.push({ type, ...data }); }
 
   drainEvents() {
@@ -146,12 +198,16 @@ export class Game {
     this.spawnEvery = this.spawnEveryFor(n);
     this.spawnTimer = 0.4;
     this.upcoming = [];
+    this.boss = null;
+    this.bossPlan = null;          // where the boss will rise, while the ground rumbles
+    this.bossWarn = 0;
+    this.bossBeaten = false;
     this.phase = 'banner';
     this.phaseT = LEVELS.bannerTime;
     const unlocksItems = n === ITEMS.unlockLevel;
     const unlocksSkill = n === KLAYMAN.skillLevel;
-    if (unlocksItems) this.itemTimer = this.itemEvery;
-    this.emit('level', { level: n, unlocksItems, unlocksSkill });
+    if (unlocksItems) this.potItems.timer = ITEMS.every;
+    this.emit('level', { level: n, unlocksItems, unlocksSkill, boss: isBossLevel(n), firstBoss: n === BOSS.firstLevel });
   }
 
   /** A spot on the rim, not right next to Klayman. */
@@ -179,6 +235,81 @@ export class Game {
     const d = new Dirtball(x, y);
     this.dirtballs.push(d);
     return d;
+  }
+
+  // ------------------------------------------------------------- the boss
+
+  /** One of the pot's four corners, at random, but not where Klayman stands. */
+  planBoss() {
+    const corners = BOSS_CORNERS.map((a) => rimPoint(a, BOSS_INSET));
+    const clear = corners.filter((c) => dist(c, this.klay) > 220);
+    const pool = clear.length ? clear : corners;
+    return pool[Math.floor(this.rng() * pool.length) % pool.length];
+  }
+
+  /** The level's own bacteria are gone: the ground rumbles where the boss will rise. */
+  callBoss() {
+    this.bossPlan = this.planBoss();
+    this.bossWarn = BOSS.warn;
+    this.emit('bossComing', { ...this.bossPlan });
+  }
+
+  raiseBoss() {
+    const { x, y } = this.bossPlan;
+    this.boss = new Boss(x, y, { hp: bossHp(this.level), spawnEvery: bossSpawnEvery(this.level) });
+    this.bossPlan = null;
+    this.emit('bossRises', { x, y });
+  }
+
+  /** The boss sends a bacteria out of its side facing the sprout. */
+  bossSpawn() {
+    const b = this.boss;
+    const c = b.aimPoint;
+    const toward = Math.atan2(this.tree.y - c.y, this.tree.x - c.x);
+    const a = toward + (this.rng() - 0.5) * 1.6;
+    const p = { x: c.x + Math.cos(a) * (BOSS.foot.rx + 6), y: c.y + Math.sin(a) * (BOSS.foot.ry + 6) };
+    keepOnSoil(p, 12);
+    this.addBacteria(p.x, p.y);
+    this.emit('bossSpawn', { x: p.x, y: p.y });
+  }
+
+  /** Dirt lands on the boss: a throw, or a rolling dirtball. */
+  hitBoss(damage, at) {
+    const boss = this.boss;
+    const down = boss.hit(damage);
+    this.emit('bossHit', { x: at.x, y: at.y, damage, hp: boss.hp, maxHp: boss.maxHp });
+    if (!down) return;
+    this.addScore(SCORE.boss, { x: boss.x, y: boss.y - 140 });
+    this.emit('bossDown', { x: boss.x, y: boss.y });
+  }
+
+  updateBoss(dt) {
+    if (this.bossPlan) {
+      this.bossWarn -= dt;
+      if (this.bossWarn <= 0) this.raiseBoss();
+    }
+    const boss = this.boss;
+    if (!boss) return;
+    const was = boss.state;
+    if (boss.update(dt, this.frozen)) this.bossSpawn();
+    if (boss.state === 'burrowing' && was !== 'burrowing') this.emit('bossBurrows', { x: boss.x, y: boss.y });
+    if (!boss.gone) return;
+    // Back in the ground: a big coin pops out where it stood.
+    this.boss = null;
+    this.bossBeaten = true;
+    const spot = { x: boss.x, y: boss.y + 28 };
+    keepOnSoil(spot, 24);
+    this.dropCoin(spot, BOSS.coin, { x: boss.x, y: boss.y, ground: boss.y });
+  }
+
+  /** Keeps a spot (for a coin) out from under the boss. */
+  clearOfBoss(p, pad = 16) {
+    if (this.boss?.solid) this.boss.pushOut(p, pad);
+    if (this.bossPlan) {
+      const ghost = new Boss(this.bossPlan.x, this.bossPlan.y, { hp: 1, spawnEvery: 1 });
+      ghost.pushOut(p, pad);
+    }
+    return p;
   }
 
   // ------------------------------------------------- asked for by Klayman
@@ -210,15 +341,16 @@ export class Game {
     this.emit('throw', { x, y, gun: this.gear.lockOn });
   }
 
-  /** The dirt gun's pick: the nearest bacteria a shot can reach. */
+  /** The dirt gun's pick: the nearest thing a shot can reach and hurt. A
+   *  bacteria, the boss (measured to its edge) and, once dirt breaks them
+   *  (level 7), a dirtball. */
   lockTarget(from) {
     let best = null;
     let bestD = this.shotRange;
-    for (const b of this.bacteria) {
-      if (!b.alive) continue;
-      const d = dist(b, from);
-      if (d < bestD) { best = b; bestD = d; }
-    }
+    const consider = (t, d) => { if (d < bestD) { best = t; bestD = d; } };
+    for (const b of this.bacteria) if (b.lockable) consider(b, dist(b, from));
+    if (this.boss?.lockable) consider(this.boss, this.boss.gap(from));
+    if (this.skillUnlocked) for (const d of this.dirtballs) if (d.lockable) consider(d, dist(d, from));
     return best;
   }
 
@@ -226,6 +358,7 @@ export class Game {
     for (const b of this.dirtballs) {
       if (b.solid) separate(p, b, r + DIRTBALL.radius);
     }
+    if (this.boss?.solid) this.boss.pushOut(p, r);
     if (sproutBlocks) separate(p, this.tree, r + TREE.radius * 0.6);
   }
 
@@ -237,12 +370,14 @@ export class Game {
     if (this.freeze > 0) this.freeze = Math.max(0, this.freeze - dt);
     if (this.treeHurt > 0) this.treeHurt = Math.max(0, this.treeHurt - dt);
 
+    this.updateGadgets(dt, input.gadget ?? -1);
     this.lock = this.gear.lockOn ? this.lockTarget(this.klay) : null;
     this.klay.update(dt, input, this);
     this.updateShots(dt);
     this.updateBacteria(dt);
     if (this.over) return;
     this.updateDirtballs(dt);
+    this.updateBoss(dt);
     this.updateItems(dt);
     this.updateCoins(dt);
     this.updateSprout(dt);
@@ -250,6 +385,7 @@ export class Game {
   }
 
   updateShots(dt) {
+    const boss = this.boss;
     for (const s of this.shots) {
       s.update(dt, this.bacteria);
       if (s.dead) continue;
@@ -262,7 +398,15 @@ export class Game {
           break;
         }
       }
-      if (s.dead || !this.skillUnlocked) continue;
+      if (s.dead) continue;
+      // Dirt splats on the boss; while it's still fighting, it wears it down.
+      if (boss?.solid && boss.touches(s, SHOT.radius)) {
+        s.dead = true;
+        if (boss.alive) this.hitBoss(BOSS.shotDamage * this.boostFactor, s);
+        else this.emit('hit', { x: s.x, y: s.y });
+        continue;
+      }
+      if (!this.skillUnlocked) continue;
       // Before level 7, dirt flies past dirtballs. After, it breaks them.
       const ball = this.dirtballs.find((d) => d.solid && dist(d, s) < DIRTBALL.radius + SHOT.radius);
       if (ball) {
@@ -276,18 +420,23 @@ export class Game {
   turnIntoDirtball(b) {
     b.state = 'gone';
     b.dead = true;
-    this.addDirtball(b.x, b.y);
+    const ball = this.addDirtball(b.x, b.y);
     this.emit('dirtball', { x: b.x, y: b.y });
+    return ball;
   }
 
   updateBacteria(dt) {
     const frozen = this.frozen;
     const closed = this.sproutClosed;
     const coat = TOOLS.coat;
+    const pace = this.pace;
+    const wind = this.windReach;
     // A closed lily can't be seen: bacteria wander instead of heading for it.
     const target = this.hidden > 0 ? null : this.tree;
     for (const b of this.bacteria) {
-      b.update(dt, target, frozen, this.tree);
+      b.update(dt, target, frozen, this.tree, pace);
+      // The leaf's wind: nothing gets through to Klayman.
+      if (wind > 0 && b.alive) this.blowAway(b, wind);
       if (!b.crawling || frozen) continue;
 
       if (!closed && dist(b, this.tree) < TREE.radius + 4) {
@@ -324,12 +473,20 @@ export class Game {
         for (const d of this.dirtballs) {
           if (d.solid) separate(c, d, BACTERIA.radius + DIRTBALL.radius);
         }
+        // The boss stands its ground: they crawl round it.
+        if (this.boss?.solid) this.boss.pushOut(c, BACTERIA.radius);
         // A closed sprout is a wall: they bump into it and wait.
         if (closed) separate(c, this.tree, TREE.radius + 8);
         keepOnSoil(c, 6);
       }
     }
     this.bacteria = this.bacteria.filter((b) => !b.dead);
+  }
+
+  /** The leaf's wind holds a bacteria outside its ring round Klayman. */
+  blowAway(b, reach) {
+    const r = reach + BACTERIA.radius;
+    if (pushOutOfOval(b, this.klay, r, reach * RING_SQUASH + BACTERIA.radius)) keepOnSoil(b, 6);
   }
 
   hurtTree() {
@@ -340,9 +497,14 @@ export class Game {
   }
 
   updateDirtballs(dt) {
+    const boss = this.boss;
     for (const d of this.dirtballs) {
       d.update(dt, this.frozen);
 
+      if (d.state === 'idle') {
+        if (boss?.solid) boss.pushOut(d, DIRTBALL.radius);
+        if (d.knock > 0) keepOnSoil(d, 10);
+      }
       if (d.state === 'idle' && d.cracked) {
         // Held too long: it cracks and a very dirty bacteria climbs out.
         d.dead = true;
@@ -354,6 +516,13 @@ export class Game {
 
       if (!insideSoil(d.x, d.y, 8)) { this.breakDirtball(d); continue; }
       if (dist(d, this.tree) < DIRTBALL.radius + TREE.radius * 0.6) { this.breakDirtball(d); continue; }
+
+      // A rolling dirtball hits the boss hard, and breaks.
+      if (boss?.solid && boss.touches(d, DIRTBALL.radius)) {
+        if (boss.alive) this.hitBoss(BOSS.ballDamage, d);
+        this.breakDirtball(d);
+        continue;
+      }
 
       const victim = this.bacteria.find((b) => b.alive && dist(b, d) < DIRTBALL.radius + BACTERIA.radius - 2);
       if (victim) {
@@ -388,7 +557,7 @@ export class Game {
     if (this.rng() >= COINS.dropChance) return;
     const spot = { x: at.x, y: at.y };
     keepOnSoil(spot, 24);
-    this.dropCoin(spot, COINS.dropValue);
+    this.dropCoin(this.clearOfBoss(spot), COINS.dropValue);
   }
 
   addScore(points, at) {
@@ -398,43 +567,47 @@ export class Game {
 
   // ---------------------------------------------------------------- items
 
-  /** Where the sunflower's head is right now (it grows with the sprout). */
+  /** Where a flower's head is right now (it grows with the sprout). */
   get flowerTop() {
-    return { x: this.tree.x, y: this.tree.y - FLOWER_TOP * this.treeScale };
+    const top = FLOWER_TOP[this.gear.sprout] ?? FLOWER_TOP.sunflower;
+    return { x: this.tree.x, y: this.tree.y - top * this.treeScale };
   }
 
-  /** The next item: what it is, and where it lands (near the sprout, or
-   *  close to a sunflower). Decided ahead, so the glasses can show it; what
-   *  they show is what comes. */
-  planItem() {
-    const { min, max } = this.gear.drop ?? ITEMS.nearSprout;
+  /** The next item from `source`: what it is, and where it lands (near the
+   *  sprout, or close to a sunflower). Decided ahead, so the glasses can
+   *  show it; what they show is what comes. */
+  planItem(source) {
+    const { min, max } = source.kind === 'flower' ? this.gear.drop : ITEMS.nearSprout;
     const spot = randomSpotNear(this.tree, min, max, this.rng, this.klay);
     const type = pickItem(this.lives, this.maxLives, this.rng, this.gear.maxLives);
     return { type, x: spot.x, y: spot.y };
   }
 
   updateItems(dt) {
-    if (!this.itemsUnlocked) return;
-    if (this.item) {
-      this.item.update(dt);
-      if (this.item.landed && dist(this.item, this.klay) < ITEMS.pickupRadius) {
-        this.useItem(this.item);
-        this.item = null;
-      } else if (this.item.gone) {
-        this.item = null;
+    for (const item of this.items) {
+      item.update(dt);
+      if (item.landed && dist(item, this.klay) < ITEMS.pickupRadius) {
+        item.taken = true;
+        this.useItem(item);
       }
     }
-    this.itemTimer -= dt;
-    if (!this.item && !this.nextItem && this.itemTimer <= LOOKAHEAD) this.nextItem = this.planItem();
-    if (this.itemTimer <= 0) {
-      this.itemTimer += this.itemEvery;
-      if (!this.item) {
-        const { type, x, y } = this.nextItem ?? this.planItem();
-        const from = this.gear.drop ? this.flowerTop : null;
-        this.item = new Item(type, x, y, from);
+    this.items = this.items.filter((item) => !item.taken && !item.gone);
+
+    for (const source of this.itemSources) {
+      if (source.out && !this.items.includes(source.out)) source.out = null;
+      source.timer -= dt;
+      if (!source.out && !source.next && source.timer <= LOOKAHEAD) source.next = this.planItem(source);
+      if (source.timer > 0) continue;
+      source.timer += source.every;
+      if (!source.out) {
+        const { type, x, y } = source.next ?? this.planItem(source);
+        const from = source.kind === 'flower' ? this.flowerTop : null;
+        const item = new Item(type, x, y, from);
+        this.items.push(item);
+        source.out = item;
         this.emit('itemAppears', { item: type, x, y, from });
       }
-      this.nextItem = null;
+      source.next = null;
     }
   }
 
@@ -459,18 +632,45 @@ export class Game {
 
   // ---------------------------------------------------------------- coins
 
+  /** A daisy's next coin: where it lands, and what it's worth (1K, 5K or 10K). */
+  planFlowerCoin() {
+    const { min, max } = this.gear.drop;
+    const spot = this.clearOfBoss(randomSpotNear(this.tree, min, max, this.rng, this.klay));
+    const roll = this.rng();
+    const { coins } = this.gear;
+    let upTo = 0;
+    const pick = coins.find((c) => roll < (upTo += c.chance)) ?? coins[coins.length - 1];
+    return { x: spot.x, y: spot.y, value: pick.value };
+  }
+
   updateCoins(dt) {
     this.coinTimer -= dt;
     // Where the next 1K coin lands is decided a little early, for the glasses.
-    if (!this.nextCoin && this.coinTimer <= LOOKAHEAD) this.nextCoin = randomSpotOnSoil(this.rng);
+    if (!this.nextCoin && this.coinTimer <= LOOKAHEAD) this.nextCoin = this.clearOfBoss(randomSpotOnSoil(this.rng));
     if (this.coinTimer <= 0) {
       this.coinTimer += COINS.every;
-      this.dropCoin(this.nextCoin ?? randomSpotOnSoil(this.rng), COINS.value);
+      this.dropCoin(this.nextCoin ?? this.clearOfBoss(randomSpotOnSoil(this.rng)), COINS.value);
       this.nextCoin = null;
     }
+    // A daisy: a coin pops out of the flower, from level 1.
+    const daisy = this.flowerCoins;
+    if (daisy) {
+      daisy.timer -= dt;
+      if (!daisy.next && daisy.timer <= LOOKAHEAD) daisy.next = this.planFlowerCoin();
+      if (daisy.timer <= 0) {
+        daisy.timer += daisy.every;
+        const c = daisy.next ?? this.planFlowerCoin();
+        daisy.next = null;
+        this.dropCoin(c, c.value, { ...this.flowerTop, ground: this.tree.y });
+      }
+    }
+    const magnet = this.gear.magnet;
     for (const c of this.coins) {
       c.update(dt);
-      if (!c.gone && dist(c, this.klay) < COINS.pickupRadius) {
+      if (!c.landed || c.gone) continue;
+      // The backpack: coins close by come running.
+      if (magnet && dist(c, this.klay) < magnet) c.pull(this.klay, dt);
+      if (dist(c, this.klay) < COINS.pickupRadius) {
         c.taken = true;
         this.earned += c.value;
         this.emit('coin', { value: c.value, x: c.x, y: c.y });
@@ -479,9 +679,46 @@ export class Game {
     this.coins = this.coins.filter((c) => !c.taken && !c.gone);
   }
 
-  dropCoin(at, value) {
-    this.coins.push(new Coin(at.x, at.y, value, COINS.lifetime));
-    this.emit('coinAppears', { value, x: at.x, y: at.y });
+  /** A coin worth `value` K. `from`: where it flies out of first (a flower, the ground). */
+  dropCoin(at, value, from = null) {
+    this.coins.push(new Coin(at.x, at.y, value, COINS.lifetime, from));
+    this.emit('coinAppears', { value, x: at.x, y: at.y, from });
+  }
+
+  // --------------------------------------------------------------- gadgets
+
+  /** Uses gadget `i` (0 or 1) if it's ready. */
+  useGadget(i) {
+    const g = this.gadgets[i];
+    if (this.over || !g?.use()) return false;
+    const at = g.id === 'spray' ? this.tree : this.klay;
+    this.emit('gadget', { id: g.id, index: i, x: at.x, y: at.y });
+    return true;
+  }
+
+  updateGadgets(dt, pressed = -1) {
+    if (pressed >= 0) this.useGadget(pressed);
+    this.gadgets.forEach((g, index) => {
+      const before = g.t;
+      const running = g.active;
+      const news = g.update(dt);
+      if (running && g.id === 'spray') {
+        // Two puffs of mist on the sprout; the second brings half a heart back.
+        const { puffs, heal } = g.spec;
+        puffs.forEach((at, n) => {
+          if (before >= at || g.t < at) return;
+          this.emit('mist', { x: this.tree.x, y: this.tree.y });
+          if (n === puffs.length - 1) this.sprayHeal(heal);
+        });
+      }
+      if (news) this.emit(news === 'end' ? 'gadgetEnds' : 'gadgetReady', { id: g.id, index });
+    });
+  }
+
+  sprayHeal(amount) {
+    const before = this.lives;
+    this.lives = Math.min(this.maxLives, this.lives + amount);
+    this.emit('sprayHeal', { x: this.tree.x, y: this.tree.y, amount: this.lives - before });
   }
 
   // --------------------------------------------------------- sprout powers
@@ -512,9 +749,8 @@ export class Game {
       this.sporeTimer -= dt;
       if (this.sporeTimer <= 0) {
         this.sporeTimer += g.spores.every;
-        const { reach, push, slowTime, slowFactor } = g.spores;
-        this.repel(reach, push, slowTime, slowFactor);
-        this.emit('spores', { ...at, reach });
+        this.spores(g.spores);
+        this.emit('spores', { ...at, reach: g.spores.reach });
       }
     }
     if (g.growEvery) {
@@ -546,12 +782,30 @@ export class Game {
     }
   }
 
-  /** Pushes every crawling bacteria inside the ring away from the sprout,
-   *  and slows it down if `slowTime` is set. Dirty ones and dirtballs stay. */
-  repel(reach, push, slowTime = 0, slowFactor = 1) {
+  /** A mushroom's spores: inside the ring, dirtballs slide away, and every
+   *  bacteria (crawling or dirty) gets one more layer of dirt, is pushed
+   *  back and slowed. One already three layers deep becomes a dirtball. */
+  spores({ reach, push, dirt, slowTime, slowFactor }) {
+    const t = this.tree;
+    const inside = (p) => insideRing(p, t, reach);
+    for (const d of this.dirtballs) {
+      if (d.solid && inside(d)) d.knockBack(d.x - t.x, d.y - t.y, push);
+    }
+    for (const b of [...this.bacteria]) {
+      if (!b.alive || !inside(b)) continue;
+      const dx = b.x - t.x;
+      const dy = b.y - t.y;
+      if (b.addDirt(dirt)) this.turnIntoDirtball(b).knockBack(dx, dy, push);
+      else b.knockBack(dx, dy, push, slowTime, slowFactor);
+    }
+  }
+
+  /** Pushes every crawling bacteria inside the ring away from the sprout
+   *  (a revived sprout, or a backup taking over, clears a little room). */
+  repel(reach, push) {
     for (const b of this.bacteria) {
       if (!b.crawling || !insideRing(b, this.tree, reach)) continue;
-      b.knockBack(b.x - this.tree.x, b.y - this.tree.y, push, slowTime, slowFactor);
+      b.knockBack(b.x - this.tree.x, b.y - this.tree.y, push);
     }
   }
 
@@ -568,7 +822,13 @@ export class Game {
           this.spawnTimer = this.spawnEvery;
         }
       }
-      if (this.toSpawn === 0 && this.bacteria.length === 0 && this.dirtballs.length === 0) {
+      const empty = this.toSpawn === 0 && this.bacteria.length === 0 && this.dirtballs.length === 0;
+      // A boss level: once its own bacteria are gone, the boss comes. The
+      // level is cleared when the boss is back underground and the pot is empty.
+      const bossToCome = this.bossLevel && !this.bossBeaten;
+      if (bossToCome && empty && !this.boss && !this.bossPlan) {
+        this.callBoss();
+      } else if (!bossToCome && empty) {
         this.phase = 'clear';
         this.phaseT = LEVELS.clearDelay;
         this.emit('cleared', { level: this.level });
@@ -618,7 +878,6 @@ export class Game {
     if (!this.over || !this.backupSprout) return false;
     this.sproutIndex += 1;
     this.plant(this.loadout.sprouts[this.sproutIndex]);
-    this.itemTimer = Math.min(this.itemTimer, this.itemEvery);
     this.carryOn('backup');
     return true;
   }

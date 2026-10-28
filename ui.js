@@ -1,6 +1,7 @@
-// The DOM parts: score bar, coins, hearts, what the glasses count, the level
-// banner and the screens laid over the game: title, setup, paused and the
-// summary when the sprout is lost (with a revive or the backup sprout, if any).
+// The DOM parts: score bar, coins, hearts, what the glasses count, the
+// gadget buttons, the level banner and the screens laid over the game: title,
+// setup, paused and the summary when the sprout is lost (with a revive or the
+// backup sprout, if any).
 import { heartArt, coinArt } from './sprites.js';
 import { CATALOG, formatK } from './gear.js';
 
@@ -48,6 +49,9 @@ export function createUI() {
     backupName: $('backup-name'),
     backupPic: $('backup-pic'),
     again: $('again'),
+    app: $('app'),
+    gadgetBar: $('gadget-bar'),
+    gadgetButtons: [...document.querySelectorAll('[data-gadget]')],
     soundButtons: [...document.querySelectorAll('[data-sound]')],
     musicButtons: [...document.querySelectorAll('[data-music]')],
   };
@@ -59,8 +63,9 @@ export function createUI() {
 
   // What's on screen now, so it's only rebuilt when it changes. `left` starts
   // unknown, so a new game always shows or hides the glasses' count afresh.
-  let shown = { score: -1, level: -1, hearts: '', left: null };
+  let shown = { score: -1, level: -1, hearts: '', left: null, gadgets: null };
   let bannerTimer = 0;
+  let gadgetPics = {};             // each gadget's icon, as a CSS image
 
   function renderHearts(lives, maxLives) {
     const key = `${lives}/${maxLives}`;
@@ -95,7 +100,51 @@ export function createUI() {
     }
   }
 
+  /** The gadget buttons: grey and filling up while they recharge (with the
+   *  glasses, the seconds left too), gold when ready, lit while working. */
+  function renderGadgets(game) {
+    const list = game.gadgets;
+    const glasses = game.gear.glasses;
+    const looks = list.map((g) => {
+      const state = g.active ? 'active' : g.ready ? 'ready' : 'charging';
+      const fill = Math.round(g.charge * 32) / 32;    // fills in small steps, like pixels
+      const secs = glasses && state === 'charging' ? String(Math.ceil(g.wait)) : '';
+      return { g, state, fill, secs };
+    });
+    const key = looks.map((l) => `${l.g.id}:${l.state}:${l.fill}:${l.secs}`).join('|');
+    if (key === shown.gadgets) return;
+    shown.gadgets = key;
+    el.gadgetBar.hidden = list.length === 0;
+    el.app.classList.toggle('has-gadgets', list.length > 0);
+    el.gadgetButtons.forEach((b, i) => {
+      const look = looks[i];
+      b.hidden = !look;
+      if (!look) return;
+      const { g, state, fill, secs } = look;
+      if (b.dataset.id !== g.id) {
+        b.dataset.id = g.id;
+        b.style.setProperty('--pic', gadgetPics[g.id] ?? 'none');
+      }
+      if (b.dataset.state === 'charging' && state === 'ready') {
+        b.classList.remove('is-fresh');
+        void b.offsetWidth;
+        b.classList.add('is-fresh');
+      }
+      b.dataset.state = state;
+      b.style.setProperty('--fill', String(fill));
+      b.querySelector('.gadget-secs').textContent = secs;
+      const name = CATALOG[g.id].name;
+      b.setAttribute('aria-label', state === 'ready' ? `${name}: ready`
+        : state === 'active' ? `${name}: working` : `${name}: recharging`);
+    });
+  }
+
   return {
+    /** The gadgets' icons, drawn once, for their buttons. */
+    setGadgetIcons(icons) {
+      gadgetPics = Object.fromEntries(Object.entries(icons).map(([id, c]) => [id, `url(${c.toDataURL()})`]));
+    },
+
     update(game, dt) {
       if (game.score !== shown.score) {
         shown.score = game.score;
@@ -107,6 +156,7 @@ export function createUI() {
       }
       renderHearts(game.lives, game.maxLives);
       renderVisor(game);
+      renderGadgets(game);
       if (bannerTimer > 0) {
         bannerTimer -= dt;
         if (bannerTimer <= 0) el.banner.hidden = true;
@@ -193,7 +243,8 @@ export function createUI() {
     setMusic(on) { showSwitch(el.musicButtons, 'Music', on); },
 
     reset() {
-      shown = { score: -1, level: -1, hearts: '', left: null };
+      shown = { score: -1, level: -1, hearts: '', left: null, gadgets: null };
+      for (const b of el.gadgetButtons) delete b.dataset.id;
     },
   };
 }

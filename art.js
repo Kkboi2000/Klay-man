@@ -1,12 +1,52 @@
 // Pixel art drawn in code: the bought sprouts (and how corn and lilies look
-// closed), the tool and shop icons, the coin and the dirt gun. One character per pixel; '.' is see-through. Drawn with
-// the same black outline as the original art. sprites.js turns these into
-// canvases.
+// closed), the tool, gadget and shop icons, the coin, the dirt gun, the
+// backpack as worn, a gadget leaf and the mist bottle. One character per
+// pixel; '.' is see-through. Drawn with the same black outline as the
+// original art. sprites.js turns these into canvases.
 
 // Sprouts are 32 x 48 like tree.png, rooted at the same spot (16, 35).
 export const SPROUT_PALETTE = { C: '#f4d65a', M: '#d9483b', N: '#3f2209', P: '#e85a8a', R: '#d8263d', h: '#cfe39a', T: '#a8864d', Y: '#f6c431', a: '#000000', b: '#668543', c: '#54762f', d: '#abba9b', e: '#31631b', f: '#224f0e', g: '#1a2e11', l: '#ff9a8a', m: '#9e2a22', n: '#6b3d12', o: '#a8742e', p: '#ff8593', q: '#c99a2a', r: '#8f1023', t: '#e3c98f', u: '#c4ad86', v: '#efe0c4', w: '#fff4e3', x: '#8a6a45', y: '#d68f1c' };
 
 export const SPROUT_ROWS = {
+  daisy: [
+    '...............aa...............',
+    '..............avva..............',
+    '...........a..awwa..a...........',
+    '..........avaaawwaaava..........',
+    '..........awwwawwawwwa..........',
+    '..........awwwwwwwwwwa..........',
+    '.........aaawwCYYYwwaaa.........',
+    '........awwwwaCYYYawwwwa........',
+    '.......avwwwwYYYYyywwwwva.......',
+    '........awwwwaYYyyawwwwa........',
+    '.........aaavvYyyyvvaaa.........',
+    '..........avvvvvvvvvva..........',
+    '..........avvvavvavvva..........',
+    '..........avaaavvaaava..........',
+    '...........a..avva..a...........',
+    '..............avva..............',
+    '..............aefa..............',
+    '..............aefa..............',
+    '..............aefaaaa...........',
+    '..............aefbbbba..........',
+    '..............aefccbbbaa........',
+    '..............aefccccdbba.......',
+    '...........aaaaefaaccccba.......',
+    '.........aabbbcefa.acccca.......',
+    '........abbbcccefa..aaaa........',
+    '.......abbbcccaefa..............',
+    '......abbccccaaefa..............',
+    '......accccaa.aefa..............',
+    '.......aaaa...aefa..............',
+    '..............aefa..............',
+    '..............aefa..............',
+    '..............aefa..............',
+    '............aagefaa.............',
+    '...........agggefgga............',
+    '...........aggggggga............',
+    '............aagggaa.............',
+    '..............aaa...............',
+  ],
   sunflower: [
     '..............aaaa..............',
     '...........aaaYYYYaaa...........',
@@ -303,12 +343,30 @@ export const CLOSING_ROWS = {
 };
 
 // How far down each sprout sways (rows above this lean 1px in frame 2).
-export const SPROUT_SWAY = { sunflower: 20, corn: 13, rose: 14, lilies: 14, mushroom: 21 };
+export const SPROUT_SWAY = { daisy: 18, sunflower: 20, corn: 13, rose: 14, lilies: 14, mushroom: 21 };
 
-export const ART_PALETTE = { b: '#3fa7d6', C: '#8fe3ff', G: '#3f7a2e', g: '#6aa84f', B: '#7fa8c9', D: '#4a2f17', L: '#ffd27a', M: '#3d474d', O: '#b8761a', R: '#9e2a22', S: '#b9c6cf', W: '#eef2f5', Y: '#ffd25a', Z: '#fff2b8', d: '#8a5a2b', h: '#ff9a8a', k: '#2b1a0c', l: '#a9b6bc', m: '#6f7d84', o: '#f0a830', r: '#d9483b', s: '#c9bfb2', w: '#fff4e3', y: '#d99a1e' };
+export const ART_PALETTE = { e: '#31631b', n: '#cfe39a', q: '#c9a46a', u: '#2a6fa8', b: '#3fa7d6', C: '#8fe3ff', G: '#3f7a2e', g: '#6aa84f', B: '#7fa8c9', D: '#4a2f17', L: '#ffd27a', M: '#3d474d', O: '#b8761a', R: '#9e2a22', S: '#b9c6cf', W: '#eef2f5', Y: '#ffd25a', Z: '#fff2b8', d: '#8a5a2b', h: '#ff9a8a', k: '#2b1a0c', l: '#a9b6bc', m: '#6f7d84', o: '#f0a830', r: '#d9483b', s: '#c9bfb2', w: '#fff4e3', y: '#d99a1e' };
 
 // 16 x 16 shop icons.
 export const TOOL_ICON_ROWS = {
+  backpack: [
+    '................',
+    '......kkkk......',
+    '.....kk..kk.....',
+    '....kkkkkkkk....',
+    '...kZYYYYYYyk...',
+    '..kZYYYYYYYYyk..',
+    '..kYYYYYYYYYyk..',
+    '..kkkkkkkkkkkk..',
+    '..kyyyyDDyyyOk..',
+    '..kyyyykkyyyOk..',
+    '..kyykkkkkkyOk..',
+    '..kykYYYYYYkOk..',
+    '..kykyyyyyykOk..',
+    '..kykyyyyyykOk..',
+    '..kOkkkkkkkkOk..',
+    '...kkkkkkkkkk...',
+  ],
   shoes: [
     '................',
     '................',
@@ -393,8 +451,84 @@ export const TOOL_ICON_ROWS = {
   ],
 };
 
+// 16 x 16 gadget icons.
+export const GADGET_ICON_ROWS = {
+  leaf: [
+    '................',
+    '..........kkkk..',
+    '........kkgggk..',
+    '......kkgggggk..',
+    '.....kgggggnGk..',
+    '....kggggnnGgk..',
+    '....kgggnGggGk..',
+    '...kgggnGgggk...',
+    '...kggnGggggk...',
+    '...kgnGgggGGk...',
+    '...knGggGGGk....',
+    '..kkGkkkkkk.....',
+    '.kk.............',
+    'kk..ww..ww......',
+    '...w..ww..w.....',
+    '................',
+  ],
+  spray: [
+    '................',
+    '.......kkkkkk...',
+    '.w...kkSWWWSk...',
+    'w.w.kSWWWWWSk...',
+    '.w..kkkkkSSSk...',
+    '.....kSkkkSk....',
+    '......kk.kSSk...',
+    '........kkkkkk..',
+    '.......kCCCCbk..',
+    '.......kCbbbuk..',
+    '.......kCbbbuk..',
+    '.......kCbbbuk..',
+    '.......kCbbbuk..',
+    '.......kCCbbuk..',
+    '.......kkkkkkk..',
+    '................',
+  ],
+  fertilizer: [
+    '................',
+    '.....k....k.....',
+    '....kdk..kdk....',
+    '.....kdkkdk.....',
+    '......kddk......',
+    '.....kqqqqk.....',
+    '....kqqqqqqk....',
+    '...kqqqgqqqqk...',
+    '..kqqqgGgqqqdk..',
+    '..kqqgqGqgqqdk..',
+    '..kqqqqGqqqqdk..',
+    '..kqqqqGqqqddk..',
+    '..kdqqqqqqqddk..',
+    '...kddddddddk...',
+    '....kkkkkkkk.d..',
+    '..d.......d.....',
+  ],
+};
+
 // 16 x 16 icons for the slots and the one-use items.
 export const SHOP_ICON_ROWS = {
+  gadgetSlot: [
+    '................',
+    '.......kk.......',
+    '...kk.kYYk.kk...',
+    '..kYYkYYYYkYYk..',
+    '..kYYYYYYYYYYk..',
+    '...kYYYkkYYYk...',
+    '.kkYYYk..kYYykk.',
+    'kYYYYk....kYyyyk',
+    'kYYYYk....kyyyyk',
+    '.kkYYYk..kyyykk.',
+    '...kYYykkyyyk...',
+    '..kYYyyyyyyyyk..',
+    '..kYYkyyyykyyk..',
+    '...kk.kyyk.kk...',
+    '.......kk.......',
+    '................',
+  ],
   toolSlot: [
     '................',
     '................',
@@ -575,3 +709,65 @@ export const GUN_ART_SMALL = {
     ],
   },
 };
+
+// The backpack as Klayman wears it, in art pixels (drawn 2x like him): on
+// his back seen from behind, sticking out of his back from the side, and the
+// edges that show round him from the front, with the straps over his shirt.
+export const PACK_ART = {
+  back: [
+    '.kkkkkkk.',
+    'kZYYYYYyk',
+    'kYYYYYYyk',
+    'kkkkkkkkk',
+    'kyykDkyOk',
+    'kyyykyyOk',
+    'kyyyyyyOk',
+    '.kkkkkkk.',
+  ],
+  side: [
+    '.kkk.',
+    'kZYyk',
+    'kYYyk',
+    'kkkkk',
+    'kyyOk',
+    'kyyOk',
+    'kyOOk',
+    '.kkk.',
+  ],
+  front: [
+    '.kkkkkkkkk.',
+    'kYkkkkkkkyk',
+    'kYk.....kyk',
+    'kyk.....kOk',
+    'kyk.....kOk',
+    'kyk.....kOk',
+    '.kk.....kk.',
+  ],
+};
+
+// A gadget leaf, spinning round Klayman.
+export const LEAF_ROWS = [
+  '..kkk..',
+  '.kgggk.',
+  'kgnggGk',
+  '.kGGGk.',
+  '..kkk..',
+];
+
+// The mist spray's bottle, standing by the sprout, nozzle toward it.
+export const BOTTLE_ROWS = [
+  '..kkkkk...',
+  '.kSWWWSkk.',
+  '.kSSSSSkSk',
+  '..kkSSkkk.',
+  '..kSSk....',
+  '.kkkkkk...',
+  'kCCCCbbk..',
+  'kCbbbbbk..',
+  'kCbbbbuk..',
+  'kCbbbbuk..',
+  'kCbbbbuk..',
+  'kCbbbbuk..',
+  'kCCbbbuk..',
+  '.kkkkkk...',
+];

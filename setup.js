@@ -1,17 +1,20 @@
-// The setup page: pick tools and sprouts (buying them the first time), slots
-// and level skips, switch auto throw, and see Klayman dressed for the game.
-// (Revive isn't sold here: the summary offers it when the sprout is lost.)
+// The setup page: pick tools, sprouts and gadgets (buying them the first
+// time), slots and level skips, switch auto throw, and see Klayman dressed
+// for the game. (Revive isn't sold here: the summary offers it when the
+// sprout is lost.)
 import {
-  CATALOG, TOOL_IDS, SPROUT_IDS, SLOT_IDS, SKIP_IDS, priceOf, kindOf, formatK,
+  CATALOG, TOOL_IDS, SPROUT_IDS, GADGET_IDS, SLOT_IDS, SKIP_IDS, priceOf, kindOf, formatK,
 } from './gear.js';
 import { Game, NO_INPUT } from './game.js';
-import { ITEMS } from './config.js';
 import { Renderer } from './render.js';
 import { KLAY } from './sprites.js';
 
 const $ = (id) => document.getElementById(id);
 
 const NO_TOOL = { name: 'No tool', says: 'Just Klayman.' };
+const NO_GADGET = { name: 'No gadget', says: 'Nothing to use in the game.' };
+/** The free rows that put things away: no tool, no gadget. */
+const NONE = { none: NO_TOOL, noGadget: NO_GADGET };
 /** Where Klayman's head sits in his first idle frame (the title face, and the app icon). */
 export const FACE = { x: 15, y: 19, w: 18, h: 17 };
 const SLOT_NAMES = ['1st', '2nd'];
@@ -27,9 +30,10 @@ export function pixelCanvas(source, sx, sy, sw, sh) {
 }
 
 function iconFor(id, sprites) {
-  if (id === 'none') return pixelCanvas(sprites.klay, 16, 19, 16, 25);
+  if (NONE[id]) return pixelCanvas(sprites.klay, 16, 19, 16, 25);
   const kind = kindOf(id);
   if (kind === 'tool') return pixelCanvas(sprites.toolIcons[id], 0, 0, 16, 16);
+  if (kind === 'gadget') return pixelCanvas(sprites.gadgetIcons[id], 0, 0, 16, 16);
   if (kind === 'sprout') return pixelCanvas(sprites.sprouts[id].sheet, 0, 0, 32, 37);
   const art = sprites.shopIcons[id.startsWith('skip') ? 'skip' : id];
   return pixelCanvas(art, 0, 0, 16, 16);
@@ -37,7 +41,8 @@ function iconFor(id, sprites) {
 
 // ----------------------------------------------------------------- showcase
 // A close-up of the pot: the first sprout, and Klayman in the chosen tools,
-// throwing now and then so gloves and the gun show what they do.
+// throwing now and then so gloves and the gun show what they do. A sprout's
+// power and the first gadget show what they do too, over and over.
 
 class Showcase {
   constructor(canvas, sprites) {
@@ -48,11 +53,14 @@ class Showcase {
   }
 
   show(loadout) {
-    const game = new Game({ rng: () => 0.5, loadout: { tools: loadout.tools, sprouts: loadout.sprouts.slice(0, 1) } });
+    const game = new Game({
+      rng: () => 0.5,
+      loadout: { tools: loadout.tools, sprouts: loadout.sprouts.slice(0, 1), gadgets: loadout.gadgets.slice(0, 1) },
+    });
     game.phase = 'showcase';
     game.toSpawn = 0;
     game.coinTimer = Infinity;
-    game.itemTimer = Infinity;
+    game.potItems.timer = Infinity;
     game.klay.x = game.tree.x + 46;
     game.klay.y = game.tree.y + 10;
     // Show the sprout's power straight away rather than in a minute.
@@ -62,10 +70,12 @@ class Showcase {
     if (g.heal) { game.lives -= 1; game.healTimer = soon; }
     if (g.shield) game.shieldTimer = soon;
     if (g.hide) game.hideTimer = soon;
-    if (g.drop) { game.level = ITEMS.unlockLevel; game.itemTimer = soon; }
+    if (game.flowerItems) game.flowerItems.timer = soon;
+    if (game.flowerCoins) game.flowerCoins.timer = soon;
     game.drainEvents();
     this.game = game;
     this.clock = 0.9;
+    this.rest = 0.6;               // the gadget's first go comes quickly
     this.renderer.clearEffects();
     this.renderer.snapCamera = true;
   }
@@ -82,7 +92,18 @@ class Showcase {
     this.clock -= dt;
     const pressed = this.clock <= 0;
     if (pressed) this.clock = 2.2;
-    game.update(dt, { ...NO_INPUT, pressed });
+    // The gadget, again and again: a short rest instead of its real cooldown.
+    const gadget = game.gadgets[0];
+    let use = -1;
+    if (gadget) {
+      if (gadget.wait > 0) gadget.wait = Math.min(gadget.wait, this.rest);
+      if (gadget.ready) {
+        if (gadget.id === 'spray') game.lives = Math.max(0.5, game.maxLives - 0.5);
+        use = 0;
+        this.rest = 1.4;
+      }
+    }
+    game.update(dt, { ...NO_INPUT, pressed, gadget: use });
     this.renderer.handle(game.drainEvents());
     this.renderer.draw(game, dt, { x: (game.tree.x + game.klay.x) / 2, y: game.tree.y - 25 });
   }
@@ -99,6 +120,8 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     toolsNote: $('tools-note'),
     sprouts: $('sprouts'),
     sproutsNote: $('sprouts-note'),
+    gadgets: $('gadgets'),
+    gadgetsNote: $('gadgets-note'),
     sproutSlots: $('sprout-slots'),
     slots: $('slots'),
     once: $('once'),
@@ -112,7 +135,7 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
   let sproutSlot = 0;              // which sprout a tap picks: 1st or 2nd
 
   function makeRow(id) {
-    const info = id === 'none' ? NO_TOOL : CATALOG[id];
+    const info = NONE[id] ?? CATALOG[id];
     const row = document.createElement('button');
     row.type = 'button';
     row.className = 'gear';
@@ -136,6 +159,7 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
 
   el.tools.append(...['none', ...TOOL_IDS].map(makeRow));
   el.sprouts.append(...SPROUT_IDS.map(makeRow));
+  el.gadgets.append(...['noGadget', ...GADGET_IDS].map(makeRow));
   el.slots.append(...SLOT_IDS.map(makeRow));
   el.once.append(...SKIP_IDS.map(makeRow));
 
@@ -144,8 +168,9 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
   /** What a tap on something you own does, and what to tell you about it. */
   function use(id) {
     const name = CATALOG[id]?.name;
-    const kind = id === 'none' ? 'tool' : kindOf(id);
+    const kind = kindOf(id);
     if (id === 'none') { wallet.equip(null); return ''; }
+    if (id === 'noGadget') { wallet.equip('noGadget'); return ''; }
     if (kind === 'slot') return `${name} is yours.`;
     wallet.equip(id, sproutSlot);
     if (kind === 'once') return wallet.skip === id ? `Your next game starts at level ${startLevel()}.` : '';
@@ -156,13 +181,15 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     const name = CATALOG[id].name;
     if (id === 'toolSlot') return `Bought the ${name}. Tap two tools to wear both.`;
     if (id === 'sproutSlot') return `Bought the ${name}. Pick a 2nd sprout to take over if the 1st is lost.`;
+    if (id === 'gadgetSlot') return `Bought the ${name}. Tap two gadgets to take both.`;
+    if (kindOf(id) === 'gadget') return `Bought ${name}. In a game, tap its button (G on a computer).`;
     if (kindOf(id) === 'once') return `Bought ${name}. Your next game starts there.`;
     return `Bought ${name}. It’s yours to keep.`;
   }
 
   function choose(id) {
-    const name = id === 'none' ? NO_TOOL.name : CATALOG[id].name;
-    if (id === 'none' || wallet.owns(id)) {
+    const name = (NONE[id] ?? CATALOG[id]).name;
+    if (NONE[id] || wallet.owns(id)) {
       armed = null;
       say(use(id));
     } else if (!wallet.canAfford(id)) {
@@ -202,8 +229,9 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     for (const [id, { row, tag }] of rows) {
       let state;
       let text;
-      if (id === 'none') {
-        state = wallet.tools.length === 0 ? 'on' : 'owned';
+      if (NONE[id]) {
+        const list = id === 'none' ? wallet.tools : wallet.gadgets;
+        state = list.length === 0 ? 'on' : 'owned';
         text = state === 'on' ? 'On' : 'Use';
       } else if (wallet.owns(id)) {
         const t = ownedTag(id);
@@ -218,6 +246,7 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
       tag.textContent = text;
     }
     el.toolsNote.textContent = wallet.toolSlots > 1 ? 'two per game' : 'one per game';
+    el.gadgetsNote.textContent = wallet.gadgetSlots > 1 ? 'two per game' : 'one per game';
     el.sproutSlots.hidden = !wallet.hasBackup;
     el.sproutsNote.textContent = wallet.hasBackup ? 'the 2nd takes over if the 1st is lost' : '';
     if (!wallet.hasBackup) sproutSlot = 0;

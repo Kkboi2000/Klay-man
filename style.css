@@ -90,6 +90,7 @@ body {
 }
 
 #frame {
+  position: relative;
   height: 100%;
   display: grid;
   touch-action: none;
@@ -383,6 +384,105 @@ body {
   color: rgba(255, 244, 227, 0.6);
   pointer-events: none;
 }
+
+/* ------------------------------------------------------------ gadgets */
+
+/* Bottom-left: of the game on a computer, of the joystick pad on a phone,
+   across from the auto-throw switch. A button fills from the bottom as its
+   gadget recharges; full, it turns gold. Through the glasses it also counts
+   the seconds down. */
+.gadget-bar {
+  position: absolute;
+  left: 0.6rem;
+  bottom: 0.6rem;
+  z-index: 2;
+  display: flex;
+  gap: 0.55rem;
+}
+.gadget-bar[hidden] { display: none; }
+[data-layout="desk"] .gadget-bar { left: 0.9rem; bottom: 0.9rem; }
+[data-mode="title"] .gadget-bar,
+[data-mode="setup"] .gadget-bar { visibility: hidden; }
+/* With gadgets, the joystick pad's label makes way for them. */
+.has-gadgets .pad-stick .pad-label { display: none; }
+
+.gadget {
+  position: relative;
+  width: 3.2rem;
+  height: 3.2rem;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  font: inherit;
+  background: rgba(36, 25, 13, 0.78);
+  box-shadow: 0 -2px var(--ink), 0 2px var(--ink), -2px 0 var(--ink), 2px 0 var(--ink);
+  cursor: pointer;
+  touch-action: none;
+}
+.gadget[hidden] { display: none; }
+.gadget:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+
+.gadget-fill {
+  position: absolute;
+  inset: auto 0 0;
+  height: calc(var(--fill, 1) * 100%);
+  background: rgba(255, 210, 90, 0.34);
+  box-shadow: inset 0 2px rgba(255, 242, 184, 0.55);
+}
+.gadget-pic {
+  position: absolute;
+  inset: 0.4rem;
+  background: var(--pic, none) center / contain no-repeat;
+  image-rendering: pixelated;
+}
+.gadget-secs {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 1.3rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #7fdcff;
+  text-shadow: 2px 0 #0c2b3a, -2px 0 #0c2b3a, 0 2px #0c2b3a, 0 -2px #0c2b3a;
+}
+.gadget-secs:empty { display: none; }
+.gadget-key {
+  display: none;
+  position: absolute;
+  top: 0.1rem;
+  left: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: rgba(255, 244, 227, 0.8);
+  text-shadow: 1px 1px 0 var(--ink);
+}
+[data-layout="desk"] .gadget-key { display: block; }
+
+/* Recharging: grey, filling up. */
+.gadget[data-state="charging"] .gadget-pic { filter: grayscale(1) brightness(0.75); opacity: 0.7; }
+/* Ready: gold. */
+.gadget[data-state="ready"] {
+  background: rgba(255, 210, 90, 0.22);
+  box-shadow: 0 -2px var(--gold), 0 2px var(--gold), -2px 0 var(--gold), 2px 0 var(--gold),
+    0 -4px var(--ink), 0 4px var(--ink), -4px 0 var(--ink), 4px 0 var(--ink);
+}
+.gadget[data-state="ready"] .gadget-fill { display: none; }
+.gadget.is-fresh { animation: gadget-ready 320ms steps(4); }
+@keyframes gadget-ready {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.14); }
+}
+/* Working right now. */
+.gadget[data-state="active"] { background: rgba(255, 244, 227, 0.3); }
+.gadget[data-state="active"] .gadget-fill { display: none; }
+.gadget[data-state="active"] .gadget-pic { animation: gadget-on 500ms steps(2) infinite; }
+@keyframes gadget-on {
+  50% { transform: translateY(-2px); }
+}
+
+/* On a computer the mouse aims, so the pointer becomes a sight. */
+[data-layout="desk"][data-mode="playing"] #stage { cursor: crosshair; }
 
 /* ------------------------------------------------------------ screens */
 
@@ -813,6 +913,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .banner.is-in { animation: none; }
   .gear.is-short { animation: none; }
+  .gadget.is-fresh, .gadget[data-state="active"] .gadget-pic { animation: none; }
 }
 
 /* A phone held sideways is short: the pause and summary screens, which open

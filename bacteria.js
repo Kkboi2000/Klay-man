@@ -1,6 +1,7 @@
 // Ported from bacteria.gd. Crawls to the sprout; each dirt hit adds a layer and
 // stops it. Left alone, it sheds one layer every decay_time and crawls again.
 // With no sprout in sight (a closed lily) it wanders, keeping away from it.
+// Dirt is counted in throws: BACTERIA.maxDirt of it makes a dirtball.
 import { BACTERIA, KNOCK_TIME } from './config.js';
 
 export const BREAK_TIME = 0.4;   // green splat animation
@@ -29,6 +30,8 @@ export class Bacteria {
 
   get crawling() { return this.state === 'crawl'; }
   get alive() { return this.state === 'crawl' || this.state === 'dirty'; }
+  /** The dirt gun can lock on to it. */
+  get lockable() { return this.alive; }
 
   /** Adds dirt. Returns true when it is covered enough to become a dirtball. */
   addDirt(amount = 1) {
@@ -46,9 +49,11 @@ export class Bacteria {
     this.state = this.dirt > 0 ? 'dirty' : 'crawl';
   }
 
-  /** Which dirt row of the sprite sheet to show: one row per layer. */
+  /** Which dirt row of the sprite sheet to show (0-3 layers), in step with
+   *  how close it is to a dirtball: the third layer means one throw to go. */
   get look() {
-    return Math.max(0, Math.min(3, Math.floor(this.dirt)));
+    if (this.dirt <= 0) return 0;
+    return Math.min(3, Math.ceil((this.dirt / BACTERIA.maxDirt) * 3 - 1e-9));
   }
 
   breakApart() {
@@ -104,8 +109,9 @@ export class Bacteria {
   }
 
   /** `target` is the sprout, or null when it can't be seen; then the
-   *  bacteria wanders and steers clear of `avoid`. */
-  update(dt, target, frozen, avoid = null) {
+   *  bacteria wanders and steers clear of `avoid`. `pace` slows every
+   *  bacteria at once (fertilizer). */
+  update(dt, target, frozen, avoid = null, pace = 1) {
     if (this.state === 'breaking') {
       this.fx += dt;
       if (this.fx >= BREAK_TIME) this.dead = true;
@@ -122,15 +128,17 @@ export class Bacteria {
     if (frozen) return;
     this.t += dt;
 
+    // A spore push slides it along, crawling or dirty.
+    if (this.knock > 0) {
+      const k = this.knock / KNOCK_TIME;
+      this.x += this.kx * k * dt;
+      this.y += this.ky * k * dt;
+      this.knock = Math.max(0, this.knock - dt);
+      if (this.state === 'crawl') return;
+    }
+
     if (this.state === 'crawl') {
-      if (this.knock > 0) {
-        const k = this.knock / KNOCK_TIME;
-        this.x += this.kx * k * dt;
-        this.y += this.ky * k * dt;
-        this.knock = Math.max(0, this.knock - dt);
-        return;
-      }
-      let speed = this.speed;
+      let speed = this.speed * pace;
       if (this.slow > 0) {
         speed *= this.slowFactor;
         this.slow = Math.max(0, this.slow - dt);

@@ -2,9 +2,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game, NO_INPUT } from './game.js';
-import { BACTERIA, COINS, ITEMS, ONCE, REVIVE, SHOT, SLOTS, SPROUTS, TOOLS, TREE } from './config.js';
-import { Wallet, gearFor, formatK, SAVE, ADMIN_SAVE, TOOL_IDS, SPROUT_IDS, SLOT_IDS, ONCE_IDS, SKIP_IDS, CATALOG } from './gear.js';
-import { SOIL, TREE_SPOT, dist, insideRing, insideSoil } from './world.js';
+import { BACTERIA, COINS, GADGETS, ITEMS, ONCE, REVIVE, SHOT, SLOTS, SPROUTS, TOOLS, TREE } from './config.js';
+import {
+  Wallet, gearFor, formatK, SAVE, ADMIN_SAVE, TOOL_IDS, SPROUT_IDS, GADGET_IDS, SLOT_IDS, ONCE_IDS, SKIP_IDS, CATALOG,
+} from './gear.js';
+import { RING_SQUASH, SOIL, TREE_SPOT, dist, insideRing, insideSoil } from './world.js';
 
 const STEP = 1 / 60;
 const run = (game, seconds, input = NO_INPUT) => {
@@ -217,17 +219,16 @@ test('two tools at once: their boosts multiply, and both powers work', () => {
 
 // ---------------------------------------------------------------- sprouts
 
-test('sunflower: every 30 seconds an item pops out of the flower and lands near it', () => {
+test('sunflower: from level 1, every 30 seconds a glowing item pops out of the flower and lands near it', () => {
   const game = quietGame(planting('sunflower'));
-  game.startLevel(ITEMS.unlockLevel);
-  game.phase = 'test';
-  game.toSpawn = 0;
+  assert.equal(game.level, 1);
   game.drainEvents();
   run(game, 29.5);
-  assert.equal(game.item, null);
+  assert.equal(game.items.length, 0);
   run(game, 0.6);
-  const item = game.item;
+  const [item] = game.items;
   assert.ok(item);
+  assert.equal(item.glowing, true);
   const pop = game.drainEvents().find((e) => e.type === 'itemAppears');
   assert.deepEqual(pop.from, game.flowerTop, 'out of the flower');
   const d = dist(item, game.tree);
@@ -236,9 +237,9 @@ test('sunflower: every 30 seconds an item pops out of the flower and lands near 
   // It can't be caught in the air.
   game.klay.x = item.x; game.klay.y = item.y;
   game.update(STEP);
-  assert.equal(game.item, item, 'still flying');
+  assert.deepEqual(game.items, [item], 'still flying');
   run(game, 0.7);
-  assert.equal(game.item, null, 'picked up once it landed');
+  assert.equal(game.items.length, 0, 'picked up once it landed');
 });
 
 test('rose: starts with 4 hearts and heals 1 every 20 seconds', () => {
@@ -302,25 +303,37 @@ test('lilies: closed for 15 of every 40 seconds; bacteria wander and keep away',
   assert.ok(game.lives < TREE.lives, 'it heads for the sprout again');
 });
 
-test('mushroom: every 25s, spores push crawlers inside the ring 60 back and slow them', () => {
+test('mushroom: every 25s, spores push bacteria and dirtballs inside the ring 60 back, and dirty bacteria up a layer', () => {
   const m = SPROUTS.mushroom.spores;
   assert.equal(m.push, 60);
   assert.ok(Math.abs(m.reach - 330 * 0.75) < 1, 'a ring 25% smaller than 330');
   const game = quietGame(planting('mushroom'));
   game.sporeTimer = 0.01;
   game.healTimer = Infinity;
-  const near = game.addBacteria(game.tree.x + 100, game.tree.y);
-  const out = game.addBacteria(game.tree.x + m.reach + 30, game.tree.y);
-  const dirty = game.addBacteria(game.tree.x - 100, game.tree.y);
+  const t = game.tree;
+  const near = game.addBacteria(t.x + 100, t.y);
+  const out = game.addBacteria(t.x + m.reach + 30, t.y);
+  const dirty = game.addBacteria(t.x - 100, t.y);
   dirty.addDirt(1);
-  const before = { near: dist(near, game.tree), out: dist(out, game.tree), dirty: { x: dirty.x, y: dirty.y } };
+  const deep = game.addBacteria(t.x, t.y + 70);
+  deep.addDirt(BACTERIA.maxDirt - 1);               // one throw from a dirtball
+  const ball = game.addDirtball(t.x - 60, t.y - 90);
+  const before = { near: dist(near, t), out: dist(out, t), dirty: dist(dirty, t), ball: dist(ball, t) };
   run(game, 0.5);
-  const pushed = dist(near, game.tree) - before.near;
+  const pushed = dist(near, t) - before.near;
   assert.ok(pushed > 45 && pushed < 75, `pushed ${pushed.toFixed(0)}`);
-  assert.equal(near.slowed, true);
-  assert.ok(dist(out, game.tree) < before.out, 'outside the ring: not pushed');
-  assert.equal(out.slowed, false);
-  assert.deepEqual({ x: dirty.x, y: dirty.y }, before.dirty, 'a dirty one stays');
+  assert.equal(near.dirt, 1, 'a clean one gets its first layer');
+  assert.equal(near.state, 'dirty');
+  assert.equal(near.slowed, true, 'and crawls slowly when it’s clean again');
+  assert.ok(dist(out, t) < before.out, 'outside the ring: not pushed');
+  assert.equal(out.dirt, 0);
+  assert.ok(dist(dirty, t) - before.dirty > 45, 'a dirty one is pushed too');
+  assert.equal(dirty.dirt, 2, 'and gets a layer more');
+  assert.equal(deep.dead, true, 'three layers deep: it becomes a dirtball');
+  assert.equal(game.dirtballs.length, 2);
+  assert.ok(dist(game.dirtballs[1], t) > 70 + 45, 'and that dirtball is pushed too');
+  assert.ok(dist(ball, t) - before.ball > 45, 'dirtballs slide away');
+  assert.equal(ball.state, 'idle', 'without rolling');
   assert.equal(insideRing({ x: game.tree.x, y: game.tree.y + m.reach * 0.7 }, game.tree, m.reach), false,
     'the ring is flattened like the pot');
 });
@@ -478,7 +491,7 @@ test('one tool slot: picking a tool swaps it; you can only use what you own', ()
   w.equip(null);
   assert.deepEqual(w.tools, [], 'bare hands');
   w.buy('rose');
-  assert.deepEqual(w.loadout, { tools: [], sprouts: ['rose'] });
+  assert.deepEqual(w.loadout, { tools: [], sprouts: ['rose'], gadgets: [] });
 });
 
 test('2nd tool slot: wear two; a third swaps out the oldest; tap one to take it off', () => {
@@ -535,7 +548,7 @@ test('a v13 save (one tool, one sprout) still loads', () => {
   storage.setItem(SAVE, JSON.stringify({ coins: 80, owned: ['sprout', 'gun', 'corn'], tool: 'gun', sprout: 'corn' }));
   const w = new Wallet(storage);
   assert.equal(w.coins, 80);
-  assert.deepEqual(w.loadout, { tools: ['gun'], sprouts: ['corn'] });
+  assert.deepEqual(w.loadout, { tools: ['gun'], sprouts: ['corn'], gadgets: [] });
 });
 
 test('a broken or tampered save falls back safely', () => {
@@ -552,11 +565,12 @@ test('a broken or tampered save falls back safely', () => {
 
 test('prices match the brief', () => {
   assert.deepEqual(
-    Object.fromEntries(Object.entries({ ...TOOLS, ...SPROUTS, ...SLOTS, ...ONCE }).map(([k, v]) => [k, v.price])),
+    Object.fromEntries(Object.entries({ ...TOOLS, ...SPROUTS, ...GADGETS, ...SLOTS, ...ONCE }).map(([k, v]) => [k, v.price])),
     {
-      shoes: 29, gloves: 29, coat: 49, glasses: 69, gun: 99,
-      sprout: 0, sunflower: 149, rose: 199, corn: 249, lilies: 249, mushroom: 299,
-      toolSlot: 499, sproutSlot: 999,
+      backpack: 19, shoes: 29, gloves: 29, coat: 49, glasses: 69, gun: 99,
+      sprout: 0, daisy: 99, sunflower: 149, rose: 199, corn: 249, lilies: 249, mushroom: 299,
+      leaf: 39, spray: 39, fertilizer: 39,
+      toolSlot: 199, sproutSlot: 399, gadgetSlot: 99,
       skip3: 29, skip7: 74, skip10: 99, revive: 49,
     },
   );
@@ -574,7 +588,7 @@ test('admin mode is its own save: everything unlocked, the real save untouched',
   w.open(ADMIN_SAVE);
   assert.equal(w.isAdmin, true);
   assert.equal(w.coins, 9999);
-  for (const id of [...TOOL_IDS, ...SPROUT_IDS, ...SLOT_IDS, ...ONCE_IDS]) assert.equal(w.owns(id), true, id);
+  for (const id of [...TOOL_IDS, ...SPROUT_IDS, ...GADGET_IDS, ...SLOT_IDS, ...ONCE_IDS]) assert.equal(w.owns(id), true, id);
   w.equip('gun');
   w.add(500);
 
@@ -595,7 +609,7 @@ test('admin: lock all to try buying, unlock all to try everything', () => {
   w.equip('rose');
   w.lockAll();
   assert.equal(w.owns('coat'), false);
-  assert.deepEqual(w.loadout, { tools: [], sprouts: ['sprout'] });
+  assert.deepEqual(w.loadout, { tools: [], sprouts: ['sprout'], gadgets: [] });
   assert.equal(w.buy('mushroom'), true, 'buying works again');
   w.unlockAll();
   assert.equal(w.owns('gun'), true);
@@ -608,4 +622,193 @@ test('a game can start at a later level', () => {
   assert.equal(game.skillUnlocked, true);
   assert.equal(game.itemsUnlocked, true);
   assert.equal(game.levelSize(7), game.toSpawn);
+});
+
+// -------------------------------------------------------------- backpack
+
+test('backpack: coins within 50 units (300) fly to Klayman; farther ones wait', () => {
+  assert.equal(TOOLS.backpack.magnet, 300);
+  const game = quietGame(wearing('backpack'));
+  const k = game.klay;
+  game.dropCoin({ x: k.x + 250, y: k.y }, 1);
+  game.dropCoin({ x: k.x + 360, y: k.y }, 5);
+  run(game, 1.2);
+  assert.equal(game.earned, 1, 'the near one ran to him');
+  assert.equal(game.coins.length, 1);
+  assert.equal(game.coins[0].x, k.x + 360, 'the far one stayed put');
+
+  const plain = quietGame();
+  plain.dropCoin({ x: plain.klay.x + 250, y: plain.klay.y }, 1);
+  run(plain, 1.2);
+  assert.equal(plain.earned, 0, 'no backpack, no magnet');
+});
+
+test('backpack: it pulls a coin that drops close by mid-game', () => {
+  const game = quietGame(wearing('backpack'));
+  const k = game.klay;
+  run(game, 0.5);
+  game.dropCoin({ x: k.x - 120, y: k.y + 40 }, 5);
+  run(game, 1);
+  assert.equal(game.earned, 5);
+});
+
+// ------------------------------------------------------------------ daisy
+
+test('daisy: from level 1, a coin pops out of the flower every 30 seconds', () => {
+  const game = quietGame(planting('daisy'));
+  assert.equal(game.level, 1);
+  game.drainEvents();
+  run(game, 29.9);
+  assert.equal(game.coins.length, 0);
+  run(game, 0.2);
+  assert.equal(game.coins.length, 1);
+  const coin = game.coins[0];
+  assert.deepEqual({ x: coin.from.x, y: coin.from.y }, game.flowerTop, 'out of the flower');
+  const d = dist(coin, game.tree);
+  assert.ok(d >= SPROUTS.daisy.drop.min && d <= SPROUTS.daisy.drop.max, `lands ${d.toFixed(0)} away`);
+  game.drainEvents();
+  run(game, 30);
+  assert.equal(game.drainEvents().filter((e) => e.type === 'coinAppears').length, 1, 'and again 30 seconds later');
+});
+
+test('daisy: 80% 1K, 19% 5K, 1% 10K', () => {
+  const value = (roll) => {
+    const game = quietGame(planting('daisy'), () => roll);
+    return game.planFlowerCoin().value;
+  };
+  assert.equal(value(0), 1);
+  assert.equal(value(0.799), 1);
+  assert.equal(value(0.8), 5);
+  assert.equal(value(0.9899), 5);
+  assert.equal(value(0.9901), 10);
+  assert.equal(value(0.9999), 10);
+});
+
+test('daisy: the glasses know the next coin and its worth, 3 seconds early', () => {
+  const game = quietGame(planting('daisy'));
+  run(game, 27.1);
+  const next = game.flowerCoins.next;
+  assert.ok(next && [1, 5, 10].includes(next.value));
+  run(game, 3);
+  assert.deepEqual({ x: game.coins[0].x, y: game.coins[0].y, value: game.coins[0].value }, next);
+});
+
+// --------------------------------------------- sunflower and the pot, both
+
+test('sunflower from level 3: its items and the pot’s both come, side by side', () => {
+  const game = quietGame(planting('sunflower'));
+  game.startLevel(ITEMS.unlockLevel);
+  game.phase = 'test';
+  game.toSpawn = 0;
+  game.potItems.timer = 1;
+  game.flowerItems.timer = 1;
+  run(game, 1.1);
+  assert.equal(game.items.length, 2, 'one from the pot and one from the flower');
+  assert.deepEqual(game.items.map((i) => i.glowing).sort(), [false, true]);
+});
+
+// ---------------------------------------------------------------- gadgets
+
+const withGadgets = (...gadgets) => ({ gadgets });
+const press = (i) => ({ ...NO_INPUT, gadget: i });
+
+test('gadgets cost 39K; the 2nd gadget slot 99K; the 2nd tool slot 199K; the 2nd sprout slot 399K', () => {
+  assert.deepEqual(GADGET_IDS.map((id) => GADGETS[id].price), [39, 39, 39]);
+  assert.equal(SLOTS.gadgetSlot.price, 99);
+  assert.equal(SLOTS.toolSlot.price, 199);
+  assert.equal(SLOTS.sproutSlot.price, 399);
+});
+
+test('leaf: its wind keeps bacteria out of a ring round Klayman for 5 seconds, then 20 to cool down', () => {
+  const game = quietGame(withGadgets('leaf'));
+  const k = game.klay;
+  k.x = game.tree.x + 160; k.y = game.tree.y;              // standing in the way to the sprout
+  const b = game.addBacteria(k.x + 40, k.y);               // already close
+  game.drainEvents();
+  game.update(STEP, press(0));
+  assert.ok(game.drainEvents().some((e) => e.type === 'gadget' && e.id === 'leaf'));
+  run(game, 0.6);
+  // The ring is flattened like every ring on the pot: 60 across, 36 deep, plus the bacteria's own size.
+  const { reach } = GADGETS.leaf;
+  const inRing = (p) => Math.hypot((p.x - k.x) / (reach + 13), (p.y - k.y) / (reach * RING_SQUASH + 13));
+  assert.ok(inRing(b) >= 0.999, `pushed out (${inRing(b).toFixed(3)})`);
+  let closest = Infinity;
+  for (let t = 0; t < 4; t += STEP) {
+    game.update(STEP);
+    if (b.alive) closest = Math.min(closest, dist(b, k));
+  }
+  assert.ok(closest >= GADGETS.leaf.reach * 0.6, `held off (closest ${closest.toFixed(0)})`);
+  assert.equal(k.poisoned, false, 'it never got in');
+  const leaf = game.gadgets[0];
+  run(game, 0.5);
+  assert.equal(leaf.active, false, 'the wind stops after 5 seconds');
+  assert.ok(Math.abs(leaf.wait - 20) < 0.5, 'then it cools down for 20');
+  game.update(STEP, press(0));
+  assert.equal(leaf.active, false, 'it can’t be used while cooling down');
+  run(game, leaf.wait + 0.05);
+  assert.equal(leaf.ready, true, 'ready again once it has cooled down');
+});
+
+test('mist spray: sprays the sprout twice, half a heart back', () => {
+  const game = quietGame(withGadgets('spray'));
+  game.lives = 1;
+  game.drainEvents();
+  game.update(STEP, press(0));
+  run(game, GADGETS.spray.time + 0.1);
+  const events = game.drainEvents();
+  assert.equal(events.filter((e) => e.type === 'mist').length, 2);
+  assert.equal(game.lives, 1.5);
+  assert.equal(game.gadgets[0].wait > 19, true, 'then 20 seconds to cool down');
+  game.gadgets[0].wait = 0;
+  game.lives = game.maxLives;
+  game.update(STEP, press(0));
+  run(game, GADGETS.spray.time + 0.1);
+  assert.equal(game.lives, game.maxLives, 'never past full');
+});
+
+test('fertilizer: every bacteria crawls 70% slower for 5 seconds', () => {
+  const crawl = (fed) => {
+    const game = quietGame(withGadgets('fertilizer'));
+    const b = game.addBacteria(game.tree.x + 300, game.tree.y);
+    if (fed) game.update(STEP, press(0));
+    const x0 = b.x;
+    run(game, 2);
+    return x0 - b.x;
+  };
+  const ratio = crawl(true) / crawl(false);
+  assert.ok(Math.abs(ratio - 0.3) < 0.03, `crawled ${(ratio * 100).toFixed(0)}% as far`);
+  const game = quietGame(withGadgets('fertilizer'));
+  game.update(STEP, press(0));
+  run(game, 5.1);
+  assert.equal(game.pace, 1, 'over after 5 seconds');
+});
+
+test('two gadgets with the 2nd gadget slot, each on its own key', () => {
+  const w = new Wallet(memory());
+  w.add(500);
+  w.buy('leaf');
+  w.buy('spray');
+  assert.deepEqual(w.loadout.gadgets, ['spray'], 'one slot: the new one swaps in');
+  w.buy('gadgetSlot');
+  w.equip('leaf');
+  assert.deepEqual(w.loadout.gadgets, ['spray', 'leaf']);
+  w.buy('fertilizer');
+  assert.deepEqual(w.loadout.gadgets, ['leaf', 'fertilizer'], 'a third swaps out the oldest');
+  w.equip('noGadget');
+  assert.deepEqual(w.loadout.gadgets, []);
+
+  const game = quietGame(withGadgets('leaf', 'spray'));
+  game.update(STEP, press(1));
+  assert.deepEqual(game.gadgets.map((g) => g.active), [false, true]);
+});
+
+test('gadgets are saved with the wallet', () => {
+  const storage = memory();
+  const w = new Wallet(storage);
+  w.add(200);
+  w.buy('gadgetSlot');
+  w.buy('leaf');
+  w.buy('fertilizer');
+  const again = new Wallet(storage);
+  assert.deepEqual(again.loadout.gadgets, ['leaf', 'fertilizer']);
 });

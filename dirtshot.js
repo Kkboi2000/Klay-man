@@ -1,7 +1,8 @@
 // Ported from dirtshot.gd: flies forward, gone after max_range.
 // Each bacteria has a little magnetism: a shot that passes close by bends
 // toward it, so throws don't have to be exact. A dirt gun shot is locked on
-// to one bacteria and turns hard enough to reach it from any angle.
+// to one target (a bacteria, a dirtball or a boss) and turns hard enough to
+// reach it from any angle.
 import { GUN, SHOT } from './config.js';
 import { insideSoil } from './world.js';
 
@@ -19,10 +20,10 @@ export class DirtShot {
     this.dead = false;
   }
 
-  get locked() { return Boolean(this.target?.alive); }
+  get locked() { return Boolean(this.target?.lockable); }
 
   update(dt, bacteria = []) {
-    if (this.locked) this.bendToward(this.target, dt, GUN.lockTurn);
+    if (this.locked) this.bendToward(this.target.aimPoint ?? this.target, dt, GUN.lockTurn);
     else this.bendToward(this.nearestAhead(bacteria), dt, SHOT.magnetTurn);
     this.x += this.vx * dt;
     this.y += this.vy * dt;
