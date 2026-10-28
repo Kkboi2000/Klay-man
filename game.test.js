@@ -23,8 +23,8 @@ function quietGame() {
   return game;
 }
 
-test('a dirtball takes 15% more dirt: five throws, and the third layer means one to go', () => {
-  assert.ok(Math.abs(BACTERIA.maxDirt - 4 * 1.15) < 1e-9);
+test('a dirtball takes 4 x 1.15 x 0.9 dirt: still five throws, and the third layer means one to go', () => {
+  assert.ok(Math.abs(BACTERIA.maxDirt - 4 * 1.15 * 0.9) < 1e-9);
   const b = new Bacteria(0, 0);
   const looks = [];
   for (let i = 0; i < 4; i++) { assert.equal(b.addDirt(1), false); looks.push(b.look); }
@@ -32,11 +32,14 @@ test('a dirtball takes 15% more dirt: five throws, and the third layer means one
   assert.equal(b.addDirt(1), true);
 });
 
-test('with the bag, four throws are enough', () => {
+test('with the bag, three throws are enough (10% less dirt than before)', () => {
   const b = new Bacteria(0, 0);
-  const hits = [1, 2, 3, 4].map(() => b.addDirt(ITEMS.bagBoost));
-  assert.deepEqual(hits, [false, false, false, true]);
+  const hits = [1, 2, 3].map(() => b.addDirt(ITEMS.bagBoost));
+  assert.deepEqual(hits, [false, false, true]);
   assert.equal(new Bacteria(0, 0).look, 0);
+  const cracked = new Bacteria(0, 0);
+  cracked.setDirtStage(BACTERIA.maxDirt - 1);
+  assert.equal(cracked.look, 3, 'out of a cracked dirtball: one to go');
 });
 
 test('dirt sheds one layer at a time, then the bacteria crawls again', () => {
@@ -226,12 +229,13 @@ test('the action button (K on a phone, Space on a computer) pushes a dirtball he
   assert.equal(ball.state, 'rolling', 'touching: a push');
 });
 
-test('bacteria are 5% faster again, and every level spawns 10% more often again', () => {
-  assert.ok(Math.abs(BACTERIA.speed - 16 * 1.05 * 1.05) < 1e-9);
+test('bacteria crawl 3% slower and every level spawns them 6% less often than v18', () => {
+  assert.ok(Math.abs(BACTERIA.speed - 16 * 1.05 * 1.05 * 0.97) < 1e-9);
   const game = new Game({ rng: () => 0.5 });
   for (const n of [1, 4, 12]) {
-    const before = Math.max(LEVELS.minSpawnEvery, LEVELS.spawnEvery - LEVELS.spawnEveryStep * (n - 1));
-    assert.ok(Math.abs(game.spawnEveryFor(n) - before / 1.1 / 1.1) < 1e-9, `level ${n}`);
+    const plain = Math.max(LEVELS.minSpawnEvery, LEVELS.spawnEvery - LEVELS.spawnEveryStep * (n - 1));
+    const v18 = plain / (1.1 * 1.1);
+    assert.ok(Math.abs(game.spawnEveryFor(n) - v18 / 0.94) < 1e-9, `level ${n}`);
   }
 });
 

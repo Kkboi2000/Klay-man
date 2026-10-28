@@ -32,11 +32,13 @@ export const SHOT = {
 };
 
 export const BACTERIA = {
-  speed: 16 * 1.05 * 1.05,   // bacteria.gd speed was 24; slowed to 16, then 5% back up, twice
+  // bacteria.gd speed was 24; slowed to 16, then 5% back up twice, then 3% down.
+  speed: 16 * 1.05 * 1.05 * 0.97,
   radius: 13,
   // Dirt that makes a dirtball, counted in throws (bacteria.gd had 7). It
-  // was 4; now 15% more, so it takes a fifth throw (a fourth with the bag).
-  maxDirt: 4 * 1.15,
+  // was 4, then 15% more, then 10% less: 4.14. Throws are whole, so that's
+  // still five plain throws, but three with the bag (it was four).
+  maxDirt: 4 * 1.15 * 0.9,
   decayTime: 2.5,            // seconds to shed one layer (bacteria.gd had 1.2)
   levelSpeedUp: 1.05,        // +5% per level
   maxSpeedFactor: 2,         // ...up to double speed
@@ -67,7 +69,7 @@ export const LEVELS = {
   spawnEvery: 1.5,
   spawnEveryStep: 0.08,      // spawns come a little quicker each level...
   minSpawnEvery: 0.7,        // ...but never faster than this...
-  spawnRate: 1.1 * 1.1,      // ...and every level spawns 10% more often than that, twice over
+  spawnRate: 1.1 * 1.1 * 0.94, // ...and every level spawns 10% more often than that twice over, then 6% less
   bannerTime: 1.8,
   clearDelay: 1.2,
 };
@@ -95,26 +97,28 @@ export const SCORE = {
 
 // The brief measures some reaches in "units". A literal 10 would sit inside
 // Klayman (he is 11 across the middle), so a unit is 6 world pixels: the
-// leaf's 10 units are 60, the backpack's 50 units are 300 (about half the screen).
+// leaf's and the backpack's 25 units are 150, the shovel's 30 are 180.
 export const UNIT = 6;
 
-// A boss bacteria closes every fifth level from 10 (10, 15, 20, ...). Once
+// A boss bacteria closes every fifth level from 5 (5, 10, 15, ...). Once
 // the level's own bacteria are gone it rises out of a corner, stays put and
 // sends out bacteria until dirt wears its HP (level x 10) down. Then it's
 // worn out, burrows back down, and a 10K coin pops out where it was.
 export const BOSS = {
-  firstLevel: 10,
+  firstLevel: 5,
   every: 5,
-  size: 5,                   // drawn 5x a normal bacteria
+  size: 4,                   // 4x a normal bacteria (boss.png, drawn by make-boss.py)
   // Where it stands on the soil: a flattened oval around a spot a little
-  // above its feet, 5x a bacteria's reach (13 x 5 = 65) and wider than deep.
-  foot: { rx: 100, ry: 55, lift: 20 },
+  // above its feet, 4x a bacteria's reach (13 x 4 = 52) and wider than deep.
+  foot: { rx: 80, ry: 44, lift: 16 },
+  corner: 70,                // how far in from the rim, at a corner of the pot
   hpPerLevel: 10,
   shotDamage: 1,             // a throw (the bag makes it 1.5)
-  ballDamage: 5,             // a rolling dirtball
-  // Seconds between the bacteria it sends out: 2.5 at level 10, then 0.625
-  // less every boss level (1.875 at 15, 1.25 at 20), never under 1 (from 25).
-  spawn: { first: 2.5, step: 0.625, min: 1 },
+  ballDamage: 5,             // a rolling dirtball (thrown dirt doesn't break dirtballs while a boss is out)
+  // Seconds between the bacteria it sends out: 2.5 at level 10, and 0.625
+  // less every boss level after (1.875 at 15, 1.25 at 20), never under 1
+  // (from 25). Level 5 carries the steps back: 3.125.
+  spawn: { at: 10, every: 2.5, step: 0.625, min: 1 },
   warn: 2,                   // the ground rumbles this long before it rises...
   rise: 1,                   // ...and it takes this long to climb out
   tired: 1.4,                // worn out: it sags and sweats...
@@ -140,7 +144,7 @@ export const COINS = {
 // Tools. Bought once, kept forever; Klayman wears one per game (two with
 // the second tool slot). Numbers are multipliers on his own: 1.15 means 15% more.
 export const TOOLS = {
-  backpack: { price: 19, magnet: 50 * UNIT },          // coins this close fly to him
+  backpack: { price: 19, magnet: 25 * UNIT },          // coins this close fly to him
   shoes: { price: 29, speed: 1.15 },                   // and he walks through the sprout
   gloves: { price: 29, fireRate: 1.15, range: 1.15 },
   coat: { price: 49, slowTime: 5, slowFactor: 0.7 },   // bacteria can't get in; a touch slows them 30%
@@ -206,16 +210,24 @@ export const SPROUTS = {
 export const GADGETS = {
   leaf: {
     price: 39,
-    reach: 10 * UNIT,        // three leaves spin out this far round Klayman...
-    grow: 0.4,               // ...taking this long to spread
-    time: 5,                 // their wind keeps bacteria out for 5 seconds
+    reach: 25 * UNIT,        // three leaves spin out this far round Klayman...
+    grow: 0.5,               // ...taking this long to spread
+    time: 7,                 // their wind keeps bacteria out for 7 seconds
     cooldown: 20,
   },
   spray: {
     price: 39,
-    puffs: [0.45, 1.05],     // a mist bottle by the sprout sprays twice...
+    puffs: [0.2, 0.5],       // a mist bottle by the sprout sprays twice...
     heal: 0.5,               // ...and the sprout gets half a heart back
-    time: 1.5,
+    time: 0.75,
+    cooldown: 20,
+  },
+  shovel: {
+    price: 39,
+    reach: 30 * UNIT,        // Klayman digs; dirt flies over this far round him...
+    dig: 0.4,                // ...the moment the blade comes up...
+    dirt: 1,                 // ...and every bacteria in it gets a layer more
+    time: 0.75,              // he stands and digs this long
     cooldown: 20,
   },
   fertilizer: {

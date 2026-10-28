@@ -11,8 +11,9 @@ const run = (game, seconds, input = NO_INPUT) => {
   for (let t = 0; t < seconds; t += STEP) game.update(STEP, input);
 };
 
-/** A boss level with its own bacteria already beaten. */
-function bossGame(level = 10, { tools = [], rng = () => 0.5 } = {}) {
+/** A boss level with its own bacteria already beaten. Its boss rises in
+ *  the top-left corner, so the pot's middle is below it. */
+function bossGame(level = 10, { tools = [], rng = () => 0.1 } = {}) {
   const game = new Game({ rng, loadout: { tools } });
   game.reset(undefined, level);
   game.phase = 'play';
@@ -31,17 +32,35 @@ function raise(game) {
   return game.boss;
 }
 
-test('bosses come at levels 10, 15, 20, 25 ...', () => {
+test('bosses come at levels 5, 10, 15, 20 ...', () => {
   const levels = Array.from({ length: 40 }, (_, i) => i + 1).filter(isBossLevel);
-  assert.deepEqual(levels, [10, 15, 20, 25, 30, 35, 40]);
+  assert.deepEqual(levels, [5, 10, 15, 20, 25, 30, 35, 40]);
 });
 
 test('a boss has level x 10 HP', () => {
-  assert.deepEqual([10, 15, 20, 35].map(bossHp), [100, 150, 200, 350]);
+  assert.deepEqual([5, 10, 15, 20, 35].map(bossHp), [50, 100, 150, 200, 350]);
 });
 
-test('it sends out a bacteria every 2.5s at 10, 1.875s at 15, 1.25s at 20, 1s from 25 on', () => {
-  assert.deepEqual([10, 15, 20, 25, 30, 45].map(bossSpawnEvery), [2.5, 1.875, 1.25, 1, 1, 1]);
+test('it sends out a bacteria every 2.5s at 10, 1.875s at 15, 1.25s at 20, 1s from 25 on (3.125s at 5)', () => {
+  assert.deepEqual([5, 10, 15, 20, 25, 30, 45].map(bossSpawnEvery), [3.125, 2.5, 1.875, 1.25, 1, 1, 1]);
+});
+
+test('it rises right in a corner: closer to the rim than before, still standing on the soil', () => {
+  const game = bossGame();
+  assert.equal(BOSS.corner, 70);
+  for (const roll of [0, 0.3, 0.6, 0.9]) {
+    game.rng = () => roll;
+    game.klay.x = SOIL.cx; game.klay.y = SOIL.cy;
+    const c = game.planBoss();
+    const boss = new Boss(c.x, c.y, { hp: 1, spawnEvery: 1 });
+    const middle = boss.aimPoint;
+    assert.ok(insideSoil(middle.x, middle.y, 30), 'its middle is on the soil, with room to spare');
+    // Its front and inner sides, where Klayman and the bacteria come at it from, are on the soil.
+    const inward = { x: Math.sign(SOIL.cx - c.x), y: Math.sign(SOIL.cy - c.y) };
+    assert.ok(insideSoil(middle.x + inward.x * BOSS.foot.rx, middle.y), 'inner side');
+    assert.ok(insideSoil(middle.x, middle.y + inward.y * BOSS.foot.ry), 'front or back');
+    assert.ok(Math.hypot((c.x - SOIL.cx) / SOIL.rx, (c.y - SOIL.cy) / SOIL.ry) > 0.75, 'out toward the rim');
+  }
 });
 
 test('it rises from a corner only once the level’s own bacteria are gone', () => {
@@ -86,7 +105,7 @@ test('no boss on other levels', () => {
   }
 });
 
-test('it never moves, sends out bacteria toward the sprout, and is 5x a bacteria', () => {
+test('it never moves, sends out bacteria toward the sprout, and is 4x a bacteria', () => {
   const game = bossGame(20);
   const boss = raise(game);
   const at = { x: boss.x, y: boss.y };
@@ -98,8 +117,8 @@ test('it never moves, sends out bacteria toward the sprout, and is 5x a bacteria
   const minion = game.bacteria[0];
   assert.ok(insideSoil(minion.x, minion.y));
   assert.ok(dist(minion, game.tree) < dist(boss, game.tree), 'out of its side facing the sprout');
-  assert.equal(BOSS.size, 5);
-  assert.ok(BOSS.foot.rx >= 13 * 5, 'it stands on 5x the ground a bacteria does');
+  assert.equal(BOSS.size, 4);
+  assert.ok(BOSS.foot.rx >= 13 * 4, 'it stands on 4x the ground a bacteria does');
 });
 
 test('throws take 1 HP (1.5 with the bag); a rolling dirtball takes 5', () => {
@@ -214,4 +233,37 @@ test('the boss’s footprint: inside, outside, pushed out', () => {
   boss.pushOut(p, 11);
   assert.ok(Math.abs(boss.reachOf(p, 11) - 1) < 1e-9, 'right on its edge');
   assert.equal(boss.gap({ x: 500, y: 500 }), 0);
+});
+
+test('while a boss is out, thrown dirt flies past dirtballs; a push still breaks them on it', () => {
+  const game = bossGame(10, { tools: ['gun'] });
+  const boss = raise(game);
+  boss.spawnTimer = Infinity;
+  const k = game.klay;
+  k.x = boss.x + 40; k.y = boss.y + 190;
+  k.lookAlong({ x: 0, y: 1 });
+  const ball = game.addDirtball(k.x, k.y + 90);
+  game.update(STEP, { ...NO_INPUT, pressed: true });
+  assert.notEqual(game.lock, ball, 'the gun doesn’t lock on to it');
+  run(game, 0.6);
+  assert.equal(ball.state, 'idle', 'the dirt flew past');
+  assert.equal(game.shotsBreakBalls, false);
+  // Pushed into the boss, it still breaks, and hurts it.
+  const push = game.addDirtball(boss.x, boss.y + 90);
+  push.push({ x: 0, y: -1 });
+  run(game, 0.4);
+  assert.ok(push.dead || push.state === 'breaking');
+  assert.ok(boss.hp <= boss.maxHp - BOSS.ballDamage);
+  // Once the boss is gone, dirt breaks dirtballs again.
+  game.hitBoss(boss.hp, boss);
+  run(game, BOSS.tired + BOSS.burrow + 0.1);
+  assert.equal(game.bossTime, false);
+  assert.equal(game.shotsBreakBalls, true);
+});
+
+test('the first boss comes at level 5, with 50 HP', () => {
+  const game = bossGame(5);
+  const boss = raise(game);
+  assert.equal(boss.maxHp, 50);
+  assert.equal(boss.spawnEvery, 3.125);
 });

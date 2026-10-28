@@ -24,7 +24,7 @@ Every file sits in one folder, with no subfolders, so uploading is simple.
 ### Updating
 
 Upload the changed files the same way. Also open `sw.js` and bump `VERSION`
-(`klayman-v18` → `klayman-v19`): phones keep an offline copy, and this is how
+(`klayman-v19` → `klayman-v20`): phones keep an offline copy, and this is how
 they know to fetch the new one.
 
 ## Pages
@@ -62,11 +62,11 @@ On the setup page, tap something you don’t own, then tap again to buy it.
 
 | Tool | Price | What it does |
 | --- | --- | --- |
-| Backpack | 19K | A coin magnet: coins within 300 (the brief’s 50 units) fly to Klayman, faster and faster. Worn on his back |
+| Backpack | 19K | A coin magnet: coins within 150 (the brief’s 25 units) fly to Klayman, faster and faster. Worn on his back |
 | Shoes | 29K | 15% faster; walks through the sprout |
 | Gloves | 29K | Throws 15% faster and 15% farther, with three pixel streaks off the hand |
 | Coat | 49K | Bacteria can’t get into Klayman; one that touches him crawls 30% slower for 5 s |
-| Glasses | 69K | A light-blue visor: arrows to bacteria, the boss, items and coins off-screen; seconds left on items and coins; bacteria left this level; a ring wherever bacteria, an item, a coin or a boss will appear in the next 3 s (with a see-through picture of which item, or the coin); the boss’s HP; and the seconds until each gadget is ready |
+| Glasses | 69K | A light-blue visor: arrows to bacteria, the boss, items and coins off-screen; seconds left on items and coins; bacteria left this level; a ring wherever bacteria, an item, a coin or a boss will appear in the next 3 s (with a see-through picture of which item, or the coin); the boss’s HP; the seconds until the sprout’s next power (above the sprout, and on its arrow when it’s off-screen); and the seconds until each gadget is ready |
 | Dirt gun | 99K | Locks on to the closest thing it can hit (red brackets): a bacteria, the boss, or from level 7 a dirtball. Keeps Klayman facing it; throws, range and walking 5% up |
 
 | Sprout | Price | What it does |
@@ -81,9 +81,10 @@ On the setup page, tap something you don’t own, then tap again to buy it.
 
 | Gadget | Price | What it does |
 | --- | --- | --- |
-| Leaf | 39K | Three leaves spin out round Klayman (60, the brief’s 10 units); their wind pushes bacteria out and keeps them out for 5 s. Then 20 s to recharge |
-| Mist spray | 39K | A bottle by the sprout sprays it twice: half a heart back. Then 20 s to recharge |
+| Leaf | 39K | Three leaves spin out round Klayman (150, the brief’s 25 units); their wind pushes bacteria out and keeps them out for 7 s. Then 20 s to recharge |
+| Mist spray | 39K | A bottle by the sprout sprays it twice in 0.75 s: half a heart back. Then 20 s to recharge |
 | Fertilizer | 39K | Every bacteria crawls 70% slower for 5 s. Then 20 s to recharge |
+| Shovel | 39K | Klayman stops and digs for 0.75 s; light-brown dirt flies over a ring 180 round him (the brief’s 30 units), and every bacteria in it gets one more layer of dirt (one on its third becomes a dirtball). Dirtballs don’t mind. Then 20 s to recharge |
 
 In a game, a gadget’s button sits bottom-left (of the game on a computer, of
 the joystick pad on a phone). It fills up as the gadget recharges and turns
@@ -113,14 +114,18 @@ All these numbers are in `config.js` (`COINS`, `TOOLS`, `SPROUTS`, `GADGETS`, `S
 
 ## Boss bacteria
 
-Levels 10, 15, 20, 25 and on end with a boss: a bacteria five times the size.
-Once the level’s own bacteria are gone, the ground rumbles in one of the pot’s
-four corners (never the one Klayman stands in) and the boss climbs out. It
-never moves, and Klayman can’t walk through it. It sends a bacteria out of its
-side every 2.5 s at level 10, 1.875 s at 15, 1.25 s at 20, and 1 s from 25 on.
+Levels 5, 10, 15, 20 and on end with a boss: a bacteria four times the size,
+darker and meaner, drawn on the same pixel grid as everything else
+(`boss.png`, made by `make-boss.py`). Once the level’s own bacteria are gone,
+the ground rumbles right in one of the pot’s four corners (never the one
+Klayman stands in) and the boss climbs out. It never moves, and Klayman can’t
+walk through it. It sends a bacteria out of its side every 3.125 s at level 5,
+2.5 s at 10, 1.875 s at 15, 1.25 s at 20, and 1 s from 25 on.
 
-It has level × 10 HP (100 at level 10, 150 at 15...). A throw takes 1 (1.5
-with the bag) and a rolling dirtball 5. Only the glasses show its HP: a bar,
+It has level × 10 HP (50 at level 5, 100 at 10...). A throw takes 1 (1.5
+with the bag) and a rolling dirtball 5. While a boss is out, thrown dirt flies
+past dirtballs instead of breaking them (and the dirt gun leaves them be):
+they’re for pushing into the boss. Only the glasses show its HP: a bar,
 green, yellow from half, red from a fifth, with what’s left out of its full HP.
 Worn out, it sags and sweats, burrows back into the ground, and a 10K coin pops
 out where it stood (and 1,000 points). The level is cleared once it’s gone and
@@ -135,8 +140,8 @@ Tap Klayman’s face on the title page **5 times** (or open the game with
 unlocked and you start with 9,999K. The setup page then shows an admin panel:
 
 - **+1,000K**, **Unlock all**, and **Lock all** (to try buying again).
-- **Start at level** 1, 3, 7, 10, 15, 20 or 25: level 3 brings special items,
-  level 7 the dirtball-breaking skill, and 10, 15, 20 and 25 a boss.
+- **Start at level** 1, 3, 5, 7, 10, 15, 20 or 25: level 3 brings special
+  items, level 7 the dirtball-breaking skill, and 5, 10, 15, 20 and 25 a boss.
 - **Leave admin mode** goes back to your own save, exactly as you left it.
   Coins, purchases and best score in admin mode never touch it.
 
@@ -160,9 +165,11 @@ The dirt gun aims for him, on whichever platform. A push only works when
 Klayman is touching the dirtball. From level 7, dirt thrown at a dirtball
 breaks it.
 
-Bacteria are 5% faster again and every level spawns them 10% more often again
-(`BACTERIA.speed`, `LEVELS.spawnRate`). A dirtball now takes 15% more dirt
-(`BACTERIA.maxDirt`): five throws, or four with the bag.
+Bacteria crawl 3% slower than in v18 and every level spawns them 6% less often
+(`BACTERIA.speed`, `LEVELS.spawnRate`). A dirtball takes 10% less dirt than in
+v18 (`BACTERIA.maxDirt`, 4.14): throws are whole, so that's still five plain
+throws, but three with the bag instead of four. A bacteria on its third layer
+of dirt is always one throw away.
 
 ## Changing how it feels
 
@@ -180,6 +187,7 @@ to bacteria, items and coins).
 | `klayman.js`, `bacteria.js`, `dirtball.js`, `dirtshot.js` | Ported from your `.gd` scripts |
 | `items.js` | The four special items (a sunflower’s fly out of it, glowing), and coins (a daisy’s and a boss’s fly out too; the backpack pulls them in) |
 | `boss.js` | The boss bacteria: where it stands, HP, rising, tiring and burrowing |
+| `boss.png`, `make-boss.py` | The boss's frames (four fighting, two worn out), drawn by the script: edit and run it (`pip install pillow`) |
 | `gadgets.js` | A gadget’s clock: ready, working, recharging (what each does is in `game.js`) |
 | `gear.js` | Tools, sprouts, gadgets, slots and used-once items: names, what they change, and the saved wallet |
 | `setup.js` | The setup page and the title face |

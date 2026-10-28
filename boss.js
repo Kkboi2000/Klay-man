@@ -1,20 +1,21 @@
-// A boss bacteria: five times a bacteria, rooted to one spot near a corner of
+// A boss bacteria: four times a bacteria, rooted to one spot near a corner of
 // the pot. It climbs out of the ground, sends out a bacteria every few
 // seconds and wears down under dirt: 1 a throw, 5 a rolling dirtball. Worn
 // out, it sags and sweats, then burrows back down. It never moves.
 import { BOSS } from './config.js';
 
-/** Levels 10, 15, 20, ... end with a boss. */
+/** Levels 5, 10, 15, ... end with a boss. */
 export const isBossLevel = (n) => n >= BOSS.firstLevel && (n - BOSS.firstLevel) % BOSS.every === 0;
 
-/** A boss's HP at level `n`: 100 at level 10, 150 at 15, ... */
+/** A boss's HP at level `n`: 50 at level 5, 100 at 10, 150 at 15, ... */
 export const bossHp = (n) => n * BOSS.hpPerLevel;
 
-/** Seconds between the bacteria a boss sends out at level `n`. */
+/** Seconds between the bacteria a boss sends out at level `n`: 2.5 at 10,
+ *  a step less every boss level after (a step more before), never under the minimum. */
 export function bossSpawnEvery(n) {
-  const { first, step, min } = BOSS.spawn;
-  const steps = Math.max(0, Math.floor((n - BOSS.firstLevel) / BOSS.every));
-  return Math.max(min, first - step * steps);
+  const { at, every, step, min } = BOSS.spawn;
+  const steps = Math.floor((n - at) / BOSS.every);
+  return Math.max(min, every - step * steps);
 }
 
 export class Boss {

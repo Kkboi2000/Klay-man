@@ -5,14 +5,14 @@ import { GADGETS, ONCE, SLOTS, SPROUTS, TOOLS, TREE } from './config.js';
 
 export const TOOL_IDS = ['backpack', 'shoes', 'gloves', 'coat', 'glasses', 'gun'];
 export const SPROUT_IDS = ['sprout', 'daisy', 'sunflower', 'rose', 'corn', 'lilies', 'mushroom'];
-export const GADGET_IDS = ['leaf', 'spray', 'fertilizer'];
+export const GADGET_IDS = ['leaf', 'spray', 'fertilizer', 'shovel'];
 export const SLOT_IDS = ['toolSlot', 'sproutSlot', 'gadgetSlot'];
 export const ONCE_IDS = ['skip3', 'skip7', 'skip10', 'revive'];
 // Sold on the setup page. Revive isn't: it's offered on the summary when the sprout is lost.
 export const SKIP_IDS = ['skip3', 'skip7', 'skip10'];
 
 export const CATALOG = {
-  backpack: { name: 'Backpack', says: 'A coin magnet: coins nearby fly to Klayman.' },
+  backpack: { name: 'Backpack', says: 'A coin magnet: coins close by fly to Klayman.' },
   shoes: { name: 'Shoes', says: '15% faster. Walk right through the sprout.' },
   gloves: { name: 'Gloves', says: 'Throw 15% faster and 15% farther.' },
   coat: { name: 'Coat', says: 'Bacteria can’t get into Klayman. One that touches him slows down 30% for 5 seconds.' },
@@ -25,9 +25,10 @@ export const CATALOG = {
   corn: { name: 'Corn', says: '6 hearts, up to 11. Every 40 seconds its leaves close and keep bacteria out for 15 seconds.' },
   lilies: { name: 'Lilies', says: 'Every 40 seconds it closes for 15 seconds. Bacteria lose sight of it and wander.' },
   mushroom: { name: 'Mushroom', says: 'Spores push bacteria and dirtballs back, and give bacteria a layer of dirt. Heals half a heart every 30 seconds. Grows to 9 hearts.' },
-  leaf: { name: 'Leaf', says: 'Three leaves spin round Klayman. Their wind keeps bacteria away for 5 seconds.' },
+  leaf: { name: 'Leaf', says: 'Three leaves spin round Klayman. Their wind keeps bacteria away for 7 seconds.' },
   spray: { name: 'Mist spray', says: 'Sprays the sprout twice: half a heart back.' },
   fertilizer: { name: 'Fertilizer', says: 'Every bacteria crawls 70% slower for 5 seconds.' },
+  shovel: { name: 'Shovel', says: 'Klayman digs and throws dirt all round him: every bacteria near him gets a layer of dirt.' },
   toolSlot: { name: '2nd tool slot', says: 'Wear two tools at once.' },
   sproutSlot: { name: '2nd sprout slot', says: 'Pick a backup sprout. When the first is lost, carry on with it.' },
   gadgetSlot: { name: '2nd gadget slot', says: 'Take two gadgets into a game.' },

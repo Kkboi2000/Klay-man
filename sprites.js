@@ -3,7 +3,7 @@
 // icons and gadget props from the pixel art in art.js.
 import {
   SPROUT_PALETTE, SPROUT_ROWS, CLOSING_ROWS, SPROUT_SWAY, ART_PALETTE, TOOL_ICON_ROWS, SHOP_ICON_ROWS,
-  GADGET_ICON_ROWS, COIN_ROWS, GUN_ART, GUN_ART_SMALL, PACK_ART, LEAF_ROWS, BOTTLE_ROWS,
+  GADGET_ICON_ROWS, COIN_ROWS, GUN_ART, GUN_ART_SMALL, PACK_ART, LEAF_ROWS, BOTTLE_ROWS, SHOVEL_ROWS, SHOVEL_GRIP,
 } from './art.js';
 
 /** In the single-file preview build, assets arrive inline as data URLs. */
@@ -83,6 +83,10 @@ export const BAC = {
   splatY: 183,
   ballBreakY: 219,
 };
+
+// --- Boss: 96x72 frames from make-boss.py --------------------------------------
+// Frames 0-3 fighting (legs waving, breathing), 4-5 worn out. Feet at (48, 64).
+export const BOSS_ART = { w: 96, h: 72, anchor: { x: 48, y: 64 }, fight: [0, 1, 2, 3], tired: [4, 5], top: 51 };
 
 // --- Sprout: two 32x48 frames, gently swaying --------------------------------
 export const TREE_ART = { w: 32, h: 48, anchor: { x: 16, y: 35 } };
@@ -440,11 +444,12 @@ export const shopIconArt = (id) => pixelArt(SHOP_ICON_ROWS[id], ART_PALETTE);
 export const gadgetIconArt = (id) => pixelArt(GADGET_ICON_ROWS[id], ART_PALETTE);
 
 export async function loadSprites() {
-  const [bg, klay, bac, tree] = await Promise.all([
+  const [bg, klay, bac, tree, boss] = await Promise.all([
     loadImage('bg.png'),
     loadImage('klay.png'),
     loadImage('bacteiras.png'),
     loadImage('tree.png'),
+    loadImage('boss.png'),
   ]);
   const info = readKlay(klay);
   // Klayman in any mix of tools, painted the first time it's needed.
@@ -501,8 +506,12 @@ export async function loadSprites() {
     bacSlow: tinted(bac, 'rgba(176, 110, 214, 0.5)'),
     bac,
     bacFrozen: tinted(bac, 'rgba(150, 215, 255, 0.55)'),
-    bacHit: tinted(bac, 'rgba(255, 255, 255, 0.75)'),      // a boss taking a hit
-    bacTired: tinted(bac, 'rgba(120, 104, 80, 0.45)'),     // a boss worn out
+    boss: {
+      sheet: boss,
+      hit: tinted(boss, 'rgba(255, 255, 255, 0.8)'),       // the flash when dirt lands on it
+      frozen: tinted(boss, 'rgba(150, 215, 255, 0.55)'),   // a sandclock
+    },
+    shovel: { img: pixelArt(SHOVEL_ROWS, ART_PALETTE), grip: SHOVEL_GRIP },
     heart: heartArt('full'),
     halfHeart: heartArt('half'),
     icons,

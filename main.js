@@ -288,7 +288,7 @@ function handleEvents(events) {
         if (e.unlocksItems) news = 'From now on, special items will appear near the sprout.';
         if (e.unlocksSkill) news = 'New skill: throw dirt at a dirtball from afar to break it. Up close, you still push it.';
         if (e.boss) news = e.firstBoss
-          ? 'A boss bacteria waits at the end of this level. Wear it down with dirt, and roll dirtballs into it.'
+          ? 'A boss bacteria waits at the end of this level. Wear it down with dirt, and push dirtballs into it.'
           : 'A boss bacteria waits at the end of this level.';
         ui.banner(`Level ${e.level}`, news, news ? 4.5 : 1.8);
         break;
@@ -311,6 +311,11 @@ function handleEvents(events) {
       case 'gadget':
         if (e.id === 'leaf') sound.play('throw', { volume: 0.6, rate: 1.4 });
         if (e.id === 'fertilizer') sound.play('break', { volume: 0.4, rate: 1.4 });
+        if (e.id === 'shovel') sound.play('throw', { volume: 0.45, rate: 0.8 });
+        break;
+      case 'dig':
+        sound.play('break', { volume: 0.7, rate: 0.85 });
+        sound.buzz(25);
         break;
       case 'mist': sound.play('throw', { volume: 0.4, rate: 2.2 }); break;
       case 'sprayHeal': sound.play('buy', { volume: 0.4, rate: 1.35 }); break;

@@ -25,8 +25,7 @@ export const NO_INPUT = Object.freeze({ x: 0, y: 0, pressed: false, held: false,
 // Where a flower's head is, above the spot it's rooted in (unscaled).
 const FLOWER_TOP = { sunflower: 54, daisy: 50 };
 
-// A boss rises this far in from the rim, at one of the pot's four corners.
-const BOSS_INSET = 150;
+// A boss rises at one of the pot's four corners, BOSS.corner in from the rim.
 const BOSS_CORNERS = [-3, -1, 1, 3].map((k) => (k * Math.PI) / 4);
 
 /** Moves `a` out of `b` until they are at least `minD` apart. */
@@ -134,6 +133,29 @@ export class Game {
   get sproutClosed() { return this.shield > 0 || this.hidden > 0; }
   /** This level ends with a boss bacteria. */
   get bossLevel() { return isBossLevel(this.level); }
+  /** A boss is out (or rumbling up): thrown dirt doesn't break dirtballs
+   *  then; they're for pushing into it. */
+  get bossTime() { return Boolean(this.boss || this.bossPlan); }
+  /** Dirt thrown at a dirtball breaks it: from level 7, but not while a boss is out. */
+  get shotsBreakBalls() { return this.skillUnlocked && !this.bossTime; }
+  /** Klayman is digging with the shovel: he stands still till he's done. */
+  get digging() { return this.gadgets.some((g) => g.id === 'shovel' && g.active); }
+
+  /** The sprout's powers and the seconds until each comes round (what the
+   *  glasses show by the sprout). Corn and lilies count down to closing,
+   *  then, while closed, to opening again. */
+  get sproutClocks() {
+    const g = this.gear;
+    const out = [];
+    if (this.flowerCoins) out.push({ power: 'coin', secs: this.flowerCoins.timer });
+    if (this.flowerItems) out.push({ power: 'item', secs: this.flowerItems.timer });
+    if (g.shield) out.push(this.shield > 0 ? { power: 'opens', secs: this.shield } : { power: 'closes', secs: this.shieldTimer });
+    if (g.hide) out.push(this.hidden > 0 ? { power: 'opens', secs: this.hidden } : { power: 'closes', secs: this.hideTimer });
+    if (g.spores) out.push({ power: 'spores', secs: this.sporeTimer });
+    if (g.heal) out.push({ power: 'heal', secs: this.healTimer });
+    if (g.growEvery && this.maxLives < g.maxLives) out.push({ power: 'grow', secs: this.growTimer });
+    return out;
+  }
 
   /** Bacteria still to beat this level: to come, crawling or dirty, inside
    *  a dirtball, and the boss until it's worn out. */
@@ -241,7 +263,7 @@ export class Game {
 
   /** One of the pot's four corners, at random, but not where Klayman stands. */
   planBoss() {
-    const corners = BOSS_CORNERS.map((a) => rimPoint(a, BOSS_INSET));
+    const corners = BOSS_CORNERS.map((a) => rimPoint(a, BOSS.corner));
     const clear = corners.filter((c) => dist(c, this.klay) > 220);
     const pool = clear.length ? clear : corners;
     return pool[Math.floor(this.rng() * pool.length) % pool.length];
@@ -342,15 +364,15 @@ export class Game {
   }
 
   /** The dirt gun's pick: the nearest thing a shot can reach and hurt. A
-   *  bacteria, the boss (measured to its edge) and, once dirt breaks them
-   *  (level 7), a dirtball. */
+   *  bacteria, the boss (measured to its edge) and, when dirt breaks them
+   *  (from level 7, but not while a boss is out), a dirtball. */
   lockTarget(from) {
     let best = null;
     let bestD = this.shotRange;
     const consider = (t, d) => { if (d < bestD) { best = t; bestD = d; } };
     for (const b of this.bacteria) if (b.lockable) consider(b, dist(b, from));
     if (this.boss?.lockable) consider(this.boss, this.boss.gap(from));
-    if (this.skillUnlocked) for (const d of this.dirtballs) if (d.lockable) consider(d, dist(d, from));
+    if (this.shotsBreakBalls) for (const d of this.dirtballs) if (d.lockable) consider(d, dist(d, from));
     return best;
   }
 
@@ -406,8 +428,8 @@ export class Game {
         else this.emit('hit', { x: s.x, y: s.y });
         continue;
       }
-      if (!this.skillUnlocked) continue;
-      // Before level 7, dirt flies past dirtballs. After, it breaks them.
+      if (!this.shotsBreakBalls) continue;
+      // Before level 7, or while a boss is out, dirt flies past dirtballs. Otherwise it breaks them.
       const ball = this.dirtballs.find((d) => d.solid && dist(d, s) < DIRTBALL.radius + SHOT.radius);
       if (ball) {
         s.dead = true;
@@ -711,8 +733,21 @@ export class Game {
           if (n === puffs.length - 1) this.sprayHeal(heal);
         });
       }
+      // The shovel: the moment the blade comes up full, dirt flies all round him.
+      if (running && g.id === 'shovel' && before < g.spec.dig && g.t >= g.spec.dig) this.dig(g.spec);
       if (news) this.emit(news === 'end' ? 'gadgetEnds' : 'gadgetReady', { id: g.id, index });
     });
+  }
+
+  /** Dirt flies over every bacteria in the ring round Klayman: one layer
+   *  more each (one on its third becomes a dirtball). Dirtballs don't mind. */
+  dig({ reach, dirt }) {
+    const k = this.klay;
+    for (const b of [...this.bacteria]) {
+      if (!b.alive || !insideRing(b, k, reach)) continue;
+      if (b.addDirt(dirt)) this.turnIntoDirtball(b);
+    }
+    this.emit('dig', { x: k.x, y: k.y, reach });
   }
 
   sprayHeal(amount) {

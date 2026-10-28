@@ -89,8 +89,8 @@ export class Klayman {
       if (this.action.t >= KLAYMAN.actionTime) this.action = null;
     }
 
-    // Stunned: can't move or throw for a moment.
-    if (this.stun > 0) {
+    // Stunned, or digging with the shovel: no walking or throwing for a moment.
+    if (this.stun > 0 || game.digging) {
       this.moving = false;
       return;
     }

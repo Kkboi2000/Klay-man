@@ -49,11 +49,13 @@ export class Bacteria {
     this.state = this.dirt > 0 ? 'dirty' : 'crawl';
   }
 
-  /** Which dirt row of the sprite sheet to show (0-3 layers), in step with
-   *  how close it is to a dirtball: the third layer means one throw to go. */
+  /** Which dirt row of the sprite sheet to show (0-3 layers). The third
+   *  layer always means one throw to go; the first two share the rest. */
   get look() {
     if (this.dirt <= 0) return 0;
-    return Math.min(3, Math.ceil((this.dirt / BACTERIA.maxDirt) * 3 - 1e-9));
+    const last = BACTERIA.maxDirt - 1;
+    if (this.dirt >= last - 1e-9) return 3;
+    return Math.min(2, 1 + Math.floor((this.dirt / last) * 2));
   }
 
   breakApart() {

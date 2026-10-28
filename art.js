@@ -1,6 +1,7 @@
 // Pixel art drawn in code: the bought sprouts (and how corn and lilies look
 // closed), the tool, gadget and shop icons, the coin, the dirt gun, the
-// backpack as worn, a gadget leaf and the mist bottle. One character per
+// backpack as worn, a gadget leaf, the mist bottle and the shovel. (The boss
+// is bigger: make-boss.py draws it into boss.png.) One character per
 // pixel; '.' is see-through. Drawn with the same black outline as the
 // original art. sprites.js turns these into canvases.
 
@@ -507,6 +508,24 @@ export const GADGET_ICON_ROWS = {
     '....kkkkkkkk.d..',
     '..d.......d.....',
   ],
+  shovel: [
+    '..........kkkk..',
+    '.........kOyOk..',
+    '..........kdk...',
+    '.........kdk....',
+    '........kdk.....',
+    '.......kdk......',
+    '......kdk.......',
+    '.....kdk........',
+    '...kkkkkk.......',
+    '..kSWllmk.......',
+    '.kSlllmk........',
+    '.kllllmk..q.....',
+    'kllllmk..qdq....',
+    'kllmmk..qdDdq...',
+    '.kmmk..kkkkkkk..',
+    '..kk............',
+  ],
 };
 
 // 16 x 16 icons for the slots and the one-use items.
@@ -771,3 +790,26 @@ export const BOTTLE_ROWS = [
   'kCCbbbuk..',
   '.kkkkkk...',
 ];
+
+// The shovel, as Klayman holds it: grip at the top, blade down. He holds it
+// at SHOVEL_GRIP and swings it round that point as he digs.
+export const SHOVEL_ROWS = [
+  '.kkk.',
+  'kOyOk',
+  '.kdk.',
+  '.kdk.',
+  '.kdk.',
+  '.kdk.',
+  '.kdk.',
+  '.kdk.',
+  '.kdk.',
+  '.kdk.',
+  'kkdkk',
+  'kSWlk',
+  'kSllk',
+  'kllmk',
+  'kllmk',
+  '.kmk.',
+  '..k..',
+];
+export const SHOVEL_GRIP = { x: 2, y: 4 };

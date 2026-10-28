@@ -5,7 +5,7 @@
 // the boss's HP.
 import { SPRITE_SCALE as S, SHOT, POT_SCALE, COINS, KLAYMAN, LOOKAHEAD, ITEM_FLIGHT, BOSS } from './config.js';
 import { SOIL, WORLD, CAMERA_BOUNDS as BOUNDS, TREE_SPOT, RING_SQUASH } from './world.js';
-import { KLAY, BAC, TREE_ART } from './sprites.js';
+import { KLAY, BAC, TREE_ART, BOSS_ART } from './sprites.js';
 import { BREAK_TIME, ABSORB_TIME } from './bacteria.js';
 import { DIRTBALL_BREAK_TIME } from './dirtball.js';
 import { ITEM_INFO } from './items.js';
@@ -24,8 +24,10 @@ const MIST = ['#d4f0ff', '#ffffff', '#8fe3ff'];
 const FEED = ['#8a5a2b', '#6b4423', '#cfe39a', '#6aa84f'];
 const SWEAT = ['#8fe3ff', '#d4f0ff'];
 const HP = { full: '#6aa84f', half: '#ffd25a', low: '#d9483b' };
-const BOSS_ART = { w: 22, top: 13, bottom: 1 };  // the boss's body in sheet pixels: width, above and below its feet
-const LEAF_SPIN = 5.5;            // the gadget leaves, radians a second round Klayman
+const LEAF_SPIN = 2.8;            // the gadget leaves, radians a second round Klayman
+const DUG = ['#c9a46a', '#e0c08a', '#a07c45'];   // the shovel's light-brown dirt
+// What the glasses call each of a sprout's powers, above the sprout.
+const POWER_WORDS = { coin: 'coin', item: 'item', closes: 'closes', opens: 'opens', spores: 'spores', heal: 'heal', grow: 'grow' };
 const ROLL = 0.5;                 // seconds a corn or lily takes to close up or open
 const VISOR = '#7fdcff';          // everything the glasses show
 const VISOR_INK = '#0c2b3a';
@@ -63,7 +65,39 @@ export class Renderer {
     this.bloom = 0;                // seconds the sunflower stays lit up
     this.kick = 0;                 // seconds the corn still shudders from closing
     this.feed = 0;                 // seconds of fertilizer still raining down
+    this.patches = [];             // the shovel's dirt, settling on the soil
     this.shake = 0;
+  }
+
+  /** The shovel's dirt: light-brown specks over the whole ring, drifting up. */
+  spray(x, y, reach) {
+    const n = this.calm ? 16 : 46;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.sqrt(Math.random()) * reach;
+      this.particles.push({
+        x: x + Math.cos(a) * r, y: y + Math.sin(a) * r * RING_SQUASH - 6, vx: Math.cos(a) * 20, vy: -20 - Math.random() * 30,
+        life: 0, max: 0.45 + Math.random() * 0.45, color: DUG[i % DUG.length], size: 2 + (i % 2) * 2, gravity: 40,
+      });
+    }
+  }
+
+  /** Where the shovel's dirt landed: a light-brown patch, fading. */
+  drawPatches(dt) {
+    const { ctx } = this;
+    for (const p of this.patches) {
+      p.t += dt;
+      const k = p.t / p.max;
+      const r = p.reach * (0.6 + 0.4 * Math.min(1, p.t / 0.2));
+      ctx.save();
+      ctx.globalAlpha = 0.26 * (1 - k);
+      ctx.fillStyle = DUG[0];
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, r, r * RING_SQUASH, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    this.patches = this.patches.filter((p) => p.t < p.max);
   }
 
   /** A point on the canvas (CSS pixels) as a point in the pot: where the mouse aims. */
@@ -197,6 +231,14 @@ export class Renderer {
           }
           break;
         case 'mist': this.mist(); break;
+        case 'dig':
+          // Light-brown dirt flies out over the ring round him, settling as it goes.
+          this.ring(e.x, e.y - 4, e.reach, 0.7, '#c9a46a', '#f0dcb0');
+          this.patches.push({ x: e.x, y: e.y, reach: e.reach, t: 0, max: 0.9 });
+          this.burst(e.x, e.y - 16, 18, DIRT, 150, -50);
+          this.spray(e.x, e.y, e.reach);
+          this.shake = Math.max(this.shake, 0.15);
+          break;
         case 'sprayHeal':
           this.ring(e.x, e.y - 6, 80, 0.6, '#4aa3df', '#d4f0ff');
           if (e.amount > 0) this.floatHeart(top.x, top.y - 20, 'half');
@@ -314,6 +356,7 @@ export class Renderer {
     ctx.imageSmoothingEnabled = false;
 
     if (game.pace < 1) this.drawFeed(game);
+    this.drawPatches(dt);
     if (game.bossPlan) this.drawRumble(game);
     const wind = game.windReach;
     if (wind > 0) this.drawGust(game.klay, wind);
@@ -369,7 +412,12 @@ export class Renderer {
         marks.push({ x: c.x, y: c.y - 12, color: GOLD, size: 8, icon: 'coin', secs: Math.ceil(c.life) });
       }
     }
-    if (!game.over) marks.push({ x: TREE_SPOT.x, y: TREE_SPOT.y - 30, color: '#8cc152', size: 10, icon: 'heart' });
+    if (!game.over) {
+      // Through the glasses, the sprout's arrow also says when its next power comes.
+      const clocks = game.gear.glasses ? game.sproutClocks.map((c) => c.secs) : [];
+      const secs = clocks.length ? Math.max(0, Math.ceil(Math.min(...clocks))) : null;
+      marks.push({ x: TREE_SPOT.x, y: TREE_SPOT.y - 30, color: '#8cc152', size: 10, icon: 'heart', secs });
+    }
 
     const { ctx } = this;
     const W = this.cssW;
@@ -618,13 +666,20 @@ export class Renderer {
     const k = game.klay;
     const sp = this.sprites;
     const tools = game.gear.tools;
-    const hasGun = tools.includes('gun');
+    const dig = game.gadgets.find((g) => g.id === 'shovel' && g.active);
+    const hasGun = tools.includes('gun') && !dig;   // digging, he holds the shovel instead
     const look = sp.lookFor(tools);
     // With the dirt gun he doesn't wind up a throw: he aims and fires.
     let kind = k.moving ? 'walk' : 'idle';
+    let actionT = k.action ? k.action.t : 0;
     if (k.action && !(hasGun && k.action.kind === 'attack')) kind = k.action.kind;
+    if (dig) {
+      // Digging: arms out, leaning into it, across the whole dig.
+      kind = 'push';
+      actionT = Math.min(0.19, (dig.t / dig.spec.time) * 0.2);
+    }
     const clock = kind === 'idle' ? this.time : k.t;
-    const { col, row } = KLAY.frame(kind, k.facing, clock, k.action ? k.action.t : 0);
+    const { col, row } = KLAY.frame(kind, k.facing, clock, actionT);
     const size = KLAY.size;
     const a = KLAY.anchor;
     const flip = k.facing === 'side' && k.flip;
@@ -640,7 +695,8 @@ export class Renderer {
       if (Math.random() < 0.15) this.burst(k.x, k.y - 20, 1, SPARK, 30, -40);
     }
 
-    const gun = hasGun ? () => this.drawGun(k, row, col, flip, jitter) : null;
+    const gun = hasGun ? () => this.drawGun(k, row, col, flip, jitter)
+      : dig ? () => this.drawShovel(k, row, col, flip, dig) : null;
     const pack = tools.includes('backpack');
     if (gun && k.facing === 'back') gun();      // held up the pot, behind him
     if (pack && k.facing === 'front') this.drawPack(k, row, col, flip, jitter, 'behind');
@@ -655,6 +711,31 @@ export class Renderer {
     }
     if (gun && k.facing !== 'back') gun();
     if (tools.includes('gloves') && k.action?.kind === 'attack') this.drawStreaks(k);
+  }
+
+  /** The shovel in his front hand: out it comes, the blade goes in, comes up
+   *  full and tosses the dirt, and away it goes. */
+  drawShovel(k, row, col, flip, g) {
+    const { img, grip } = this.sprites.shovel;
+    const hand = this.sprites.gunSpots[row][col];
+    const t = g.t;
+    let angle = -1.1;
+    let drop = 0;
+    let size = 1;
+    if (t < 0.12) { size = t / 0.12; angle = -0.5; }
+    else if (t < 0.4) { const p = (t - 0.12) / 0.28; angle = -0.5 + 0.9 * p; drop = 5 * p; }
+    else if (t < 0.6) { const p = (t - 0.4) / 0.2; angle = 0.4 - 1.5 * p; drop = 5 * (1 - p); }
+    else size = Math.max(0, 1 - (t - 0.6) / 0.15);
+    if (this.calm) angle = 0;
+    const { ctx } = this;
+    ctx.save();
+    ctx.translate(Math.round(k.x), Math.round(k.y));
+    if (flip) ctx.scale(-1, 1);
+    ctx.translate((hand.x - KLAY.anchor.x) * S, (hand.y - KLAY.anchor.y + Math.round(drop)) * S);
+    ctx.rotate(angle);
+    ctx.scale(size, size);
+    ctx.drawImage(img, -grip.x * S, -grip.y * S, img.width * S, img.height * S);
+    ctx.restore();
   }
 
   /** The backpack: from behind, on his back; from the side, sticking out of
@@ -716,10 +797,10 @@ export class Renderer {
     const { ctx } = this;
     const pulse = this.calm ? 0 : Math.round(Math.sin(this.time * 9) * 2);
     const boss = t.maxHp !== undefined;
-    const half = boss ? { w: 118 + pulse * 2, h: 80 + pulse * 2 } : { w: 19 + pulse, h: 19 + pulse };
-    const arm = boss ? 18 : 7;
+    const half = boss ? { w: 90 + pulse * 2, h: 58 + pulse * 2 } : { w: 19 + pulse, h: 19 + pulse };
+    const arm = boss ? 16 : 7;
     const x = Math.round(t.x);
-    const y = Math.round(boss ? t.y - 62 : t.y - 12);
+    const y = Math.round(boss ? t.y - 50 : t.y - 12);
     ctx.save();
     for (const [w, color] of [[6, '#2b1a0c'], [3, '#ff5a4a']]) {
       ctx.lineWidth = w;
@@ -849,6 +930,11 @@ export class Renderer {
     }
     const boss = game.boss;
     if (boss && (boss.alive || boss.state === 'tired')) this.drawHp(boss);
+    // The sprout's powers: what comes next, and in how many seconds.
+    const top = TREE_SPOT.y - 70 * game.treeScale - 14;
+    game.sproutClocks.forEach((c, i) => {
+      this.label(`${POWER_WORDS[c.power]} ${Math.max(0, Math.ceil(c.secs))}`, TREE_SPOT.x, top - i * 16, 13);
+    });
   }
 
   /** The boss's HP, through the glasses: a bar, green, yellow from half, red
@@ -858,11 +944,12 @@ export class Renderer {
     const share = Math.max(0, boss.hpShare);
     const color = share > 0.5 ? HP.full : share > 0.2 ? HP.half : HP.low;
     const rise = boss.state === 'rising' ? Math.min(1, boss.fx / BOSS.rise) : 1;
-    const w = 124;
+    const w = 112;
     const h = 10;
     const x = Math.round(boss.x - w / 2);
-    // Above its head, but never up under the score bar.
-    const y = Math.round(Math.max(boss.y - BOSS_ART.top * S * BOSS.size * rise - 26, this.cam.y + 104 / this.zoom));
+    // Above its head; when that's up under the score bar, under its feet instead.
+    const above = boss.y - BOSS_ART.top * S * rise - 22;
+    const y = Math.round(above >= this.cam.y + 104 / this.zoom ? above : boss.y + 30);
     ctx.save();
     ctx.fillStyle = VISOR_INK;
     ctx.fillRect(x - 4, y - 4, w + 8, h + 8);
@@ -916,81 +1003,78 @@ export class Renderer {
 
   // ---------------------------------------------------------------- boss
 
-  /** The boss: a bacteria five times over. It climbs out of the ground,
-   *  breathes, swells before it sends one out, flashes when hit; worn out,
-   *  it sags and sweats, then sinks back into the soil. */
+  /** The boss: boss.png, drawn 2x like every sprite, so its pixels match
+   *  Klayman's. It climbs out of the ground, waves its legs, shudders before
+   *  it sends a bacteria out and flashes when hit; worn out, it droops,
+   *  pants and sweats, then sinks back into the soil. Every move is in whole
+   *  art pixels, so it never blurs. */
   drawBoss(boss, game) {
-    const sp = this.sprites;
+    const sp = this.sprites.boss;
+    const art = BOSS_ART;
     const { ctx } = this;
-    const scale = S * BOSS.size;
-    const a = BAC.anchor;
     const k = game.klay;
-    const ground = boss.y + BOSS_ART.bottom * scale;
-    let sheet = game.frozen && boss.alive ? sp.bacFrozen : sp.bac;
-    let fps = 4;
-    let sink = 0;                // how far into the ground it is (0 to 1)
-    let sx = 1;
-    let sy = 1;
+    const px = (v) => Math.round(v) * S;            // whole art pixels, in world units
+    let sheet = game.frozen && boss.alive ? sp.frozen : sp.sheet;
+    let frames = art.fight;
+    let fps = 5;
+    let sink = 0;                // art pixels below the ground
     let dx = 0;
+    let dy = 0;
     if (boss.state === 'rising') {
       const p = Math.min(1, boss.fx / BOSS.rise);
-      sink = (1 - p) ** 2;
-      if (!this.calm) dx = Math.sin(this.time * 50) * 3 * (1 - p);
-      if (Math.random() < 0.5) this.burst(boss.x + (Math.random() * 2 - 1) * 90, ground - 4, 2, DIRT, 70);
+      sink = Math.round((1 - p) ** 2 * art.top);
+      if (!this.calm) dx = Math.round(Math.sin(this.time * 40) * (1 - p));
+      if (Math.random() < 0.5) this.burst(boss.x + (Math.random() * 2 - 1) * 80, boss.y - 2, 2, DIRT, 70);
     } else if (boss.state === 'active') {
-      if (!this.calm) {
-        const breathe = Math.sin(boss.t * 2.6) * 0.025;
-        const swell = boss.spawnTimer < 0.35 ? 0.06 * Math.abs(Math.sin(this.time * 22)) : 0;
-        sx = 1 + breathe + swell;
-        sy = 1 - breathe + swell;
-      }
+      // About to send a bacteria out: a shudder.
+      if (!this.calm && boss.spawnTimer < 0.3) dx = Math.round(Math.sin(this.time * 60));
     } else {
-      // Worn out: slow, sagging, sweating; then it digs itself back in.
-      sheet = sp.bacTired;
-      fps = 1.5;
-      const p = boss.state === 'tired' ? Math.min(1, boss.fx / BOSS.tired) : 1;
-      sy = 1 - 0.14 * p;
-      sx = 1 + 0.08 * p;
-      if (!this.calm) dx = Math.sin(this.time * 4) * 5;
-      if (boss.state === 'tired' && Math.random() < 0.18) {
+      frames = art.tired;
+      fps = 2.5;
+      if (!this.calm) {
+        dx = Math.round(Math.sin(this.time * 3.5) * 2);
+        dy = Math.round(Math.abs(Math.sin(this.time * 2.5)));
+      }
+      if (boss.state === 'tired' && Math.random() < 0.15) {
         const side = Math.random() < 0.5 ? -1 : 1;
-        this.burst(boss.x + side * (40 + Math.random() * 40), boss.y - 110, 1, SWEAT, 50, -40);
+        this.burst(boss.x + side * (36 + Math.random() * 20), boss.y - 70, 1, SWEAT, 50, -40);
       }
       if (boss.state === 'burrowing') {
         const q = Math.min(1, boss.fx / BOSS.burrow);
-        sink = q * q;
-        if (!this.calm) dx = Math.sin(this.time * 46) * 4;
-        if (Math.random() < 0.7) this.burst(boss.x + (Math.random() * 2 - 1) * 100, ground - 4, 2, DIRT, 90);
+        sink = Math.round(q * q * art.top);
+        if (!this.calm) dx = Math.round(Math.sin(this.time * 36));
+        if (Math.random() < 0.7) this.burst(boss.x + (Math.random() * 2 - 1) * 90, boss.y - 2, 2, DIRT, 90);
       }
     }
-    const behind = k.y < boss.y && k.y > boss.y - 150 && Math.abs(k.x - boss.x) < 120;
-    const alpha = behind ? 0.6 : 1;   // Klayman behind it: see him through it
-    const frame = this.calm ? 0 : Math.floor(boss.t * fps) % 4;
-    const height = (BOSS_ART.top + BOSS_ART.bottom) * scale;
+    const frame = frames[this.calm ? 0 : Math.floor(boss.t * fps) % frames.length];
+    // Klayman behind it: see him through it.
+    const behind = k.y < boss.y && k.y > boss.y - 110 && Math.abs(k.x - boss.x) < 96;
+    const alpha = behind ? 0.6 : 1;
 
-    // The hole it comes out of and goes back into.
+    // The hole it comes out of and goes back into, or its shadow.
     if (boss.state === 'rising' || boss.state === 'burrowing') {
-      ctx.fillStyle = 'rgba(36, 25, 13, 0.7)';
+      ctx.fillStyle = 'rgba(36, 25, 13, 0.75)';
       ctx.beginPath();
-      ctx.ellipse(boss.x, ground - 4, 112, 34, 0, 0, Math.PI * 2);
+      ctx.ellipse(boss.x, boss.y - 2, 92, 26, 0, 0, Math.PI * 2);
       ctx.fill();
     } else {
-      this.shadow(boss.x, boss.y, 104, 0.32);
+      this.shadow(boss.x, boss.y - 2, 86, 0.34);
     }
+    const x = Math.round(boss.x) + px(dx) - art.anchor.x * S;
+    const y = Math.round(boss.y) + px(dy + sink) - art.anchor.y * S;
     ctx.save();
-    ctx.beginPath();
-    ctx.rect(boss.x - 200, boss.y - 400, 400, ground - (boss.y - 400));
-    ctx.clip();
-    const draw = (img, alphaOf = 1) => {
-      ctx.save();
-      ctx.globalAlpha = alpha * alphaOf;
-      ctx.translate(Math.round(boss.x + dx), Math.round(boss.y + sink * height));
-      ctx.scale(sx, sy);
-      ctx.drawImage(img, frame * 32, BAC.crawlY(0), 32, 32, -a.x * scale, -a.y * scale, 32 * scale, 32 * scale);
-      ctx.restore();
+    if (sink > 0) {
+      // Below the soil line it's out of sight.
+      ctx.beginPath();
+      ctx.rect(boss.x - 120, boss.y - 200, 240, 200 + S);
+      ctx.clip();
+    }
+    const draw = (img, a = 1) => {
+      ctx.globalAlpha = alpha * a;
+      ctx.drawImage(img, frame * art.w, 0, art.w, art.h, x, y, art.w * S, art.h * S);
     };
     draw(sheet);
-    if (boss.flash > 0) draw(sp.bacHit, boss.flash / 0.12);
+    if (boss.flash > 0) draw(sp.hit, boss.flash / 0.12);
     ctx.restore();
   }
 
@@ -1017,10 +1101,11 @@ export class Renderer {
     const { ctx } = this;
     ctx.save();
     ctx.fillStyle = '#ffffff';
-    for (let i = 0; i < 18; i++) {
+    const n = 36;
+    for (let i = 0; i < n; i++) {
       if (i % 3 === 2) continue;
-      const a = (i / 18) * Math.PI * 2 + this.time * LEAF_SPIN * 0.8;
-      ctx.globalAlpha = 0.25 + 0.2 * Math.sin(a * 3 + this.time * 6);
+      const a = (i / n) * Math.PI * 2 + this.time * LEAF_SPIN * 0.8;
+      ctx.globalAlpha = 0.45 + 0.2 * Math.sin(a * 3 + this.time * 6);
       const x = Math.round((k.x + Math.cos(a) * reach) / 2) * 2;
       const y = Math.round((k.y + Math.sin(a) * reach * RING_SQUASH) / 2) * 2;
       ctx.fillRect(x - 3, y - 1, 6, 2);
