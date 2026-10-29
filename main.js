@@ -330,6 +330,12 @@ function handleEvents(events) {
       case 'mist': sound.play('throw', { volume: 0.4, rate: 2.2 }); break;
       case 'sprayHeal': sound.play('buy', { volume: 0.4, rate: 1.35 }); break;
       case 'gadgetReady': sound.play('coin', { volume: 0.18, rate: 2 }); break;
+      // Seasons.
+      case 'sunshine': sound.play('bling', { volume: 0.55, rate: 0.9 }); break;
+      case 'lightning':
+        sound.play('break', { volume: 1, rate: 0.35 });
+        sound.buzz(60);
+        break;
       case 'gameover': finish(e.score, e.level); break;
     }
   }

@@ -1,15 +1,17 @@
 // The world is bg.png blown up by POT_SCALE. Everything walks on the soil.
+// Since v22 the pot is seen from straight above, so the soil is a perfect
+// circle (make-pot.py draws bg.png; these numbers match it).
 import { POT_SCALE as P } from './config.js';
 
-export const WORLD = { w: 684 * P, h: 508 * P };
+export const WORLD = { w: 560 * P, h: 560 * P };
 
-export const SOIL = { cx: 319.5 * P, cy: 250.5 * P, rx: 215.5 * P, ry: 135.5 * P };
+export const SOIL = { cx: 280 * P, cy: 280 * P, rx: 171 * P, ry: 171 * P };
 
 // How far the camera may wander: the pot and a little gray around it.
-export const CAMERA_BOUNDS = { x0: 30 * P, y0: 62 * P, x1: 608 * P, y1: 470 * P };
+export const CAMERA_BOUNDS = { x0: 43 * P, y0: 43 * P, x1: 517 * P, y1: 517 * P };
 
 // The dark hole in the soil where the sprout grows.
-export const TREE_SPOT = { x: 313 * P, y: 262 * P };
+export const TREE_SPOT = { x: 275 * P, y: 293 * P };
 
 const RATIO = SOIL.ry / SOIL.rx;
 
@@ -66,9 +68,10 @@ export function randomSpotOnSoil(rng, inset = 30) {
   };
 }
 
-// Rings on the soil (spores, a revived sprout) are drawn this much flatter
-// than they are wide, so the pot looks tilted toward you.
-export const RING_SQUASH = 0.6;
+// Rings on the soil (spores, the leaf, the shovel, a revived sprout) were
+// drawn flatter than wide while the pot was seen at an angle. Seen from
+// above (v22), they're round: as deep as they are wide.
+export const RING_SQUASH = 1;
 
 /** Inside a ring of radius `reach` centred on `c`, drawn as the pot sees it. */
 export function insideRing(p, c, reach) {

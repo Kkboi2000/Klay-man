@@ -2,7 +2,7 @@
 // is touching. One button does both (the K button on a phone, Space or a
 // click on a computer): it pushes when he's touching a dirtball and throws
 // otherwise. Auto throw does both by itself. How fast he walks and throws
-// is the game's to say (game.walkSpeed, game.fireRate): his tools, the bag
+// is the game's to say (game.walkSpeed, game.fireRate): his tools, medicine
 // and the booster all count there.
 //
 // He aims all the way round, not just four ways: at the dirt gun's target;

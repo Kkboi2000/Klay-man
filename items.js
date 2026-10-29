@@ -6,7 +6,7 @@ import { COINS, ITEMS, ITEM_FLIGHT, TREE } from './config.js';
 
 export const ITEM_INFO = {
   plus: { name: 'Red plus', says: '+1 heart' },
-  bag: { name: 'Bag', says: 'Power up!' },
+  medicine: { name: 'Medicine', says: 'Power up!' },
   water: { name: 'Water drop', says: 'The sprout grows' },
   sandclock: { name: 'Sandclock', says: 'Bacteria frozen' },
 };
@@ -39,7 +39,7 @@ export class Item {
 /** Which items make sense right now. A full sprout never gets a red plus,
  *  and water only comes while the sprout can still grow. */
 export function itemChoices(lives, maxLives, cap = TREE.maxLives) {
-  const choices = ['bag', 'sandclock'];
+  const choices = ['medicine', 'sandclock'];
   if (lives < maxLives) choices.push('plus');
   if (maxLives < cap) choices.push('water');
   return choices;

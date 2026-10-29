@@ -194,8 +194,8 @@ export function createInput({
   }
 
   // ------------------------------------------------------- auto throw
-  // Set on the setup page, and switchable mid-game from the corner below
-  // the throw button. It pushes too, when Klayman walks into a dirtball.
+  // Set on the setup page, and switchable mid-game from the top middle of a
+  // phone's screen. It pushes too, when Klayman walks into a dirtball.
   function showAuto() {
     autoButton.setAttribute('aria-pressed', String(auto));
     autoButton.textContent = auto ? 'Auto throw: on' : 'Auto throw: off';
@@ -205,7 +205,7 @@ export function createInput({
     try { localStorage.setItem(AUTO_KEY, auto ? '1' : '0'); } catch { /* private mode */ }
     showAuto();
   }
-  // The switch sits inside the throw area; don't let a tap on it throw.
+  // A tap on the switch is only a tap on the switch.
   autoButton.addEventListener('pointerdown', (e) => e.stopPropagation());
   autoButton.addEventListener('click', () => setAuto(!auto));
   showAuto();

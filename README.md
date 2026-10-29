@@ -24,16 +24,21 @@ Every file sits in one folder, with no subfolders, so uploading is simple.
 ### Updating
 
 Upload the changed files the same way. Also open `sw.js` and bump `VERSION`
-(`klayman-v21` → `klayman-v22`): phones keep an offline copy, and this is how
+(`klayman-v22` → `klayman-v23`): phones keep an offline copy, and this is how
 they know to fetch the new one.
 
 ## Pages
 
 1. **Title:** Klayman’s face, over faded dirtballs rolling in from every side
    (two that meet break). Tap **Play**.
-2. **Setup:** pick tools, a sprout and gadgets, buy things, switch **Auto
-   throw**, then **Start**. The window at the top shows Klayman dressed for the
-   game, his sprout's power, and his gadget at work.
+2. **Setup:** the shop comes in groups: **Klayman** (his **Tool** and
+   **Gadget**), **Plant** (the **Sprout**, and the **Vase**: its season), then
+   **Slots** and **Level skips**. Pick, buy, switch **Auto throw**, then
+   **Start**. The window at the top shows Klayman dressed for the game, his
+   sprout's power, his gadget at work, and the pot in its season. The leaf's
+   and the shovel's rings are drawn 30% smaller there (`preview` in
+   `config.js`), but on a phone the window is so short that they still reach
+   past its edges.
 3. **Game:** when the sprout is gone you see your score and the coins you
    picked up. With a backup sprout you can carry on with it; once there's no
    backup left, you can revive the sprout just lost for 49K: half its hearts
@@ -84,13 +89,26 @@ On the setup page, tap something you don’t own, then tap again to buy it.
 | Leaf | 39K | Three leaves spin out round Klayman (150, the brief’s 25 units); their wind pushes bacteria out and keeps them out for 7 s. Then 20 s to recharge |
 | Mist spray | 39K | A bottle by the sprout sprays it twice in 0.75 s: half a heart back. Then 20 s to recharge |
 | Fertilizer | 39K | Every bacteria crawls 70% slower for 5 s. Then 20 s to recharge |
-| Shovel | 39K | Klayman stops and digs for 0.75 s; light-brown dirt flies over a ring 180 round him (the brief’s 30 units), and every bacteria in it gets one more layer of dirt (one on its third becomes a dirtball). Dirtballs don’t mind. Then 20 s to recharge |
-| Booster | 39K | For 5 s Klayman turns red, a little bigger and glowing: he throws 3 times as fast and 3 times as far, walks 3 times as fast, and his dirt counts triple (two throws to a dirtball; triple on a boss too). Then he turns grey for 2 s: all four drop to a third. Then 20 s to recharge. It stacks with gloves and the bag (booster and bag together: one throw to a dirtball). It was the hypodermic syringe; one bought before keeps working |
+| Shovel | 39K | Klayman stops and digs for 0.75 s, the shovel swinging above his head; light-brown dirt flies over a ring 360 round him (60 units: twice the old 30), and every bacteria in it gets two more layers of dirt (one already dirty enough becomes a dirtball). Dirtballs don’t mind. Then 20 s to recharge |
+| Booster | 39K | For 4 s Klayman turns red, a little bigger and glowing: he throws twice as fast and twice as far, walks twice as fast, and his dirt counts double (three throws to a dirtball; double on a boss too). Then he turns grey for 2 s: all four drop to half. Then 20 s to recharge. It stacks with gloves and medicine (booster and medicine together: two throws to a dirtball). It was the hypodermic syringe; one bought before keeps working |
 
 In a game, a gadget’s button sits in the top-right corner, under the hearts
 and the pause button. It fills up as the gadget recharges and turns
 gold when it’s ready; with the glasses it also counts the seconds down. On a
 computer, **G** uses the 1st gadget and **H** the 2nd.
+
+| Season | Price | What it does (never to a boss; the bacteria it sends out do feel it) |
+| --- | --- | --- |
+| Summer | 169K | The pot is brighter. Every minute the sun spotlights the sprout and it grows half a heart, up to 2 hearts more; then the sun stops. It raises the sprout's limit too, so water drops still grow it |
+| Winter | 169K | The pot is a little blue. Every bacteria crawls 10% slower |
+| Spring | 169K | A breeze blows across now and then, with petals in it. Every sprout power (coins, items, healing, spores, growing, closing) comes round 10% sooner; how long it lasts doesn't change |
+| Autumn | 169K | Big trees round the pot shade its edges, and leaves drift down. Dirtballs never crack open, and dirt takes 50% longer to wear off a bacteria |
+| Rainy | 169K | A light rain falls. Every minute lightning strikes a bacteria or a dirtball, at random. A bacteria dies on the spot (100 points); a dirtball rolls straight at the closest bacteria, or, with none about, into the pot's rim |
+
+Seasons are bought once and kept. Pick one on the setup page (Plant, then
+Vase), or **No season**; the pick is remembered. The numbers are in
+`config.js` (`SEASONS`); `storm.strikes` is how many things lightning hits
+each minute (1).
 
 | Slot | Price | What it does |
 | --- | --- | --- |
@@ -103,7 +121,7 @@ computer, **G** uses the 1st gadget and **H** the 2nd.
 | Skip to level 3 / 7 / 10 | 29K / 74K / 99K | The next game starts there. Tap it to pick or unpick it; it’s spent when the game starts |
 
 You hold one of each level skip at a time, and can buy it again after using
-it. Tools, sprouts and slots are yours for good.
+it. Tools, sprouts, gadgets, seasons and slots are yours for good.
 
 **Revive** isn’t on the setup page. When the sprout is lost and there’s no
 backup sprout left to carry on with, the summary offers it for 49K: the sprout
@@ -118,9 +136,10 @@ All these numbers are in `config.js` (`COINS`, `TOOLS`, `SPROUTS`, `GADGETS`, `S
 From level 3 they appear near the sprout (from level 1 out of a sunflower),
 one at a time, for 20 s. Walk over one to use it: a **red plus** gives the
 sprout a heart back, a **water drop** grows it a heart bigger, a
-**sandclock** freezes the bacteria for 5 s, and the **bag** powers Klayman up
+**sandclock** freezes the bacteria for 5 s, and **medicine** (a red and white
+capsule; it was a bag until v22) powers Klayman up
 for 5.5 s: he throws and walks 27.5% faster and his dirt counts 1.5 times
-(three throws to a dirtball). In v21 the bag's time and its raises were cut by
+(three throws to a dirtball). In v21 its time and its raises were cut by
 45% (it was 10 s and 50%); it never changed how far he throws. The numbers
 are in `config.js` (`ITEMS`).
 
@@ -135,7 +154,7 @@ walk through it. It sends a bacteria out of its side every 3.125 s at level 5,
 2.5 s at 10, 1.875 s at 15, 1.25 s at 20, and 1 s from 25 on.
 
 It has level × 10 HP (50 at level 5, 100 at 10...). A throw takes 1 (1.5
-with the bag) and a rolling dirtball 5. While a boss is out, thrown dirt flies
+with medicine, 2 with the booster) and a rolling dirtball 5. While a boss is out, thrown dirt flies
 past dirtballs instead of breaking them (and the dirt gun leaves them be):
 they’re for pushing into the boss. Only the glasses show its HP: a bar,
 green, yellow from half, red from a fifth, with what’s left out of its full HP.
@@ -171,22 +190,22 @@ Klayman aims all the way round, not just four ways.
   well: drag it and Klayman aims that way, all the way round (a short dotted
   line shows where); press it without dragging and he aims at the closest
   bacteria. Let go and he keeps aiming that way until he walks. The **Auto
-  throw** switch (on the setup page, and in the bottom-right corner in a game)
-  keeps Klayman throwing, and pushes a dirtball he walks into. Gadget buttons
-  and pause sit top right.
+  throw** switch (on the setup page, and at the top middle in a game; held
+  upright, just under the hearts) keeps Klayman throwing, and pushes a
+  dirtball he walks into. Gadget buttons and pause sit top right.
 - **Computer:** WASD or the arrow keys to move, the mouse to aim (the pointer
   becomes a sight). Click or Space to throw (or push, up against a dirtball);
   hold to keep throwing. G and H use the gadgets, P pauses.
 
 The dirt gun aims for him, on whichever platform: it wins over the K stick
-and the mouse. A push only works when
-Klayman is touching the dirtball. From level 7, dirt thrown at a dirtball
-breaks it.
+and the mouse. A push only works when Klayman is touching the dirtball, and
+it rolls exactly the way he aims, at any angle. From level 7, dirt thrown at a
+dirtball breaks it.
 
 Bacteria crawl 3% slower than in v18 and every level spawns them 6% less often
 (`BACTERIA.speed`, `LEVELS.spawnRate`). A dirtball takes 10% less dirt than in
 v18 (`BACTERIA.maxDirt`, 4.14): throws are whole, so that's still five plain
-throws, but three with the bag instead of four. A bacteria on its third layer
+throws, but three with medicine instead of four. A bacteria on its third layer
 of dirt is always one throw away.
 
 ## Changing how it feels
@@ -194,7 +213,10 @@ of dirt is always one throw away.
 Every gameplay number is in `config.js`, with your original Godot values
 noted. `FEEL` scales Klayman’s speed, his shots and dirtballs (1 = your exact
 Godot numbers); bacteria use your original speed. `POT_SCALE` sets how big the
-pot is: the camera follows Klayman, so you only see part of it. An arrow at the
+pot is: the camera follows Klayman, so you only see part of it. Since v22 the
+pot is seen from straight above, a perfect circle (`bg.png`, drawn by
+`make-pot.py`), and every ring on the soil (leaf, shovel, spores) is round
+too. An arrow at the
 screen edge points to the sprout when it’s off-screen (and, with the glasses,
 to bacteria, items and coins).
 
@@ -203,15 +225,17 @@ to bacteria, items and coins).
 | File | What it does |
 | --- | --- |
 | `klayman.js`, `bacteria.js`, `dirtball.js`, `dirtshot.js` | Ported from your `.gd` scripts |
-| `items.js` | The four special items (a sunflower’s fly out of it, glowing), and coins (a daisy’s and a boss’s fly out too; the backpack pulls them in) |
+| `items.js` | The four special items: red plus, medicine, water drop and sandclock (a sunflower’s fly out of it, glowing), and coins (a daisy’s and a boss’s fly out too; the backpack pulls them in) |
 | `boss.js` | The boss bacteria: where it stands, HP, rising, tiring and burrowing |
 | `boss.png`, `make-boss.py` | The boss's frames (four fighting, two worn out), drawn by the script: edit and run it (`pip install pillow`) |
+| `bg.png`, `make-pot.py` | The round pot seen from above, drawn by the script the same way. Change its sizes and `world.js` must match |
+| `weather.js` | How each season looks: summer's light and sun, winter's blue, spring's breeze, autumn's tree shade and leaves, rain and lightning (what they do is in `game.js`) |
 | `gadgets.js` | A gadget’s clock: ready, working, recharging (what each does is in `game.js`) |
-| `gear.js` | Tools, sprouts, gadgets, slots and used-once items: names, what they change, and the saved wallet |
+| `gear.js` | Tools, sprouts, gadgets, seasons, slots and used-once items: names, what they change, and the saved wallet |
 | `setup.js` | The setup page and the title face |
 | `titleballs.js` | The dirtballs rolling behind the title |
 | `orientation.js` | Which way round the screen opens, and following the phone after that |
-| `art.js` | Pixel art drawn in code: sprouts (open and closed), tool, gadget and shop icons, coin, dirt guns, the backpack as worn, a gadget leaf, the mist bottle |
+| `art.js` | Pixel art drawn in code: sprouts (open and closed), tool, gadget, season and shop icons, coin, dirt guns, the backpack as worn, a gadget leaf, the mist bottle |
 | `game.js` | Rules: levels, spawning, collisions, score |
 | `world.js` | The pot: soil edge, sprout spot, where items appear |
 | `render.js`, `sprites.js` | Drawing and sprite-sheet frames; shoes, gloves, coat and glasses are painted onto Klayman’s frames the first time they’re worn; the gun and backpack are drawn on him |
@@ -219,13 +243,13 @@ to bacteria, items and coins).
 | `sw.js`, `manifest.webmanifest` | Offline play and home-screen install |
 | `klay-digits.woff2`, `klay-digits-bold.woff2` | The numbers 0–9, drawn for this game so 2 and 5 never read as 8 and S |
 | `make-digits.py` | Builds those two files: edit a digit’s pixels there and run it (`pip install fonttools brotli`) |
-| `game.test.js`, `gear.test.js`, `boss.test.js`, `orientation.test.js` | Rule checks: run `npm test` (needs Node 18+) |
+| `game.test.js`, `gear.test.js`, `boss.test.js`, `season.test.js`, `orientation.test.js` | Rule checks: run `npm test` (needs Node 18+) |
 
 The sound effects were trimmed to remove the silence at the start of each
 file, so they play the moment something happens, and every effect plays at
 half volume (`EFFECTS_VOLUME` in `sound.js`). The gun, coin, shop and
-sunflower sounds are made in code (`sound.js`). The music is `music.mp3`, an
-8.8-second loop; `sound.js` finds where it really starts and ends, so it
+sunflower sounds are made in code (`sound.js`). The music is `music.mp3` (v22's new
+track), a 9-second loop; `sound.js` finds where it really starts and ends, so it
 loops without a click.
 
 The app icon is Klayman’s head, cut from the same frame as the title face.

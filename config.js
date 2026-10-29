@@ -37,8 +37,8 @@ export const BACTERIA = {
   radius: 13,
   // Dirt that makes a dirtball, counted in throws (bacteria.gd had 7). It
   // was 4, then 15% more, then 10% less: 4.14. Throws are whole, so that's
-  // still five plain throws, but three with the bag (it was four), and two
-  // with the booster.
+  // still five plain throws, but three with medicine (it was four), and
+  // three with the booster.
   maxDirt: 4 * 1.15 * 0.9,
   decayTime: 2.5,            // seconds to shed one layer (bacteria.gd had 1.2)
   levelSpeedUp: 1.05,        // +5% per level
@@ -85,11 +85,11 @@ export const ITEMS = {
   nearSprout: { min: 70, max: 210 }, // how far from the sprout items appear
   blinkFrom: 3,
   pickupRadius: 22,
-  // The bag: for a while Klayman throws quicker and walks faster, and his
-  // dirt counts more. It was 10 seconds and +50% throwing and walking; v21
-  // cut the time and both raises by 45% (x0.55): 5.5 seconds, +27.5%. It
-  // never changed how far he throws. Its dirt (x1.5) is as it was.
-  bag: { time: 10 * 0.55, fireRate: 1 + 0.5 * 0.55, speed: 1 + 0.5 * 0.55, dirt: 1.5 },
+  // Medicine (it was a bag until v22; same power-up): for a while Klayman
+  // throws quicker and walks faster, and his dirt counts more. v21 cut the
+  // bag's 10 seconds and +50% by 45% (x0.55): 5.5 seconds, +27.5%. It never
+  // changes how far he throws. Its dirt (x1.5) is as it always was.
+  medicine: { time: 10 * 0.55, fireRate: 1 + 0.5 * 0.55, speed: 1 + 0.5 * 0.55, dirt: 1.5 },
   sandclockTime: 5,
 };
 
@@ -97,6 +97,7 @@ export const SCORE = {
   dirtball: 100,             // a dirtball breaks
   smash: 300,                // a rolling dirtball smashes a bacteria
   boss: 1000,                // a boss bacteria gives up
+  storm: 100,                // lightning (rainy season) kills a bacteria
 };
 
 // The brief measures some reaches in "units". A literal 10 would sit inside
@@ -117,7 +118,7 @@ export const BOSS = {
   foot: { rx: 80, ry: 44, lift: 16 },
   corner: 70,                // how far in from the rim, at a corner of the pot
   hpPerLevel: 10,
-  shotDamage: 1,             // a throw (the bag makes it 1.5, the booster 3)
+  shotDamage: 1,             // a throw (medicine makes it 1.5, the booster 2)
   ballDamage: 5,             // a rolling dirtball (thrown dirt doesn't break dirtballs while a boss is out)
   // Seconds between the bacteria it sends out: 2.5 at level 10, and 0.625
   // less every boss level after (1.875 at 15, 1.25 at 20), never under 1
@@ -217,6 +218,7 @@ export const GADGETS = {
     grow: 0.5,               // ...taking this long to spread
     time: 7,                 // their wind keeps bacteria out for 7 seconds
     cooldown: 20,
+    preview: { reach: 25 * UNIT * 0.7 }, // 30% smaller on the setup page, to fit its window
   },
   spray: {
     price: 39,
@@ -227,21 +229,22 @@ export const GADGETS = {
   },
   shovel: {
     price: 39,
-    reach: 30 * UNIT,        // Klayman digs; dirt flies over this far round him...
+    reach: 60 * UNIT,        // Klayman digs; dirt flies over this far round him (v22: twice the 30 units)...
     dig: 0.4,                // ...the moment the blade comes up...
-    dirt: 1,                 // ...and every bacteria in it gets a layer more
+    dirt: 2,                 // ...and every bacteria in it gets two layers more (v22: was one)
     time: 0.75,              // he stands and digs this long
     cooldown: 20,
+    preview: { reach: 30 * UNIT * 0.7 }, // the setup page: 30% smaller than the old 30 units, to fit its window
   },
   booster: {
     price: 39,
-    // A shot of something: red, a little bigger and glowing. For 5 seconds
-    // he throws three times as fast and three times as far, walks three
-    // times as fast, and his dirt counts triple...
-    boost: { time: 5, fireRate: 3, range: 3, speed: 3, dirt: 3 },
-    // ...then it wears off: grey, and for 2 seconds all four drop to a third.
-    crash: { time: 2, fireRate: 1 / 3, range: 1 / 3, speed: 1 / 3, dirt: 1 / 3 },
-    time: 5 + 2,
+    // A shot of something: red, a little bigger and glowing. For 4 seconds
+    // he throws twice as fast and twice as far, walks twice as fast, and his
+    // dirt counts double...
+    boost: { time: 4, fireRate: 2, range: 2, speed: 2, dirt: 2 },
+    // ...then it wears off: grey, and for 2 seconds all four drop to half.
+    crash: { time: 2, fireRate: 0.5, range: 0.5, speed: 0.5, dirt: 0.5 },
+    time: 4 + 2,
     cooldown: 20,            // counted from when he's himself again
   },
   fertilizer: {
@@ -250,6 +253,25 @@ export const GADGETS = {
     time: 5,                 // ...for 5 seconds
     cooldown: 20,
   },
+};
+
+// Seasons: the weather over the pot. Bought once (169K each); one per game,
+// picked on the setup page under Plant > Vase. None of them touches a boss
+// (the bacteria it sends out are ordinary bacteria, so they do feel it).
+export const SEASONS = {
+  // Brighter. Every minute the sun spotlights the sprout and it grows half a
+  // heart, up to 2 hearts more than it could hold.
+  summer: { price: 169, sun: { every: 60, grow: 0.5, max: 2 } },
+  // Bluish. Every bacteria crawls 10% slower.
+  winter: { price: 169, bacteriaPace: 0.9 },
+  // A breeze now and then. Every sprout power comes round 10% sooner.
+  spring: { price: 169, sproutPace: 1.1 },
+  // Big trees' leaves and branches shade the pot. Dirtballs never crack open,
+  // and dirt takes 50% longer to wear off a bacteria.
+  autumn: { price: 169, dirtballsHold: true, decay: 1.5 },
+  // A light rain. Every minute lightning strikes a bacteria (it dies) or a
+  // dirtball (it rolls at the closest bacteria, or into the pot's rim).
+  rainy: { price: 169, storm: { every: 60, strikes: 1 } },
 };
 
 // Slots: bought once. A second tool to wear, a backup sprout, a second gadget.

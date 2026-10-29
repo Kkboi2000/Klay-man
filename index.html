@@ -27,6 +27,8 @@
             <p class="hud-coins"><span class="coin-icon" aria-hidden="true"></span><span class="sr-only">Coins </span><span id="coins">0K</span></p>
             <p id="visor" class="visor" hidden><span class="visor-bac" aria-hidden="true"></span><span id="left">0</span><span class="visor-unit" aria-hidden="true">left</span></p>
           </div>
+          <!-- On a phone, top middle: keeps Klayman throwing (and pushing). -->
+          <button id="auto" class="auto-toggle" type="button" aria-pressed="false">Auto throw: off</button>
           <div class="hud-right">
             <div class="hud-bar">
               <div id="hearts" class="hearts" role="img"></div>
@@ -68,7 +70,6 @@
         <div id="k-stick" class="k-stick">
           <button id="throw" class="throw" type="button" tabindex="-1" aria-label="Throw dirt, or push a dirtball you’re touching. Drag to aim."><span aria-hidden="true">K</span></button>
         </div>
-        <button id="auto" class="auto-toggle" type="button" aria-pressed="false">Auto throw: off</button>
       </div>
     </div>
 
@@ -120,34 +121,44 @@
         <canvas id="showcase" class="showcase" aria-hidden="true"></canvas>
         <p id="shop-news" class="shop-news" aria-live="polite"></p>
 
-        <section class="shelf" aria-labelledby="tools-name">
-          <h3 id="tools-name" class="shelf-name">Tool <span id="tools-note" class="shelf-note">one per game</span></h3>
-          <div id="tools" class="shelf-list" role="group" aria-labelledby="tools-name"></div>
+        <!-- What Klayman takes into a game, then what he looks after. -->
+        <section class="group" aria-labelledby="klayman-name">
+          <h3 id="klayman-name" class="group-name">Klayman</h3>
+          <section class="shelf" aria-labelledby="tools-name">
+            <h4 id="tools-name" class="shelf-name">Tool <span id="tools-note" class="shelf-note">one per game</span></h4>
+            <div id="tools" class="shelf-list" role="group" aria-labelledby="tools-name"></div>
+          </section>
+          <section class="shelf" aria-labelledby="gadgets-name">
+            <h4 id="gadgets-name" class="shelf-name">Gadget <span id="gadgets-note" class="shelf-note">one per game</span></h4>
+            <div id="gadgets" class="shelf-list" role="group" aria-labelledby="gadgets-name"></div>
+          </section>
         </section>
 
-        <section class="shelf" aria-labelledby="sprouts-name">
-          <div class="shelf-head">
-            <h3 id="sprouts-name" class="shelf-name">Sprout <span id="sprouts-note" class="shelf-note"></span></h3>
-            <div id="sprout-slots" class="slot-tabs" role="group" aria-label="Pick the 1st or the 2nd sprout" hidden>
-              <button type="button" data-slot="0" aria-pressed="true">1st</button>
-              <button type="button" data-slot="1" aria-pressed="false">2nd</button>
+        <section class="group" aria-labelledby="plant-name">
+          <h3 id="plant-name" class="group-name">Plant</h3>
+          <section class="shelf" aria-labelledby="sprouts-name">
+            <div class="shelf-head">
+              <h4 id="sprouts-name" class="shelf-name">Sprout <span id="sprouts-note" class="shelf-note"></span></h4>
+              <div id="sprout-slots" class="slot-tabs" role="group" aria-label="Pick the 1st or the 2nd sprout" hidden>
+                <button type="button" data-slot="0" aria-pressed="true">1st</button>
+                <button type="button" data-slot="1" aria-pressed="false">2nd</button>
+              </div>
             </div>
-          </div>
-          <div id="sprouts" class="shelf-list" role="group" aria-labelledby="sprouts-name"></div>
+            <div id="sprouts" class="shelf-list" role="group" aria-labelledby="sprouts-name"></div>
+          </section>
+          <section class="shelf" aria-labelledby="vase-name">
+            <h4 id="vase-name" class="shelf-name">Vase <span class="shelf-note">its season, one per game</span></h4>
+            <div id="seasons" class="shelf-list" role="group" aria-labelledby="vase-name"></div>
+          </section>
         </section>
 
-        <section class="shelf" aria-labelledby="gadgets-name">
-          <h3 id="gadgets-name" class="shelf-name">Gadget <span id="gadgets-note" class="shelf-note">one per game</span></h3>
-          <div id="gadgets" class="shelf-list" role="group" aria-labelledby="gadgets-name"></div>
-        </section>
-
-        <section class="shelf" aria-labelledby="slots-name">
-          <h3 id="slots-name" class="shelf-name">Slots <span class="shelf-note">yours to keep</span></h3>
+        <section class="group" aria-labelledby="slots-name">
+          <h3 id="slots-name" class="group-name">Slots <span class="shelf-note">yours to keep</span></h3>
           <div id="slots" class="shelf-list" role="group" aria-labelledby="slots-name"></div>
         </section>
 
-        <section class="shelf" aria-labelledby="once-name">
-          <h3 id="once-name" class="shelf-name">Level skips <span class="shelf-note">used once; buy again after</span></h3>
+        <section class="group" aria-labelledby="once-name">
+          <h3 id="once-name" class="group-name">Level skips <span class="shelf-note">used once; buy again after</span></h3>
           <div id="once" class="shelf-list" role="group" aria-labelledby="once-name"></div>
         </section>
 
@@ -171,13 +182,14 @@
           <ul class="howto">
             <li>Hit a bacteria with dirt five times to turn it into a dirtball.</li>
             <li>Klayman throws the way he walks. On a phone, drag K to aim, or just press it to aim at the closest bacteria. On a computer, he throws where the mouse points.</li>
-            <li>Walk right up to a dirtball and press K to push it into other bacteria. Auto throw pushes too.</li>
+            <li>Walk right up to a dirtball and press K to roll it into other bacteria, whichever way you aim. Auto throw pushes too.</li>
             <li>When the sprout is lost, you can revive it once a game for 49K.</li>
             <li>Walk over coins to pick them up. Spend them here.</li>
             <li>From level 3, special items appear near the sprout.</li>
             <li>From level 7, dirt thrown at a dirtball from afar breaks it.</li>
             <li>Levels 5, 10, 15 and on end with a boss bacteria. Wear it down with dirt, and push dirtballs into it, for a 10K coin. While it’s out, thrown dirt doesn’t break dirtballs.</li>
             <li>A gadget’s button, top right, fills up as it recharges. Tap it (G on a computer) when it’s full.</li>
+            <li>A season (Plant, then Vase) changes the weather over the pot, and what bacteria, dirtballs and the sprout do. Never the boss.</li>
           </ul>
           <p class="keys">WASD or arrow keys to move, the mouse to aim. Click or Space to throw, or to push a dirtball you’re touching. G and H use your gadgets. P to pause.</p>
         </details>

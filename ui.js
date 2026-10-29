@@ -59,7 +59,7 @@ export function createUI() {
   // The coin is drawn once and used as a CSS image everywhere it appears.
   document.documentElement.style.setProperty('--coin', `url(${coinArt().toDataURL()})`);
 
-  const heartArtUrl = { full: heartArt('full').toDataURL(), half: heartArt('half').toDataURL(), empty: heartArt('empty').toDataURL() };
+  const heartArtUrl = Object.fromEntries(['full', 'half', 'empty', 'left', 'leftEmpty'].map((k) => [k, heartArt(k).toDataURL()]));
 
   // What's on screen now, so it's only rebuilt when it changes. `left` starts
   // unknown, so a new game always shows or hides the glasses' count afresh.
@@ -71,20 +71,24 @@ export function createUI() {
     const key = `${lives}/${maxLives}`;
     if (key === shown.hearts) return;
     shown.hearts = key;
+    // One heart per heart it can hold; half a heart more (summer) is half a heart.
+    const slots = Math.ceil(maxLives);
     el.hearts.replaceChildren(
-      ...Array.from({ length: maxLives }, (_, i) => {
-        const kind = lives >= i + 1 ? 'full' : lives >= i + 0.5 ? 'half' : 'empty';
+      ...Array.from({ length: slots }, (_, i) => {
+        const half = maxLives - i < 1;
+        const kind = half ? (lives >= i + 0.5 ? 'left' : 'leftEmpty')
+          : lives >= i + 1 ? 'full' : lives >= i + 0.5 ? 'half' : 'empty';
         const img = new Image();
         img.src = heartArtUrl[kind];
         img.alt = '';
-        img.className = kind === 'empty' ? 'heart is-empty' : 'heart';
+        img.className = kind === 'empty' || kind === 'leftEmpty' ? 'heart is-empty' : 'heart';
         return img;
       }),
     );
     el.hearts.setAttribute('aria-label', `Sprout has ${lives} of ${maxLives} hearts`);
     // More than five hearts (corn, water, a grown mushroom): two even rows.
-    el.hearts.classList.toggle('is-many', maxLives > 5);
-    el.hearts.style.setProperty('--cols', String(Math.ceil(maxLives / 2)));
+    el.hearts.classList.toggle('is-many', slots > 5);
+    el.hearts.style.setProperty('--cols', String(Math.ceil(slots / 2)));
   }
 
   /** Through the glasses: how many bacteria are still to beat this level. */

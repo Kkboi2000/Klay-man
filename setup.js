@@ -1,9 +1,9 @@
-// The setup page: pick tools, sprouts and gadgets (buying them the first
-// time), slots and level skips, switch auto throw, and see Klayman dressed
-// for the game. (Revive isn't sold here: the summary offers it when the
-// sprout is lost.)
+// The setup page: what Klayman takes (tools, gadgets), the plant (sprouts,
+// and the vase's season), buying each the first time; slots and level
+// skips; auto throw; and a window into the pot showing it all. (Revive isn't
+// sold here: the summary offers it when the sprout is lost.)
 import {
-  CATALOG, TOOL_IDS, SPROUT_IDS, GADGET_IDS, SLOT_IDS, SKIP_IDS, priceOf, kindOf, formatK,
+  CATALOG, TOOL_IDS, SPROUT_IDS, GADGET_IDS, SEASON_IDS, SLOT_IDS, SKIP_IDS, priceOf, kindOf, formatK,
 } from './gear.js';
 import { Game, NO_INPUT } from './game.js';
 import { Renderer } from './render.js';
@@ -13,8 +13,9 @@ const $ = (id) => document.getElementById(id);
 
 const NO_TOOL = { name: 'No tool', says: 'Just Klayman.' };
 const NO_GADGET = { name: 'No gadget', says: 'Nothing to use in the game.' };
-/** The free rows that put things away: no tool, no gadget. */
-const NONE = { none: NO_TOOL, noGadget: NO_GADGET };
+const NO_SEASON = { name: 'No season', says: 'Plain weather.' };
+/** The free rows that put things away: no tool, no gadget, no season. */
+const NONE = { none: NO_TOOL, noGadget: NO_GADGET, noSeason: NO_SEASON };
 /** Where Klayman's head sits in his first idle frame (the title face, and the app icon). */
 export const FACE = { x: 15, y: 19, w: 18, h: 17 };
 const SLOT_NAMES = ['1st', '2nd'];
@@ -30,8 +31,10 @@ export function pixelCanvas(source, sx, sy, sw, sh) {
 }
 
 function iconFor(id, sprites) {
+  if (id === 'noSeason') return pixelCanvas(sprites.seasonIcons.noSeason, 0, 0, 16, 16);
   if (NONE[id]) return pixelCanvas(sprites.klay, 16, 19, 16, 25);
   const kind = kindOf(id);
+  if (kind === 'season') return pixelCanvas(sprites.seasonIcons[id], 0, 0, 16, 16);
   if (kind === 'tool') return pixelCanvas(sprites.toolIcons[id], 0, 0, 16, 16);
   if (kind === 'gadget') return pixelCanvas(sprites.gadgetIcons[id], 0, 0, 16, 16);
   if (kind === 'sprout') return pixelCanvas(sprites.sprouts[id].sheet, 0, 0, 32, 37);
@@ -42,7 +45,9 @@ function iconFor(id, sprites) {
 // ----------------------------------------------------------------- showcase
 // A close-up of the pot: the first sprout, and Klayman in the chosen tools,
 // throwing now and then so gloves and the gun show what they do. A sprout's
-// power and the first gadget show what they do too, over and over.
+// power and the first gadget show what they do too, over and over, and the
+// pot wears the season. The leaf's and the shovel's rings are drawn smaller
+// here (their `preview` in config.js), so they fit the window.
 
 class Showcase {
   constructor(canvas, sprites) {
@@ -55,8 +60,13 @@ class Showcase {
   show(loadout) {
     const game = new Game({
       rng: () => 0.5,
-      loadout: { tools: loadout.tools, sprouts: loadout.sprouts.slice(0, 1), gadgets: loadout.gadgets.slice(0, 1) },
+      loadout: {
+        tools: loadout.tools, sprouts: loadout.sprouts.slice(0, 1), gadgets: loadout.gadgets.slice(0, 1), season: loadout.season,
+      },
     });
+    for (const gadget of game.gadgets) {
+      if (gadget.spec.preview) gadget.spec = { ...gadget.spec, ...gadget.spec.preview };
+    }
     game.phase = 'showcase';
     game.toSpawn = 0;
     game.coinTimer = Infinity;
@@ -72,6 +82,7 @@ class Showcase {
     if (g.hide) game.hideTimer = soon;
     if (game.flowerItems) game.flowerItems.timer = soon;
     if (game.flowerCoins) game.flowerCoins.timer = soon;
+    if (game.weather.sun) game.sunTimer = soon;
     game.drainEvents();
     this.game = game;
     this.clock = 0.9;
@@ -104,6 +115,14 @@ class Showcase {
       }
     }
     game.update(dt, { ...NO_INPUT, pressed, gadget: use });
+    // Summer: the sun comes round again and again, and the sprout stays its size.
+    const sun = game.weather.sun;
+    if (sun && game.sunGrown > 0) {
+      game.maxLives -= game.sunGrown;
+      game.lives = Math.min(game.lives, game.maxLives);
+      game.sunGrown = 0;
+      game.sunTimer = 4;
+    }
     this.renderer.handle(game.drainEvents());
     this.renderer.draw(game, dt, { x: (game.tree.x + game.klay.x) / 2, y: game.tree.y - 25 });
   }
@@ -122,6 +141,7 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     sproutsNote: $('sprouts-note'),
     gadgets: $('gadgets'),
     gadgetsNote: $('gadgets-note'),
+    seasons: $('seasons'),
     sproutSlots: $('sprout-slots'),
     slots: $('slots'),
     once: $('once'),
@@ -160,6 +180,7 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
   el.tools.append(...['none', ...TOOL_IDS].map(makeRow));
   el.sprouts.append(...SPROUT_IDS.map(makeRow));
   el.gadgets.append(...['noGadget', ...GADGET_IDS].map(makeRow));
+  el.seasons.append(...['noSeason', ...SEASON_IDS].map(makeRow));
   el.slots.append(...SLOT_IDS.map(makeRow));
   el.once.append(...SKIP_IDS.map(makeRow));
 
@@ -171,6 +192,7 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     const kind = kindOf(id);
     if (id === 'none') { wallet.equip(null); return ''; }
     if (id === 'noGadget') { wallet.equip('noGadget'); return ''; }
+    if (id === 'noSeason') { wallet.equip('noSeason'); return ''; }
     if (kind === 'slot') return `${name} is yours.`;
     wallet.equip(id, sproutSlot);
     if (kind === 'once') return wallet.skip === id ? `Your next game starts at level ${startLevel()}.` : '';
@@ -184,6 +206,7 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     if (id === 'gadgetSlot') return `Bought the ${name}. Tap two gadgets to take both.`;
     if (kindOf(id) === 'gadget') return `Bought ${name}. In a game, tap its button (G on a computer).`;
     if (kindOf(id) === 'once') return `Bought ${name}. Your next game starts there.`;
+    if (kindOf(id) === 'season') return `Bought ${name}. Your games are played in it until you pick another.`;
     return `Bought ${name}. It’s yours to keep.`;
   }
 
@@ -230,8 +253,8 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
       let state;
       let text;
       if (NONE[id]) {
-        const list = id === 'none' ? wallet.tools : wallet.gadgets;
-        state = list.length === 0 ? 'on' : 'owned';
+        const off = id === 'noSeason' ? !wallet.season : (id === 'none' ? wallet.tools : wallet.gadgets).length === 0;
+        state = off ? 'on' : 'owned';
         text = state === 'on' ? 'On' : 'Use';
       } else if (wallet.owns(id)) {
         const t = ownedTag(id);

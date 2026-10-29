@@ -1,5 +1,5 @@
-// Ported from dirtball.gd. Pushed in one of four directions, rolls until it
-// hits something, then breaks. Left alone too long, it cracks open. Spores
+// Ported from dirtball.gd. Pushed any way at all, rolls until it hits
+// something, then breaks. Left alone too long, it cracks open. Spores
 // can slide it along the soil without setting it rolling.
 import { DIRTBALL, KNOCK_TIME } from './config.js';
 
@@ -25,16 +25,14 @@ export class Dirtball {
   /** The dirt gun can lock on to it (dirt only breaks it from level 7: the game decides). */
   get lockable() { return this.solid; }
 
-  /** dirtball.gd push(): snaps to the strongest axis. */
+  /** Sets it rolling along `dir`, at any angle (dirtball.gd snapped it to
+   *  the strongest axis; v22 doesn't). */
   push(dir) {
     if (this.state !== 'idle') return;
-    if (Math.abs(dir.x) > Math.abs(dir.y)) {
-      this.vx = Math.sign(dir.x) * DIRTBALL.speed;
-      this.vy = 0;
-    } else {
-      this.vx = 0;
-      this.vy = Math.sign(dir.y) * DIRTBALL.speed;
-    }
+    const d = Math.hypot(dir.x, dir.y);
+    if (d < 1e-9) return;
+    this.vx = (dir.x / d) * DIRTBALL.speed;
+    this.vy = (dir.y / d) * DIRTBALL.speed;
     this.knock = 0;
     this.state = 'rolling';
   }

@@ -121,7 +121,7 @@ test('it never moves, sends out bacteria toward the sprout, and is 4x a bacteria
   assert.ok(BOSS.foot.rx >= 13 * 4, 'it stands on 4x the ground a bacteria does');
 });
 
-test('throws take 1 HP (1.5 with the bag); a rolling dirtball takes 5', () => {
+test('throws take 1 HP (1.5 with medicine); a rolling dirtball takes 5', () => {
   const game = bossGame(10);
   const boss = raise(game);
   game.bacteria = [];
@@ -132,11 +132,11 @@ test('throws take 1 HP (1.5 with the bag); a rolling dirtball takes 5', () => {
   game.update(STEP, { ...NO_INPUT, pressed: true });
   run(game, 0.5);
   assert.equal(boss.hp, 99);
-  game.bag = ITEMS.bag.time;
+  game.medicine = ITEMS.medicine.time;
   game.update(STEP, { ...NO_INPUT, pressed: true });
   run(game, 0.5);
   assert.equal(boss.hp, 97.5);
-  game.bag = 0;
+  game.medicine = 0;
   const ball = game.addDirtball(boss.x, boss.y + 80);
   ball.push({ x: 0, y: -1 });
   run(game, 0.4);

@@ -1,10 +1,10 @@
 // The rules of Klayman. No drawing, no sound, no DOM: the game only changes
 // numbers and announces what happened through events, so it can be tested.
 import {
-  BACTERIA, BOSS, COINS, DIRTBALL, GADGETS, ITEMS, KLAYMAN, LEVELS, LOOKAHEAD, REVIVE, SCORE, SHOT, TOOLS, TREE,
+  BACTERIA, BOSS, COINS, DIRTBALL, GADGETS, ITEMS, KLAYMAN, LEVELS, LOOKAHEAD, REVIVE, SCORE, SEASONS, SHOT, TOOLS, TREE,
 } from './config.js';
 import {
-  RING_SQUASH, TREE_SPOT, dist, insideRing, insideSoil, keepOnSoil, randomSpotNear, randomSpotOnSoil, rimPoint,
+  RING_SQUASH, SOIL, TREE_SPOT, dist, insideRing, insideSoil, keepOnSoil, randomSpotNear, randomSpotOnSoil, rimPoint,
 } from './world.js';
 import { Klayman } from './klayman.js';
 import { Bacteria } from './bacteria.js';
@@ -69,8 +69,8 @@ function itemSource(kind, every) {
 }
 
 export class Game {
-  /** `loadout` is { tools, sprouts, gadgets }: what the player picked on the
-   *  setup page. sprouts[1], if there is one, is the backup. */
+  /** `loadout` is { tools, sprouts, gadgets, season }: what the player picked
+   *  on the setup page. sprouts[1], if there is one, is the backup. */
   constructor({ rng = Math.random, loadout } = {}) {
     this.rng = rng;
     this.events = [];
@@ -83,7 +83,10 @@ export class Game {
       tools: [...(loadout?.tools ?? [])],
       sprouts: loadout?.sprouts?.length ? [...loadout.sprouts] : ['sprout'],
       gadgets: [...new Set(loadout?.gadgets ?? [])].filter((id) => GADGETS[id]),
+      season: SEASONS[loadout?.season] ? loadout.season : null,
     };
+    this.season = this.loadout.season;
+    this.stormTimer = this.weather.storm?.every;
     this.items = [];               // special items out on the soil (or flying)
     this.potItems = itemSource('pot', ITEMS.every);
     this.sproutIndex = 0;
@@ -100,7 +103,7 @@ export class Game {
     this.nextCoin = null;          // ...and the next 1K coin
     this.score = 0;
     this.earned = 0;               // coins (K) picked up this game
-    this.bag = 0;                  // seconds the bag's power-up has left
+    this.medicine = 0;             // seconds medicine's power-up has left
     this.freeze = 0;
     this.coinTimer = COINS.every;
     this.over = false;
@@ -110,9 +113,10 @@ export class Game {
     this.startLevel(level);
   }
 
-  /** Puts a sprout in the pot: its hearts and its powers' clocks. */
+  /** Puts a sprout in the pot: its hearts and its powers' clocks (spring
+   *  brings them round sooner), and summer's sun on it. */
   plant(sprout) {
-    this.gear = gearFor({ tools: this.loadout.tools, sprout });
+    this.gear = gearFor({ tools: this.loadout.tools, sprout, season: this.loadout.season });
     const g = this.gear;
     this.lives = g.lives;
     this.maxLives = g.lives;
@@ -126,12 +130,20 @@ export class Game {
     this.shield = 0;               // corn: seconds left with its leaves closed
     this.hideTimer = g.hide?.every;
     this.hidden = 0;               // lilies: seconds left closed
+    this.sunTimer = this.weather.sun?.every;
+    this.sunGrown = 0;             // summer: hearts the sun has grown this sprout
   }
 
   // ---------------------------------------------------------------- state
 
-  /** The bag's power-up while it lasts. */
-  get bagEffect() { return this.bag > 0 ? ITEMS.bag : PLAIN; }
+  /** What this game's season does (nothing, with no season). */
+  get weather() { return SEASONS[this.season] ?? PLAIN; }
+
+  /** The most hearts the sprout can hold: its own limit, and what summer's sun grew on top. */
+  get heartCap() { return this.gear.maxLives + this.sunGrown; }
+
+  /** Medicine's power-up while it lasts. */
+  get medicineEffect() { return this.medicine > 0 ? ITEMS.medicine : PLAIN; }
 
   /** The booster: 'boost' for its first 5 seconds, 'crash' for the 2 after, else null. */
   get booster() {
@@ -143,9 +155,9 @@ export class Game {
   get boosterEffect() { return GADGETS.booster[this.booster] ?? PLAIN; }
 
   /** Everything that changes Klayman's `key` right now, multiplied: his
-   *  tools, the bag and the booster. Keys: fireRate, speed, range, dirt. */
+   *  tools, medicine and the booster. Keys: fireRate, speed, range, dirt. */
   power(key) {
-    return (this.gear[key] ?? 1) * (this.bagEffect[key] ?? 1) * (this.boosterEffect[key] ?? 1);
+    return (this.gear[key] ?? 1) * (this.medicineEffect[key] ?? 1) * (this.boosterEffect[key] ?? 1);
   }
   /** How much quicker than plain he throws. */
   get fireRate() { return this.power('fireRate'); }
@@ -183,7 +195,9 @@ export class Game {
     if (g.hide) out.push(this.hidden > 0 ? { power: 'opens', secs: this.hidden } : { power: 'closes', secs: this.hideTimer });
     if (g.spores) out.push({ power: 'spores', secs: this.sporeTimer });
     if (g.heal) out.push({ power: 'heal', secs: this.healTimer });
-    if (g.growEvery && this.maxLives < g.maxLives) out.push({ power: 'grow', secs: this.growTimer });
+    if (g.growEvery && this.maxLives + 1 <= this.heartCap) out.push({ power: 'grow', secs: this.growTimer });
+    const sun = this.weather.sun;
+    if (sun && this.sunGrown < sun.max) out.push({ power: 'sun', secs: this.sunTimer });
     return out;
   }
 
@@ -228,10 +242,12 @@ export class Game {
     return g.spec.reach * Math.min(1, g.t / g.spec.grow, g.on / 0.25);
   }
 
-  /** Every bacteria's speed, now: slower while the fertilizer works. */
+  /** The fertilizer is working. */
+  get fertilized() { return this.gadgets.some((g) => g.id === 'fertilizer' && g.active); }
+
+  /** Every bacteria's speed, now: slower while the fertilizer works, and in winter. */
   get pace() {
-    const fed = this.gadgets.some((g) => g.id === 'fertilizer' && g.active);
-    return fed ? GADGETS.fertilizer.slowFactor : 1;
+    return (this.fertilized ? GADGETS.fertilizer.slowFactor : 1) * (this.weather.bacteriaPace ?? 1);
   }
 
   emit(type, data = {}) { this.events.push({ type, ...data }); }
@@ -279,12 +295,14 @@ export class Game {
 
   addBacteria(x, y) {
     const b = new Bacteria(x, y, this.bacteriaSpeed(this.level));
+    b.decayTime *= this.weather.decay ?? 1;          // autumn: dirt wears off slower
     this.bacteria.push(b);
     return b;
   }
 
   addDirtball(x, y) {
     const d = new Dirtball(x, y);
+    if (this.weather.dirtballsHold) d.hold = Infinity; // autumn: never cracks open
     this.dirtballs.push(d);
     return d;
   }
@@ -431,7 +449,7 @@ export class Game {
 
   update(dt, input = NO_INPUT) {
     if (this.over) return;
-    if (this.bag > 0) this.bag = Math.max(0, this.bag - dt);
+    if (this.medicine > 0) this.medicine = Math.max(0, this.medicine - dt);
     if (this.freeze > 0) this.freeze = Math.max(0, this.freeze - dt);
     if (this.treeHurt > 0) this.treeHurt = Math.max(0, this.treeHurt - dt);
 
@@ -446,6 +464,7 @@ export class Game {
     this.updateItems(dt);
     this.updateCoins(dt);
     this.updateSprout(dt);
+    this.updateWeather(dt);
     this.updateFlow(dt);
   }
 
@@ -644,7 +663,7 @@ export class Game {
   planItem(source) {
     const { min, max } = source.kind === 'flower' ? this.gear.drop : ITEMS.nearSprout;
     const spot = randomSpotNear(this.tree, min, max, this.rng, this.klay);
-    const type = pickItem(this.lives, this.maxLives, this.rng, this.gear.maxLives);
+    const type = pickItem(this.lives, this.maxLives, this.rng, this.heartCap);
     return { type, x: spot.x, y: spot.y };
   }
 
@@ -681,11 +700,11 @@ export class Game {
       case 'plus':
         this.lives = Math.min(this.maxLives, this.lives + 1);
         break;
-      case 'bag':
-        this.bag = ITEMS.bag.time;
+      case 'medicine':
+        this.medicine = ITEMS.medicine.time;
         break;
       case 'water':
-        this.maxLives = Math.min(this.gear.maxLives, this.maxLives + 1);
+        this.maxLives = Math.min(this.heartCap, this.maxLives + 1);
         this.lives = Math.min(this.maxLives, this.lives + 1);
         break;
       case 'sandclock':
@@ -838,7 +857,7 @@ export class Game {
       this.growTimer -= dt;
       if (this.growTimer <= 0) {
         this.growTimer += g.growEvery;
-        if (this.maxLives < g.maxLives) {
+        if (this.maxLives + 1 <= this.heartCap) {
           this.maxLives += 1;
           this.lives += 1;
           this.emit('grow', at);
@@ -879,6 +898,66 @@ export class Game {
       if (b.addDirt(dirt)) this.turnIntoDirtball(b).knockBack(dx, dy, push);
       else b.knockBack(dx, dy, push, slowTime, slowFactor);
     }
+  }
+
+  // --------------------------------------------------------------- seasons
+
+  /** Summer's sun and the rainy season's lightning, on their clocks. */
+  updateWeather(dt) {
+    const { sun, storm } = this.weather;
+    if (sun && this.sunGrown < sun.max) {
+      this.sunTimer -= dt;
+      if (this.sunTimer <= 0) {
+        this.sunTimer += sun.every;
+        this.sunshine(sun);
+      }
+    }
+    if (storm) {
+      this.stormTimer -= dt;
+      if (this.stormTimer <= 0) {
+        this.stormTimer += storm.every;
+        for (let i = 0; i < storm.strikes; i++) this.lightning();
+      }
+    }
+  }
+
+  /** Summer: the sun spotlights the sprout and it grows half a heart (up to 2 more in all). */
+  sunshine({ grow, max }) {
+    const add = Math.min(grow, max - this.sunGrown);
+    this.sunGrown += add;
+    this.maxLives += add;
+    this.lives += add;
+    this.emit('sunshine', { x: this.tree.x, y: this.tree.y, amount: add });
+  }
+
+  /** Rainy: lightning strikes a bacteria or a dirtball, at random, never the
+   *  boss. A bacteria dies on the spot. A dirtball rolls at the closest
+   *  bacteria, or, with none about, straight into the pot's rim. */
+  lightning() {
+    const targets = [...this.bacteria.filter((b) => b.alive), ...this.dirtballs.filter((d) => d.solid)];
+    if (!targets.length) return;
+    const hit = targets[Math.floor(this.rng() * targets.length) % targets.length];
+    this.emit('lightning', { x: hit.x, y: hit.y });
+    if (hit instanceof Dirtball) {
+      const prey = this.nearestOf(this.bacteria.filter((b) => b.alive), hit);
+      const away = { x: hit.x - SOIL.cx, y: hit.y - SOIL.cy };
+      hit.push(prey ? { x: prey.x - hit.x, y: prey.y - hit.y } : (Math.hypot(away.x, away.y) > 1 ? away : { x: 1, y: 0 }));
+      return;
+    }
+    hit.breakApart();
+    this.addScore(SCORE.storm, hit);
+    this.killed(hit);
+  }
+
+  /** The thing in `list` closest to `p`, or null. */
+  nearestOf(list, p) {
+    let best = null;
+    let bestD = Infinity;
+    for (const t of list) {
+      const d = dist(t, p);
+      if (d < bestD) { best = t; bestD = d; }
+    }
+    return best;
   }
 
   /** Pushes every crawling bacteria inside the ring away from the sprout
@@ -939,7 +1018,7 @@ export class Game {
   get backupSprout() { return this.loadout.sprouts[this.sproutIndex + 1] ?? null; }
 
   /** Hearts a revive brings back: half the hearts the sprout could hold. */
-  get reviveHearts() { return this.maxLives / 2; }
+  get reviveHearts() { return Math.floor(this.maxLives) / 2; }
 
   /** A revive is on offer: the sprout is lost, there's no backup left to
    *  carry on with, and this game hasn't used one. */

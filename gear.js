@@ -1,11 +1,12 @@
-// Tools, sprouts, gadgets, slots and one-use items: what they're called, what
-// they do to the rules, and the wallet that remembers your coins and
-// everything you own between games.
-import { GADGETS, ONCE, SLOTS, SPROUTS, TOOLS, TREE } from './config.js';
+// Tools, sprouts, gadgets, seasons, slots and one-use items: what they're
+// called, what they do to the rules, and the wallet that remembers your coins
+// and everything you own between games.
+import { GADGETS, ONCE, SEASONS, SLOTS, SPROUTS, TOOLS, TREE } from './config.js';
 
 export const TOOL_IDS = ['backpack', 'shoes', 'gloves', 'coat', 'glasses', 'gun'];
 export const SPROUT_IDS = ['sprout', 'daisy', 'sunflower', 'rose', 'corn', 'lilies', 'mushroom'];
 export const GADGET_IDS = ['leaf', 'spray', 'fertilizer', 'shovel', 'booster'];
+export const SEASON_IDS = ['summer', 'winter', 'spring', 'autumn', 'rainy'];
 export const SLOT_IDS = ['toolSlot', 'sproutSlot', 'gadgetSlot'];
 export const ONCE_IDS = ['skip3', 'skip7', 'skip10', 'revive'];
 // Sold on the setup page. Revive isn't: it's offered on the summary when the sprout is lost.
@@ -28,8 +29,13 @@ export const CATALOG = {
   leaf: { name: 'Leaf', says: 'Three leaves spin round Klayman. Their wind keeps bacteria away for 7 seconds.' },
   spray: { name: 'Mist spray', says: 'Sprays the sprout twice: half a heart back.' },
   fertilizer: { name: 'Fertilizer', says: 'Every bacteria crawls 70% slower for 5 seconds.' },
-  shovel: { name: 'Shovel', says: 'Klayman digs and throws dirt all round him: every bacteria near him gets a layer of dirt.' },
-  booster: { name: 'Booster', says: 'For 5 seconds Klayman throws 3 times as fast and as far, walks 3 times as fast, and his dirt counts triple. Then 2 seconds at a third of all four.' },
+  shovel: { name: 'Shovel', says: 'Klayman digs and throws dirt all round him: every bacteria near him gets two layers of dirt.' },
+  booster: { name: 'Booster', says: 'For 4 seconds Klayman throws twice as fast and as far, walks twice as fast, and his dirt counts double. Then 2 seconds at half of all four.' },
+  summer: { name: 'Summer', says: 'Brighter. Every minute the sun shines on the sprout: it grows half a heart, up to 2 more.' },
+  winter: { name: 'Winter', says: 'A little blue. Every bacteria crawls 10% slower.' },
+  spring: { name: 'Spring', says: 'A breeze now and then. The sprout’s powers come round 10% sooner.' },
+  autumn: { name: 'Autumn', says: 'In the shade of big trees. Dirtballs never crack open; dirt wears off bacteria 50% slower.' },
+  rainy: { name: 'Rainy', says: 'A light rain. Every minute lightning strikes a bacteria, or sends a dirtball rolling at one.' },
   toolSlot: { name: '2nd tool slot', says: 'Wear two tools at once.' },
   sproutSlot: { name: '2nd sprout slot', says: 'Pick a backup sprout. When the first is lost, carry on with it.' },
   gadgetSlot: { name: '2nd gadget slot', says: 'Take two gadgets into a game.' },
@@ -39,7 +45,7 @@ export const CATALOG = {
   revive: { name: 'Revive', says: 'Bring a lost sprout back with half its hearts.' },
 };
 
-const SHOP = { ...TOOLS, ...SPROUTS, ...GADGETS, ...SLOTS, ...ONCE };
+const SHOP = { ...TOOLS, ...SPROUTS, ...GADGETS, ...SEASONS, ...SLOTS, ...ONCE };
 
 // Things that were sold under another name. A save keeps what was bought.
 const RENAMED = { syringe: 'booster' };
@@ -50,6 +56,7 @@ export function kindOf(id) {
   if (TOOLS[id]) return 'tool';
   if (SPROUTS[id]) return 'sprout';
   if (GADGETS[id]) return 'gadget';
+  if (SEASONS[id]) return 'season';
   if (SLOTS[id]) return 'slot';
   if (ONCE[id]) return 'once';
   return null;
@@ -58,11 +65,19 @@ export function kindOf(id) {
 /** "1,250K": coins are counted in K. */
 export const formatK = (n) => `${n.toLocaleString('en-US')}K`;
 
-/** What the worn tools and a sprout change in the rules. No tool is plain Klayman. */
-export function gearFor({ tools = [], sprout = 'sprout' } = {}) {
+/** A sprout power's clock, `pace` times as quick: every N seconds becomes N / pace. */
+function sooner(power, pace) {
+  if (!power || pace === 1) return power ?? null;
+  return { ...power, every: power.every / pace };
+}
+
+/** What the worn tools, a sprout and the season change in the rules. No
+ *  tool is plain Klayman. Spring brings every sprout power round sooner. */
+export function gearFor({ tools = [], sprout = 'sprout', season = null } = {}) {
   const worn = [...new Set(tools)].filter((id) => TOOLS[id]);
   const s = SPROUTS[sprout] ? sprout : 'sprout';
   const ss = SPROUTS[s];
+  const pace = SEASONS[season]?.sproutPace ?? 1;
   const times = (key) => worn.reduce((k, id) => k * (TOOLS[id][key] ?? 1), 1);
   const lives = ss.lives ?? TREE.lives;
   return Object.freeze({
@@ -78,15 +93,15 @@ export function gearFor({ tools = [], sprout = 'sprout' } = {}) {
     magnet: worn.includes('backpack') ? TOOLS.backpack.magnet : 0,   // how far coins are pulled from
     lives,
     maxLives: Math.max(lives, ss.maxLives ?? TREE.maxLives),
-    itemEvery: ss.itemEvery ?? null, // sunflower: items pop out of the flower...
+    itemEvery: ss.itemEvery ? ss.itemEvery / pace : null, // sunflower: items pop out of the flower...
     drop: ss.drop ?? null,           // ...or daisy's coins, and land this far off
-    coinEvery: ss.coinEvery ?? null, // daisy
+    coinEvery: ss.coinEvery ? ss.coinEvery / pace : null, // daisy
     coins: ss.coins ?? null,
-    heal: ss.heal ?? null,
-    spores: ss.spores ?? null,
-    growEvery: ss.growEvery ?? null,
-    shield: ss.shield ?? null,
-    hide: ss.hide ?? null,
+    heal: sooner(ss.heal, pace),
+    spores: sooner(ss.spores, pace),
+    growEvery: ss.growEvery ? ss.growEvery / pace : null,
+    shield: sooner(ss.shield, pace),
+    hide: sooner(ss.hide, pace),
   });
 }
 
@@ -97,7 +112,7 @@ export function gearFor({ tools = [], sprout = 'sprout' } = {}) {
 export const SAVE = 'klayman.wallet';
 export const ADMIN_SAVE = 'klayman.wallet.admin';
 const ADMIN_START = 9999;
-const ALL_IDS = [...TOOL_IDS, ...SPROUT_IDS, ...GADGET_IDS, ...SLOT_IDS, ...ONCE_IDS];
+const ALL_IDS = [...TOOL_IDS, ...SPROUT_IDS, ...GADGET_IDS, ...SEASON_IDS, ...SLOT_IDS, ...ONCE_IDS];
 
 function safeStorage() {
   try { return globalThis.localStorage ?? null; } catch { return null; }
@@ -117,6 +132,7 @@ export class Wallet {
     this.tools = [];               // worn, oldest first
     this.gadgets = [];             // taken along, oldest first
     this.sprouts = ['sprout', 'sprout']; // first, and the backup
+    this.season = null;            // the weather over the pot next game, or none
     this.skip = null;              // a level skip to spend on the next game
     const found = this.load();
     // A first visit to admin starts with everything and plenty of coins.
@@ -142,6 +158,7 @@ export class Wallet {
     this.tools = [];
     this.gadgets = [];
     this.sprouts = ['sprout', 'sprout'];
+    this.season = null;
     this.skip = null;
     this.save();
   }
@@ -152,6 +169,7 @@ export class Wallet {
       tools: this.tools.slice(0, this.toolSlots),
       sprouts: this.hasBackup ? [...this.sprouts] : [this.sprouts[0]],
       gadgets: this.gadgets.slice(0, this.gadgetSlots),
+      season: this.season,
     };
   }
 
@@ -172,6 +190,7 @@ export class Wallet {
     if (kind === 'tool') return this.tools.includes(id);
     if (kind === 'gadget') return this.gadgets.includes(id);
     if (kind === 'sprout') return this.sproutSlotsOf(id).length > 0;
+    if (kind === 'season') return this.season === id;
     return id === this.skip;
   }
 
@@ -202,12 +221,14 @@ export class Wallet {
    * Puts on what you own. A tool goes on (and with two slots full, the one
    * put on first comes off; tapping a worn one there takes it off); a gadget
    * the same. A sprout fills slot 0 (first) or 1 (backup). A level skip is
-   * picked for the next game, or unpicked. `null` takes every tool off, and
-   * `'noGadget'` leaves every gadget at home.
+   * picked for the next game, or unpicked. A season is the one for the next
+   * game. `null` takes every tool off, `'noGadget'` leaves every gadget at
+   * home, and `'noSeason'` plays without one.
    */
   equip(id, slot = 0) {
     if (id === null) { this.tools = []; this.save(); return true; }
     if (id === 'noGadget') { this.gadgets = []; this.save(); return true; }
+    if (id === 'noSeason') { this.season = null; this.save(); return true; }
     if (!this.owns(id)) return false;
     const kind = kindOf(id);
     if (kind === 'tool') {
@@ -216,6 +237,8 @@ export class Wallet {
       this.gadgets = this.toggle(this.gadgets, id, this.gadgetSlots);
     } else if (kind === 'sprout') {
       this.sprouts[slot === 1 ? 1 : 0] = id;
+    } else if (kind === 'season') {
+      this.season = id;
     } else if (kind === 'once' && ONCE[id].level) {
       this.skip = this.skip === id ? null : id;
     } else {
@@ -256,6 +279,7 @@ export class Wallet {
       const sprouts = Array.isArray(saved.sprouts) ? saved.sprouts : [saved.sprout];
       this.sprouts = [0, 1].map((i) => (kindOf(sprouts[i]) === 'sprout' && this.owns(sprouts[i]) ? sprouts[i] : 'sprout'));
       if (kindOf(saved.skip) === 'once' && this.owns(saved.skip)) this.skip = saved.skip;
+      if (kindOf(saved.season) === 'season' && this.owns(saved.season)) this.season = saved.season;
       return true;
     } catch { return false; /* nothing saved, or a broken save */ }
   }
@@ -263,7 +287,7 @@ export class Wallet {
   save() {
     try {
       this.storage?.setItem(this.key, JSON.stringify({
-        coins: this.coins, owned: [...this.owned], tools: this.tools, gadgets: this.gadgets, sprouts: this.sprouts, skip: this.skip,
+        coins: this.coins, owned: [...this.owned], tools: this.tools, gadgets: this.gadgets, sprouts: this.sprouts, season: this.season, skip: this.skip,
       }));
     } catch { /* private mode: it lasts until the page closes */ }
   }

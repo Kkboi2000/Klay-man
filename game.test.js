@@ -32,9 +32,9 @@ test('a dirtball takes 4 x 1.15 x 0.9 dirt: still five throws, and the third lay
   assert.equal(b.addDirt(1), true);
 });
 
-test('with the bag, three throws are enough (10% less dirt than before)', () => {
+test('with medicine, three throws are enough (10% less dirt than before)', () => {
   const b = new Bacteria(0, 0);
-  const hits = [1, 2, 3].map(() => b.addDirt(ITEMS.bag.dirt));
+  const hits = [1, 2, 3].map(() => b.addDirt(ITEMS.medicine.dirt));
   assert.deepEqual(hits, [false, false, true]);
   assert.equal(new Bacteria(0, 0).look, 0);
   const cracked = new Bacteria(0, 0);
@@ -298,7 +298,7 @@ test('the next special item is placed 3 seconds early, and lands right there', (
   run(game, 0.2);
   const planned = game.potItems.next;
   assert.ok(planned);
-  assert.ok(['plus', 'bag', 'water', 'sandclock'].includes(planned.type), 'it knows what is coming');
+  assert.ok(['plus', 'medicine', 'water', 'sandclock'].includes(planned.type), 'it knows what is coming');
   run(game, 3);
   const [item] = game.items;
   assert.ok(item);
@@ -324,9 +324,9 @@ test('items do what they say', () => {
   for (let i = 0; i < 5; i++) game.useItem({ type: 'water', x: 0, y: 0 });
   assert.equal(game.maxLives, TREE.maxLives, 'capped at 7');
 
-  game.useItem({ type: 'bag', x: 0, y: 0 });
-  assert.equal(game.walkSpeed, ITEMS.bag.speed);
-  run(game, ITEMS.bag.time + 0.1);
+  game.useItem({ type: 'medicine', x: 0, y: 0 });
+  assert.equal(game.walkSpeed, ITEMS.medicine.speed);
+  run(game, ITEMS.medicine.time + 0.1);
   assert.equal(game.walkSpeed, 1);
 
   const b = game.addBacteria(game.tree.x + 150, game.tree.y);

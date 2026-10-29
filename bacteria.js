@@ -26,6 +26,7 @@ export class Bacteria {
     this.ky = 0;
     this.slow = 0;               // seconds left at slowFactor speed
     this.slowFactor = 1;
+    this.decayTime = BACTERIA.decayTime; // seconds to shed a layer (autumn: longer)
   }
 
   get crawling() { return this.state === 'crawl'; }
@@ -37,7 +38,7 @@ export class Bacteria {
   addDirt(amount = 1) {
     if (!this.alive) return false;
     this.dirt = Math.min(BACTERIA.maxDirt, this.dirt + amount);
-    this.decay = BACTERIA.decayTime;
+    this.decay = this.decayTime;
     this.state = 'dirty';
     return this.dirt >= BACTERIA.maxDirt;
   }
@@ -45,7 +46,7 @@ export class Bacteria {
   /** bacteria.gd set_dirt_stage: used when a dirtball cracks open. */
   setDirtStage(stage) {
     this.dirt = Math.max(0, Math.min(stage, BACTERIA.maxDirt - 1));
-    this.decay = BACTERIA.decayTime;
+    this.decay = this.decayTime;
     this.state = this.dirt > 0 ? 'dirty' : 'crawl';
   }
 
@@ -161,7 +162,7 @@ export class Bacteria {
       this.decay -= dt;
       if (this.decay <= 0) {
         this.dirt = Math.max(0, this.dirt - 1);
-        this.decay = BACTERIA.decayTime;
+        this.decay = this.decayTime;
         if (this.dirt <= 0) this.state = 'crawl';
       }
     }

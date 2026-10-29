@@ -372,12 +372,14 @@ body {
     0 var(--side) 0 0.22rem #3d1f08;
 }
 
-/* In the bottom-right corner, under the K button: a switch that keeps
-   Klayman throwing (and pushing). */
+/* Top middle of a phone's screen, in the score bar: a switch that keeps
+   Klayman throwing (and pushing). Upright, the hearts take the top row, so
+   it sits a row lower, between the coins and the gadget buttons. */
 .auto-toggle {
   position: absolute;
-  right: calc(var(--edge-r) + 0.6rem);
-  bottom: calc(var(--edge-b) + 0.6rem);
+  left: 50%;
+  top: calc(var(--edge-t, 0px) + var(--u, 1) * 8px);
+  transform: translateX(-50%);
   min-height: 2.5rem;
   padding: 0.3em 0.85em;
   border: 0;
@@ -390,7 +392,16 @@ body {
   box-shadow: 0 -2px var(--ink), 0 2px var(--ink), -2px 0 var(--ink), 2px 0 var(--ink);
   cursor: pointer;
   touch-action: manipulation;
+  pointer-events: auto;
+  text-shadow: none;
   opacity: var(--see-through);
+}
+[data-layout="desk"] .auto-toggle { display: none; }
+[data-layout="portrait"] .auto-toggle {
+  top: calc(var(--edge-t, 0px) + var(--u, 1) * 8px + 3rem);
+  min-height: 2.2rem;
+  padding: 0.25em 0.7em;
+  font-size: 0.85rem;
 }
 .auto-toggle[aria-pressed="true"] {
   color: var(--ink);
@@ -710,6 +721,22 @@ body {
   line-height: 1.3;
 }
 
+/* The shop in groups: Klayman (tool, gadget), Plant (sprout, vase), then
+   slots and level skips. A group's shelves sit indented on a clay rule. */
+.group { display: grid; gap: 0.8rem; margin-top: 0.4rem; }
+.group-name {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--clay);
+  text-shadow: 2px 0 var(--ink), -2px 0 var(--ink), 0 2px var(--ink), 0 -2px var(--ink), 0 4px var(--ink);
+}
+.group-name .shelf-note { text-shadow: none; }
+.group > .shelf {
+  padding-left: 0.75rem;
+  box-shadow: inset 3px 0 rgba(217, 138, 69, 0.4);
+}
 .shelf { display: grid; gap: 0.5rem; }
 .shelf-head { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
 

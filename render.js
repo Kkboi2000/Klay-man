@@ -9,6 +9,7 @@ import { KLAY, BAC, TREE_ART, BOSS_ART } from './sprites.js';
 import { BREAK_TIME, ABSORB_TIME } from './bacteria.js';
 import { DIRTBALL_BREAK_TIME } from './dirtball.js';
 import { ITEM_INFO } from './items.js';
+import { Weather } from './weather.js';
 
 const FONT = '"Klay Digits", "Pixelify Sans", ui-rounded, system-ui, sans-serif';
 const DIRT = ['#4a2f17', '#6b4423', '#8a5a2b'];
@@ -30,7 +31,7 @@ const RUSH = ['#ff5a4a', '#ffb070', '#ffe9a8'];   // the booster: red sparks
 const DULL = ['#8a8a8a', '#b0b0b0'];              // ...and grey once it wears off
 const BIG = 1.2;                  // how much bigger the booster makes him
 // What the glasses call each of a sprout's powers, above the sprout.
-const POWER_WORDS = { coin: 'coin', item: 'item', closes: 'closes', opens: 'opens', spores: 'spores', heal: 'heal', grow: 'grow' };
+const POWER_WORDS = { coin: 'coin', item: 'item', closes: 'closes', opens: 'opens', spores: 'spores', heal: 'heal', grow: 'grow', sun: 'sun' };
 const ROLL = 0.5;                 // seconds a corn or lily takes to close up or open
 const VISOR = '#7fdcff';          // everything the glasses show
 const VISOR_INK = '#0c2b3a';
@@ -56,6 +57,7 @@ export class Renderer {
     this.cam = { x: 0, y: 0, w: 1, h: 1 };
     this.snapCamera = true;
     this.calm = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    this.weather = new Weather({ calm: this.calm });   // how the season looks
   }
 
   /** Forgets every effect in flight: a new game, or a new look on the setup page. */
@@ -70,6 +72,7 @@ export class Renderer {
     this.feed = 0;                 // seconds of fertilizer still raining down
     this.patches = [];             // the shovel's dirt, settling on the soil
     this.shake = 0;
+    this.weather?.clear();
   }
 
   /** The shovel's dirt: light-brown specks over the whole ring, drifting up. */
@@ -143,8 +146,18 @@ export class Renderer {
   handle(events) {
     const top = { x: TREE_SPOT.x, y: TREE_SPOT.y - 40 };
     for (const e of events) {
+      this.weather.handle(e, this.cam);
       switch (e.type) {
         case 'hit': this.burst(e.x, e.y - 12, 5, DIRT, 60); break;
+        // ------------------------------------------------------- seasons
+        case 'sunshine':
+          this.burst(top.x, top.y - 10, 18, SPARK, 90, -50);
+          if (e.amount > 0) this.floatHeart(top.x, top.y - 20, 'half');
+          break;
+        case 'lightning':
+          this.shake = Math.max(this.shake, 0.25);
+          this.burst(e.x, e.y - 14, 16, ['#ffffff', '#cfe9ff', '#8fd0ff'], 150, -30);
+          break;
         case 'dirtball': this.burst(e.x, e.y - 10, 8, DIRT, 80); break;
         case 'break': this.burst(e.x, e.y - 8, 10, DIRT, 110); break;
         case 'smash': this.burst(e.x, e.y - 8, 10, GERM, 120); break;
@@ -365,14 +378,15 @@ export class Renderer {
     const bg = this.sprites.bg;
     ctx.drawImage(bg, 0, 0, bg.width * POT_SCALE, bg.height * POT_SCALE);
     ctx.imageSmoothingEnabled = false;
+    this.weather.ground(ctx, game.season);
 
-    if (game.pace < 1) this.drawFeed(game);
+    if (game.fertilized) this.drawFeed(game);
     this.drawPatches(dt);
     if (game.bossPlan) this.drawRumble(game);
     const wind = game.windReach;
     if (wind > 0) this.drawGust(game.klay, wind);
 
-    const slowAll = game.pace < 1;
+    const slowAll = game.fertilized;
     const things = [];
     things.push({ y: TREE_SPOT.y, draw: () => this.drawTree(game) });
     if (game.boss) things.push({ y: game.boss.y, draw: () => this.drawBoss(game.boss, game) });
@@ -397,9 +411,11 @@ export class Renderer {
     this.drawParticles(dt);
     this.drawSparkles(dt);
     this.drawFloaters(dt);
+    this.weather.over(ctx, dt);
     this.drawPopups(dt);
 
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.weather.screen(ctx, game.season, this.cssW, this.cssH, dt);
     if (this.markers) this.drawMarkers(game);
   }
 
@@ -719,7 +735,7 @@ export class Renderer {
     if (red > 0) this.glow(k, red);
     if (grey > 0 && !this.calm && Math.random() < 0.1) this.burst(k.x, k.y - 30, 1, DULL, 20, 30);
 
-    if (game.bag > 0) {
+    if (game.medicine > 0) {
       const pulse = 0.25 + 0.12 * Math.sin(this.time * 10);
       const { ctx } = this;
       ctx.fillStyle = `rgba(255,214,90,${pulse})`;
@@ -729,8 +745,7 @@ export class Renderer {
       if (Math.random() < 0.15) this.burst(k.x, k.y - 20, 1, SPARK, 30, -40);
     }
 
-    const gun = hasGun ? () => this.drawGun(k, row, col, flip, jitter)
-      : dig ? () => this.drawShovel(k, row, col, flip, dig) : null;
+    const gun = hasGun ? () => this.drawGun(k, row, col, flip, jitter) : null;
     const pack = tools.includes('backpack');
     if (gun && k.facing === 'back') gun();      // held up the pot, behind him
     if (pack && k.facing === 'front') this.drawPack(k, row, col, flip, jitter, 'behind');
@@ -747,6 +762,7 @@ export class Renderer {
       if (alpha > 0) this.sprite(sheet, col * size, row * size, size, size, k.x + jitter, k.y, a.x, a.y, { flip, alpha });
     }
     if (gun && k.facing !== 'back') gun();
+    if (dig) this.drawShovel(k, dig);
     if (tools.includes('gloves') && k.action?.kind === 'attack') this.drawStreaks(k);
     ctx.restore();
   }
@@ -769,11 +785,11 @@ export class Renderer {
     }
   }
 
-  /** The shovel in his front hand: out it comes, the blade goes in, comes up
-   *  full and tosses the dirt, and away it goes. */
-  drawShovel(k, row, col, flip, g) {
+  /** The shovel, above his head (v22; it was in his hand): out it comes,
+   *  the blade goes in, comes up full and tosses the dirt, and away it goes.
+   *  It swings round its grip. */
+  drawShovel(k, g) {
     const { img, grip } = this.sprites.shovel;
-    const hand = this.sprites.gunSpots[row][col];
     const t = g.t;
     let angle = -1.1;
     let drop = 0;
@@ -785,9 +801,8 @@ export class Renderer {
     if (this.calm) angle = 0;
     const { ctx } = this;
     ctx.save();
-    ctx.translate(Math.round(k.x), Math.round(k.y));
-    if (flip) ctx.scale(-1, 1);
-    ctx.translate((hand.x - KLAY.anchor.x) * S, (hand.y - KLAY.anchor.y + Math.round(drop)) * S);
+    // The grip sits a shovel's length above the top of his head, so the blade just clears his hair.
+    ctx.translate(Math.round(k.x), Math.round(k.y - (KLAY.anchor.y - 19) * S - img.height * S + 12 + drop * S));
     ctx.rotate(angle);
     ctx.scale(size, size);
     ctx.drawImage(img, -grip.x * S, -grip.y * S, img.width * S, img.height * S);

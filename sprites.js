@@ -3,7 +3,7 @@
 // icons and gadget props from the pixel art in art.js.
 import {
   SPROUT_PALETTE, SPROUT_ROWS, CLOSING_ROWS, SPROUT_SWAY, ART_PALETTE, TOOL_ICON_ROWS, SHOP_ICON_ROWS,
-  GADGET_ICON_ROWS, COIN_ROWS, GUN_ART, GUN_ART_SMALL, PACK_ART, LEAF_ROWS, BOTTLE_ROWS, SHOVEL_ROWS, SHOVEL_GRIP,
+  GADGET_ICON_ROWS, SEASON_ICON_ROWS, COIN_ROWS, GUN_ART, GUN_ART_SMALL, PACK_ART, LEAF_ROWS, BOTTLE_ROWS, SHOVEL_ROWS, SHOVEL_GRIP,
 } from './art.js';
 
 /** In the single-file preview build, assets arrive inline as data URLs. */
@@ -124,23 +124,23 @@ const ICON_ROWS = {
     '.....kkkkkk.....',
     '................',
   ],
-  bag: [
-    '................',
-    '.....o.oo.o.....',
-    '....olobbolo....',
-    '.....obbbbo.....',
-    '......otto......',
-    '.....oottoo.....',
-    '....obbbbbbo....',
-    '...obllbbbbbo...',
-    '..oblbbggbbbbso.',
-    '..obbbgggbbbbso.',
-    '..obbbbgbbbbbso.',
-    '..obbbbgbbbbsso.',
-    '..osbbbbbbbssso.',
-    '...ossssssssso..',
-    '....ooooooooo...',
-    '................',
+  medicine: [   // a capsule, half red, half white (it was a bag until v22)
+    '..........ooo...',
+    '........oohhroo.',
+    '.......oohhrrro.',
+    '......oohhrrrrdo',
+    '.....oohhrrrrddo',
+    '....oohhrrrrdddo',
+    '...ooworrrrdddo.',
+    '..oowwlorrdddoo.',
+    '.oowwlllodddoo..',
+    '.owwllllsodoo...',
+    'owwllllsssoo....',
+    'owllllsssoo.....',
+    'ollllsssoo......',
+    '.ollsssoo.......',
+    '.oosssoo........',
+    '...ooo..........',
   ],
   water: [
     '................',
@@ -188,6 +188,7 @@ const ICON_PALETTE = {
 const PALETTE_BY_ICON = {
   water: { ...ICON_PALETTE, l: '#d4f0ff', d: '#2a6fa8', o: '#123a5c' },
   sandclock: { ...ICON_PALETTE, g: '#cfe7ef', s: '#e8c060' },
+  medicine: { ...ICON_PALETTE, w: '#fffffa', l: '#fff4e3', s: '#cdbfa8' },
 };
 
 const HEART_ROWS = [
@@ -201,12 +202,17 @@ const HEART_ROWS = [
   '....k....',
 ];
 
-/** A heart: 'full', 'half' (the left half filled) or 'empty'. */
+/** A heart: 'full', 'half' (the left half filled) or 'empty'; or just its
+ *  left half, 'left' (filled) or 'leftEmpty', for a sprout that holds half a
+ *  heart more (summer's sun grows it in halves). */
 export function heartArt(kind) {
   const full = { k: '#2b0d0d', r: '#d9483b', h: '#ff9a8a' };
   const empty = { k: '#2b0d0d', r: 'rgba(36,25,13,0.55)', h: 'rgba(36,25,13,0.55)' };
-  if (kind !== 'half') return pixelArt(HEART_ROWS, kind === 'full' ? full : empty);
   const mid = Math.floor(HEART_ROWS[0].length / 2);
+  if (kind === 'left' || kind === 'leftEmpty') {
+    return pixelArt(HEART_ROWS.map((row) => row.slice(0, mid + 1)), kind === 'left' ? full : empty);
+  }
+  if (kind !== 'half') return pixelArt(HEART_ROWS, kind === 'full' ? full : empty);
   const left = HEART_ROWS.map((row) => [...row].map((ch, x) => (x <= mid ? ch : '.')).join(''));
   const right = HEART_ROWS.map((row) => [...row].map((ch, x) => (x > mid ? ch : '.')).join(''));
   const c = pixelArt(right, empty);
@@ -455,6 +461,7 @@ export const coinArt = () => pixelArt(COIN_ROWS, ART_PALETTE);
 export const toolIconArt = (id) => pixelArt(TOOL_ICON_ROWS[id], ART_PALETTE);
 export const shopIconArt = (id) => pixelArt(SHOP_ICON_ROWS[id], ART_PALETTE);
 export const gadgetIconArt = (id) => pixelArt(GADGET_ICON_ROWS[id], ART_PALETTE);
+export const seasonIconArt = (id) => pixelArt(SEASON_ICON_ROWS[id], ART_PALETTE);
 
 export async function loadSprites() {
   const [bg, klay, bac, tree, boss] = await Promise.all([
@@ -498,7 +505,7 @@ export async function loadSprites() {
   }
   const icons = {
     plus: iconArt('plus'),
-    bag: iconArt('bag'),
+    medicine: iconArt('medicine'),
     water: iconArt('water'),
     sandclock: iconArt('sandclock'),
   };
@@ -518,6 +525,7 @@ export async function loadSprites() {
     toolIcons: Object.fromEntries(Object.keys(TOOL_ICON_ROWS).map((id) => [id, toolIconArt(id)])),
     shopIcons: Object.fromEntries(Object.keys(SHOP_ICON_ROWS).map((id) => [id, shopIconArt(id)])),
     gadgetIcons: Object.fromEntries(Object.keys(GADGET_ICON_ROWS).map((id) => [id, gadgetIconArt(id)])),
+    seasonIcons: Object.fromEntries(Object.keys(SEASON_ICON_ROWS).map((id) => [id, seasonIconArt(id)])),
     pack: Object.fromEntries(Object.entries(PACK_ART).map(([side, rows]) => [side, pixelArt(rows, ART_PALETTE)])),
     packSpots: packSpots(info),
     leaf: pixelArt(LEAF_ROWS, ART_PALETTE),
