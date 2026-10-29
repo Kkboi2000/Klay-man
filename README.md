@@ -24,7 +24,7 @@ Every file sits in one folder, with no subfolders, so uploading is simple.
 ### Updating
 
 Upload the changed files the same way. Also open `sw.js` and bump `VERSION`
-(`klayman-v20` → `klayman-v21`): phones keep an offline copy, and this is how
+(`klayman-v21` → `klayman-v22`): phones keep an offline copy, and this is how
 they know to fetch the new one.
 
 ## Pages
@@ -85,10 +85,10 @@ On the setup page, tap something you don’t own, then tap again to buy it.
 | Mist spray | 39K | A bottle by the sprout sprays it twice in 0.75 s: half a heart back. Then 20 s to recharge |
 | Fertilizer | 39K | Every bacteria crawls 70% slower for 5 s. Then 20 s to recharge |
 | Shovel | 39K | Klayman stops and digs for 0.75 s; light-brown dirt flies over a ring 180 round him (the brief’s 30 units), and every bacteria in it gets one more layer of dirt (one on its third becomes a dirtball). Dirtballs don’t mind. Then 20 s to recharge |
-| Hypodermic syringe | 39K | For 5 s Klayman turns red, a little bigger and glowing: he throws twice as fast and twice as far, and his dirt counts double (three throws to a dirtball; double on a boss too). Then he turns grey for 2 s: half as fast, half as far. Then 20 s to recharge. It stacks with gloves and the bag |
+| Booster | 39K | For 5 s Klayman turns red, a little bigger and glowing: he throws 3 times as fast and 3 times as far, walks 3 times as fast, and his dirt counts triple (two throws to a dirtball; triple on a boss too). Then he turns grey for 2 s: all four drop to a third. Then 20 s to recharge. It stacks with gloves and the bag (booster and bag together: one throw to a dirtball). It was the hypodermic syringe; one bought before keeps working |
 
-In a game, a gadget’s button sits bottom-left (of the game on a computer, of
-the joystick pad on a phone). It fills up as the gadget recharges and turns
+In a game, a gadget’s button sits in the top-right corner, under the hearts
+and the pause button. It fills up as the gadget recharges and turns
 gold when it’s ready; with the glasses it also counts the seconds down. On a
 computer, **G** uses the 1st gadget and **H** the 2nd.
 
@@ -112,6 +112,17 @@ game goes on at the same level, with the same score and the same bacteria.
 Once a game.
 
 All these numbers are in `config.js` (`COINS`, `TOOLS`, `SPROUTS`, `GADGETS`, `SLOTS`, `ONCE`, `REVIVE`).
+
+## Special items
+
+From level 3 they appear near the sprout (from level 1 out of a sunflower),
+one at a time, for 20 s. Walk over one to use it: a **red plus** gives the
+sprout a heart back, a **water drop** grows it a heart bigger, a
+**sandclock** freezes the bacteria for 5 s, and the **bag** powers Klayman up
+for 5.5 s: he throws and walks 27.5% faster and his dirt counts 1.5 times
+(three throws to a dirtball). In v21 the bag's time and its raises were cut by
+45% (it was 10 s and 50%); it never changed how far he throws. The numbers
+are in `config.js` (`ITEMS`).
 
 ## Boss bacteria
 
@@ -152,17 +163,23 @@ Admin mode stays on (even after closing the app) until you leave it.
 
 Klayman aims all the way round, not just four ways.
 
-- **Phone:** joystick on the left (he throws the way it points, and keeps
-  aiming that way when you let go), the **K** button on the right: it throws
-  (hold to keep throwing), and right up against a dirtball and facing it, it
-  pushes it. The **Auto throw** switch (on the setup page, and in the
-  bottom-right corner in a game) keeps Klayman throwing, and pushes a dirtball
-  he walks into. Gadget buttons sit bottom-left.
+- **Phone:** the game fills the whole screen and the controls float over it,
+  see-through (40%). Touch the left half and the joystick comes to your thumb
+  (he walks the way it points, and throws that way too). Touch the right half
+  and the **K** button does: it throws (hold to keep throwing), and right up
+  against a dirtball and facing it, it pushes it. K is an aiming stick as
+  well: drag it and Klayman aims that way, all the way round (a short dotted
+  line shows where); press it without dragging and he aims at the closest
+  bacteria. Let go and he keeps aiming that way until he walks. The **Auto
+  throw** switch (on the setup page, and in the bottom-right corner in a game)
+  keeps Klayman throwing, and pushes a dirtball he walks into. Gadget buttons
+  and pause sit top right.
 - **Computer:** WASD or the arrow keys to move, the mouse to aim (the pointer
   becomes a sight). Click or Space to throw (or push, up against a dirtball);
   hold to keep throwing. G and H use the gadgets, P pauses.
 
-The dirt gun aims for him, on whichever platform. A push only works when
+The dirt gun aims for him, on whichever platform: it wins over the K stick
+and the mouse. A push only works when
 Klayman is touching the dirtball. From level 7, dirt thrown at a dirtball
 breaks it.
 

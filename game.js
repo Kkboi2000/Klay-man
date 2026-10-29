@@ -18,9 +18,17 @@ import { gearFor } from './gear.js';
 /** x, y: which way to walk. pressed/held: the action button (the K button on
  *  a phone, Space or a click on a computer): it pushes a dirtball Klayman is
  *  touching, and throws otherwise. auto: auto throw (and push). aim: a point
- *  in the pot to aim at (the mouse, on a computer), or null to aim the way
- *  he walks. gadget: which gadget to use this step (0 or 1), or -1. */
-export const NO_INPUT = Object.freeze({ x: 0, y: 0, pressed: false, held: false, auto: false, aim: null, gadget: -1 });
+ *  in the pot to aim at (the mouse, on a computer), or null. steer: a way to
+ *  aim, any length (the K button dragged, on a phone), or null. seek: aim at
+ *  the closest bacteria (the K button pressed without dragging). With none
+ *  of the three, he aims the way he walks. gadget: which gadget to use this
+ *  step (0 or 1), or -1. */
+export const NO_INPUT = Object.freeze({
+  x: 0, y: 0, pressed: false, held: false, auto: false, aim: null, steer: null, seek: false, gadget: -1,
+});
+
+// Nothing raising or lowering anything.
+const PLAIN = Object.freeze({});
 
 // Where a flower's head is, above the spot it's rooted in (unscaled).
 const FLOWER_TOP = { sunflower: 54, daisy: 50 };
@@ -92,7 +100,7 @@ export class Game {
     this.nextCoin = null;          // ...and the next 1K coin
     this.score = 0;
     this.earned = 0;               // coins (K) picked up this game
-    this.boost = 0;
+    this.bag = 0;                  // seconds the bag's power-up has left
     this.freeze = 0;
     this.coinTimer = COINS.every;
     this.over = false;
@@ -122,20 +130,29 @@ export class Game {
 
   // ---------------------------------------------------------------- state
 
-  get boostFactor() { return this.boost > 0 ? ITEMS.bagBoost : 1; }
+  /** The bag's power-up while it lasts. */
+  get bagEffect() { return this.bag > 0 ? ITEMS.bag : PLAIN; }
 
-  /** The syringe: 'boost' for its first 5 seconds, 'crash' for the 2 after, else null. */
-  get syringe() {
-    const g = this.gadgets.find((x) => x.id === 'syringe' && x.active);
+  /** The booster: 'boost' for its first 5 seconds, 'crash' for the 2 after, else null. */
+  get booster() {
+    const g = this.gadgets.find((x) => x.id === 'booster' && x.active);
     if (!g) return null;
     return g.t < g.spec.boost.time ? 'boost' : 'crash';
   }
-  /** What the syringe does to his throws right now (nothing, when it isn't working). */
-  get syringeEffect() { return GADGETS.syringe[this.syringe] ?? {}; }
-  /** How much quicker than plain he throws: his tools, and the syringe. */
-  get fireRate() { return this.gear.fireRate * (this.syringeEffect.fireRate ?? 1); }
-  /** How much dirt a throw puts on: the bag, and the syringe. */
-  get dirtPower() { return this.boostFactor * (this.syringeEffect.dirt ?? 1); }
+  /** What the booster does right now (nothing, when it isn't working). */
+  get boosterEffect() { return GADGETS.booster[this.booster] ?? PLAIN; }
+
+  /** Everything that changes Klayman's `key` right now, multiplied: his
+   *  tools, the bag and the booster. Keys: fireRate, speed, range, dirt. */
+  power(key) {
+    return (this.gear[key] ?? 1) * (this.bagEffect[key] ?? 1) * (this.boosterEffect[key] ?? 1);
+  }
+  /** How much quicker than plain he throws. */
+  get fireRate() { return this.power('fireRate'); }
+  /** How much faster than plain he walks. */
+  get walkSpeed() { return this.power('speed'); }
+  /** How much dirt a throw puts on (1 is a plain throw). */
+  get dirtPower() { return this.power('dirt'); }
   get frozen() { return this.freeze > 0; }
   get itemsUnlocked() { return this.level >= ITEMS.unlockLevel; }
   /** Level 7 skill: dirt thrown from a distance breaks a dirtball. */
@@ -367,7 +384,7 @@ export class Game {
     return best;
   }
 
-  get shotRange() { return SHOT.range * this.gear.range * (this.syringeEffect.range ?? 1); }
+  get shotRange() { return SHOT.range * this.power('range'); }
 
   spawnShot(x, y, dir, target = null) {
     const shot = new DirtShot(x, y, dir, { range: this.shotRange, target });
@@ -389,6 +406,19 @@ export class Game {
     return best;
   }
 
+  /** The K button pressed without dragging: the closest bacteria (or the
+   *  boss, measured to its edge), however far. Null when there's none. */
+  nearestBacteria(from) {
+    let best = null;
+    let bestD = Infinity;
+    for (const b of this.bacteria) {
+      const d = dist(b, from);
+      if (b.lockable && d < bestD) { best = b; bestD = d; }
+    }
+    if (this.boss?.lockable && this.boss.gap(from) < bestD) best = this.boss;
+    return best;
+  }
+
   pushOutOfObstacles(p, r, sproutBlocks = true) {
     for (const b of this.dirtballs) {
       if (b.solid) separate(p, b, r + DIRTBALL.radius);
@@ -401,7 +431,7 @@ export class Game {
 
   update(dt, input = NO_INPUT) {
     if (this.over) return;
-    if (this.boost > 0) this.boost = Math.max(0, this.boost - dt);
+    if (this.bag > 0) this.bag = Math.max(0, this.bag - dt);
     if (this.freeze > 0) this.freeze = Math.max(0, this.freeze - dt);
     if (this.treeHurt > 0) this.treeHurt = Math.max(0, this.treeHurt - dt);
 
@@ -652,7 +682,7 @@ export class Game {
         this.lives = Math.min(this.maxLives, this.lives + 1);
         break;
       case 'bag':
-        this.boost = ITEMS.bagTime;
+        this.bag = ITEMS.bag.time;
         break;
       case 'water':
         this.maxLives = Math.min(this.gear.maxLives, this.maxLives + 1);
@@ -748,9 +778,9 @@ export class Game {
       }
       // The shovel: the moment the blade comes up full, dirt flies all round him.
       if (running && g.id === 'shovel' && before < g.spec.dig && g.t >= g.spec.dig) this.dig(g.spec);
-      // The syringe wears off: he goes grey.
+      // The booster wears off: he goes grey.
       const peak = g.spec.boost?.time;
-      if (running && g.id === 'syringe' && before < peak && g.t >= peak) this.emit('syringeCrash', { x: this.klay.x, y: this.klay.y });
+      if (running && g.id === 'booster' && before < peak && g.t >= peak) this.emit('boosterCrash', { x: this.klay.x, y: this.klay.y });
       if (news) this.emit(news === 'end' ? 'gadgetEnds' : 'gadgetReady', { id: g.id, index });
     });
   }

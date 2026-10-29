@@ -34,7 +34,7 @@ test('a dirtball takes 4 x 1.15 x 0.9 dirt: still five throws, and the third lay
 
 test('with the bag, three throws are enough (10% less dirt than before)', () => {
   const b = new Bacteria(0, 0);
-  const hits = [1, 2, 3].map(() => b.addDirt(ITEMS.bagBoost));
+  const hits = [1, 2, 3].map(() => b.addDirt(ITEMS.bag.dirt));
   assert.deepEqual(hits, [false, false, true]);
   assert.equal(new Bacteria(0, 0).look, 0);
   const cracked = new Bacteria(0, 0);
@@ -325,9 +325,9 @@ test('items do what they say', () => {
   assert.equal(game.maxLives, TREE.maxLives, 'capped at 7');
 
   game.useItem({ type: 'bag', x: 0, y: 0 });
-  assert.equal(game.boostFactor, ITEMS.bagBoost);
-  run(game, ITEMS.bagTime + 0.1);
-  assert.equal(game.boostFactor, 1);
+  assert.equal(game.walkSpeed, ITEMS.bag.speed);
+  run(game, ITEMS.bag.time + 0.1);
+  assert.equal(game.walkSpeed, 1);
 
   const b = game.addBacteria(game.tree.x + 150, game.tree.y);
   game.useItem({ type: 'sandclock', x: 0, y: 0 });
@@ -428,5 +428,68 @@ test('dirt gun: a dirtball he is touching is pushed, not shot', () => {
   k.x = SOIL.cx; k.y = SOIL.cy;
   const ball = game.addDirtball(k.x + 27, k.y);
   game.update(STEP, { ...NO_INPUT, pressed: true });
+  assert.equal(ball.state, 'rolling');
+});
+
+// ------------------------------------------------- the K button aims (v21)
+
+/** A press of K: `seek` (pressed without dragging) or `steer` (dragged that way). */
+const kPress = (extra) => ({ ...NO_INPUT, pressed: true, held: true, ...extra });
+const angleOf = (v) => Math.atan2(v.y, v.x);
+
+test('K pressed without dragging aims at the closest bacteria, and throws at it', () => {
+  const game = quietGame();
+  const k = game.klay;
+  const far = game.addBacteria(k.x + 160, k.y);
+  const near = game.addBacteria(k.x, k.y - 90);
+  game.drainEvents();
+  game.update(STEP, kPress({ seek: true }));
+  assert.ok(Math.abs(angleOf(k.aim) - angleOf({ x: near.x - k.x, y: near.y - k.y })) < 0.05, 'up, at the near one');
+  assert.ok(game.drainEvents().some((e) => e.type === 'throw'));
+  assert.ok(far.alive, 'not the far one');
+});
+
+test('K dragged aims that way, all the way round, and beats the closest bacteria', () => {
+  const game = quietGame();
+  const k = game.klay;
+  game.addBacteria(k.x + 60, k.y);
+  const way = { x: -0.6, y: 0.8 };
+  game.update(STEP, kPress({ steer: way, seek: false }));
+  assert.ok(Math.abs(angleOf(k.aim) - angleOf(way)) < 1e-9);
+  assert.equal(k.steering, true);
+  // Let go: he keeps aiming the way he was steered until he walks.
+  game.update(STEP, NO_INPUT);
+  assert.ok(Math.abs(angleOf(k.aim) - angleOf(way)) < 1e-9);
+  assert.equal(k.steering, false);
+});
+
+test('K pressed with no bacteria about: he aims the way he was aiming', () => {
+  const game = quietGame();
+  const k = game.klay;
+  k.lookAlong({ x: 1, y: 0 });
+  game.update(STEP, kPress({ seek: true }));
+  assert.deepEqual(k.aim, { x: 1, y: 0 });
+});
+
+test('the dirt gun still aims for him, whatever the K button says', () => {
+  const game = new Game({ rng: () => 0.5, loadout: { tools: ['gun'] } });
+  game.phase = 'test';
+  game.toSpawn = 0;
+  const k = game.klay;
+  k.x = SOIL.cx - 120;
+  k.y = SOIL.cy + 80;
+  const b = game.addBacteria(k.x + 80, k.y);
+  game.update(STEP, kPress({ steer: { x: 0, y: -1 } }));
+  assert.equal(game.lock, b);
+  assert.ok(Math.abs(angleOf(k.aim)) < 0.05, 'at the locked bacteria, to the right');
+});
+
+test('steering elsewhere, K still pushes the dirtball he walked into', () => {
+  const game = quietGame();
+  const k = game.klay;
+  const ball = game.addDirtball(k.x + KLAYMAN.radius + DIRTBALL.radius + 2, k.y);
+  game.update(STEP, { ...NO_INPUT, x: 1 });
+  game.klay.cooldown = 0;
+  game.update(STEP, kPress({ x: 1, steer: { x: 0, y: -1 } }));
   assert.equal(ball.state, 'rolling');
 });

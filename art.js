@@ -526,7 +526,7 @@ export const GADGET_ICON_ROWS = {
     '.kmmk..kkkkkkk..',
     '..kk............',
   ],
-  syringe: [
+  booster: [   // a booster shot: a syringe
     '...........kk...',
     '..........kSSk..',
     '...........kSSk.',

@@ -34,7 +34,6 @@
   --chalk: #fff4e3;
   --gold: #ffd25a;
   --veil: rgba(36, 25, 13, 0.88);
-  --pad-y: 55%;
   --outline: 2px 0 var(--ink), -2px 0 var(--ink), 0 2px var(--ink), 0 -2px var(--ink),
     2px 2px var(--ink), -2px 2px var(--ink), 2px -2px var(--ink), -2px -2px var(--ink);
   color-scheme: dark;
@@ -96,24 +95,28 @@ body {
   touch-action: none;
 }
 
-[data-layout="desk"] #frame {
-  grid-template: "stage" 1fr / 1fr;
-}
+#frame { grid-template: "stage" 1fr / 1fr; }
 [data-layout="desk"] .pad { display: none; }
 
-/* Like a handheld: the game above, the controls below. */
-[data-layout="portrait"] #frame {
-  grid-template: "stage stage" 1fr "stick throw" clamp(13.5rem, 32vh, 16rem) / 1fr 1fr;
-  --pad-y: 40%;
+/* A phone, either way round: the game fills the whole screen, edge to edge
+   (under the notch too), and the controls float over it. The score bar and
+   the controls keep clear of the notch and the home bar instead. */
+[data-layout="portrait"],
+[data-layout="landscape"] {
+  --edge-t: env(safe-area-inset-top, 0px);
+  --edge-l: env(safe-area-inset-left, 0px);
+  --edge-r: env(safe-area-inset-right, 0px);
+  --edge-b: env(safe-area-inset-bottom, 0px);
+  --see-through: 0.4;            /* every control on a phone */
 }
-[data-layout="portrait"] .pad { border-top: 3px solid var(--ink); }
-
+[data-layout="portrait"] #frame,
 [data-layout="landscape"] #frame {
-  grid-template: "stick stage throw" 1fr / clamp(140px, 20vw, 220px) 1fr clamp(140px, 20vw, 220px);
-  --pad-y: 48%;
+  position: fixed;
+  inset: 0;
 }
-[data-layout="landscape"] .pad-stick { border-right: 3px solid var(--ink); }
-[data-layout="landscape"] .pad-throw { border-left: 3px solid var(--ink); }
+/* Where the joystick and the K button rest, in from the bottom corners. */
+[data-layout="portrait"] { --rest-x: 5.25rem; --stick-y: 8rem; --k-y: 9rem; }
+[data-layout="landscape"] { --rest-x: 5.5rem; --stick-y: 5.75rem; --k-y: 7.6rem; }
 
 #stage {
   grid-area: stage;
@@ -134,10 +137,15 @@ body {
   background: linear-gradient(rgba(20, 13, 6, 0.55), rgba(20, 13, 6, 0));
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: calc(var(--u, 1) * 8px) calc(var(--u, 1) * 14px) calc(var(--u, 1) * 24px);
+  padding:
+    calc(var(--edge-t, 0px) + var(--u, 1) * 8px)
+    calc(var(--edge-r, 0px) + var(--u, 1) * 14px)
+    calc(var(--u, 1) * 24px)
+    calc(var(--edge-l, 0px) + var(--u, 1) * 14px);
+  align-items: flex-start;
   pointer-events: none;
   text-shadow: var(--outline);
+  z-index: 2;                    /* over a phone's controls; taps pass through to them */
 }
 
 .hud p { margin: 0; }
@@ -172,12 +180,13 @@ body {
 .hud-coins .coin-icon { width: 1.15em; height: 1.15em; }
 
 .hud-right {
-  display: flex;
-  align-items: center;
-  gap: 0.55em;
+  display: grid;
+  justify-items: end;
+  gap: 0.6rem;
   font-size: clamp(13px, calc(var(--u, 1) * 19px), 22px);
   font-weight: 600;
 }
+.hud-bar { display: flex; align-items: center; gap: 0.55em; }
 
 .hearts { display: flex; gap: 0.18em; }
 /* Six to nine hearts sit in two even rows, so the bar fits a narrow phone. */
@@ -208,6 +217,7 @@ body {
 }
 .hud-pause svg { width: 0.9em; height: 0.9em; fill: currentColor; shape-rendering: crispEdges; }
 .hud-pause:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+.hud-pause, .gadget { opacity: var(--see-through, 1); }
 
 /* Through the glasses: bacteria left this level, on the visor's blue screen. */
 .visor {
@@ -267,30 +277,31 @@ body {
 
 /* ------------------------------------------------- joystick and button */
 
+/* Each half of a phone's screen is a control: touch the left half and the
+   joystick comes to your thumb, the right half and the K button does. */
 .pad {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
   touch-action: none;
 }
-.pad-stick { grid-area: stick; }
-.pad-throw { grid-area: throw; cursor: pointer; }
+.pad-stick { left: 0; }
+.pad-throw { right: 0; cursor: pointer; }
 
 /* A well dug in the soil, with a clay knob. It follows your thumb. */
 .stick-base {
   position: absolute;
-  left: 50%;
-  top: var(--pad-y);
+  left: calc(var(--edge-l) + var(--rest-x));
+  top: calc(100% - var(--edge-b) - var(--stick-y));
   width: 7.5rem;
   height: 7.5rem;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background: var(--soil);
   box-shadow: inset 0 0.45rem 0 rgba(0, 0, 0, 0.5), 0 0 0 0.25rem var(--ink), 0 0.3rem 0 0.25rem rgba(0, 0, 0, 0.25);
-  opacity: 0.85;
+  opacity: var(--see-through);
 }
-.stick-base.is-active { opacity: 1; }
 
 .stick-knob {
   position: absolute;
@@ -304,55 +315,69 @@ body {
   box-shadow: inset 0 -0.35rem 0 var(--clay-deep), inset 0 0.25rem 0 var(--clay-light), 0 0 0 0.2rem var(--ink);
 }
 
-/* The action button: a round clay button with a K, standing up off the pad.
-   Pressed, it sinks down onto its base. It throws, or pushes a dirtball
-   Klayman is touching. */
+/* The K button sits in a well of its own, like the joystick's: it's an
+   aiming stick too. Pressed, it sinks onto its base and throws (or pushes a
+   dirtball Klayman is touching); dragged, it leans the way he aims. */
+.k-stick {
+  position: absolute;
+  left: calc(100% - var(--edge-r) - var(--rest-x));
+  top: calc(100% - var(--edge-b) - var(--k-y));
+  width: 8rem;
+  height: 8rem;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--soil);
+  box-shadow: inset 0 0.45rem 0 rgba(0, 0, 0, 0.5), 0 0 0 0.25rem var(--ink), 0 0.3rem 0 0.25rem rgba(0, 0, 0, 0.25);
+  opacity: var(--see-through);
+  pointer-events: none;
+}
+
 .throw {
-  --side: 0.55rem;
+  --side: 0.5rem;
+  --dx: 0px;
+  --dy: 0px;
   position: absolute;
   left: 50%;
-  top: var(--pad-y);
-  width: 6.25rem;
-  height: 6.25rem;
-  transform: translate(-50%, -50%);
+  top: 50%;
+  width: 5rem;
+  height: 5rem;
+  transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy) - 0.2rem));
   display: grid;
   place-items: center;
-  padding: 0 0 0.3rem;
+  padding: 0 0 0.25rem;
   border: 0;
   border-radius: 50%;
   font: inherit;
-  font-size: 3.1rem;
+  font-size: 2.5rem;
   font-weight: 700;
   line-height: 1;
   color: var(--chalk);
   text-shadow: var(--outline), 0 4px 0 var(--ink);
   background: var(--clay);
   box-shadow:
-    inset 0 0.35rem 0 var(--clay-light),
-    inset 0 -0.5rem 0 var(--clay-deep),
-    0 0 0 0.25rem var(--ink),
-    0 var(--side) 0 0.25rem #3d1f08,
-    0 calc(var(--side) + 0.3rem) 0 0.25rem rgba(0, 0, 0, 0.25);
+    inset 0 0.3rem 0 var(--clay-light),
+    inset 0 -0.45rem 0 var(--clay-deep),
+    0 0 0 0.22rem var(--ink),
+    0 var(--side) 0 0.22rem #3d1f08;
   pointer-events: none;
 }
 .throw.is-down {
   --side: 0.15rem;
-  transform: translate(-50%, calc(-50% + 0.4rem));
+  transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy) + 0.15rem));
   background: var(--clay-light);
   box-shadow:
     inset 0 0.2rem 0 #e9a565,
     inset 0 -0.3rem 0 var(--clay),
-    0 0 0 0.25rem var(--ink),
-    0 var(--side) 0 0.25rem #3d1f08,
-    0 calc(var(--side) + 0.3rem) 0 0.25rem rgba(0, 0, 0, 0.25);
+    0 0 0 0.22rem var(--ink),
+    0 var(--side) 0 0.22rem #3d1f08;
 }
 
-/* In the bottom-right corner, well clear of the throw button: a switch that
-   keeps Klayman throwing (and pushing). */
+/* In the bottom-right corner, under the K button: a switch that keeps
+   Klayman throwing (and pushing). */
 .auto-toggle {
   position: absolute;
-  right: 0.6rem;
-  bottom: 0.6rem;
+  right: calc(var(--edge-r) + 0.6rem);
+  bottom: calc(var(--edge-b) + 0.6rem);
   min-height: 2.5rem;
   padding: 0.3em 0.85em;
   border: 0;
@@ -365,6 +390,7 @@ body {
   box-shadow: 0 -2px var(--ink), 0 2px var(--ink), -2px 0 var(--ink), 2px 0 var(--ink);
   cursor: pointer;
   touch-action: manipulation;
+  opacity: var(--see-through);
 }
 .auto-toggle[aria-pressed="true"] {
   color: var(--ink);
@@ -374,37 +400,17 @@ body {
 }
 .auto-toggle:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
 
-.pad-label {
-  position: absolute;
-  left: 50%;
-  top: calc(var(--pad-y) + 4.6rem);
-  transform: translateX(-50%);
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: rgba(255, 244, 227, 0.6);
-  pointer-events: none;
-}
-
 /* ------------------------------------------------------------ gadgets */
 
-/* Bottom-left: of the game on a computer, of the joystick pad on a phone,
-   across from the auto-throw switch. A button fills from the bottom as its
-   gadget recharges; full, it turns gold. Through the glasses it also counts
-   the seconds down. */
+/* Top right, under the hearts and the pause button. A button fills from
+   the bottom as its gadget recharges; full, it turns gold. Through the
+   glasses it also counts the seconds down. */
 .gadget-bar {
-  position: absolute;
-  left: 0.6rem;
-  bottom: 0.6rem;
-  z-index: 2;
   display: flex;
   gap: 0.55rem;
+  margin-right: 2px;             /* the buttons' outline sits outside them */
 }
 .gadget-bar[hidden] { display: none; }
-[data-layout="desk"] .gadget-bar { left: 0.9rem; bottom: 0.9rem; }
-[data-mode="title"] .gadget-bar,
-[data-mode="setup"] .gadget-bar { visibility: hidden; }
-/* With gadgets, the joystick pad's label makes way for them. */
-.has-gadgets .pad-stick .pad-label { display: none; }
 
 .gadget {
   position: relative;
@@ -418,6 +424,8 @@ body {
   box-shadow: 0 -2px var(--ink), 0 2px var(--ink), -2px 0 var(--ink), 2px 0 var(--ink);
   cursor: pointer;
   touch-action: none;
+  pointer-events: auto;
+  text-shadow: none;
 }
 .gadget[hidden] { display: none; }
 .gadget:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }

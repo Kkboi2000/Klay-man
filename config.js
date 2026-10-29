@@ -37,7 +37,8 @@ export const BACTERIA = {
   radius: 13,
   // Dirt that makes a dirtball, counted in throws (bacteria.gd had 7). It
   // was 4, then 15% more, then 10% less: 4.14. Throws are whole, so that's
-  // still five plain throws, but three with the bag (it was four).
+  // still five plain throws, but three with the bag (it was four), and two
+  // with the booster.
   maxDirt: 4 * 1.15 * 0.9,
   decayTime: 2.5,            // seconds to shed one layer (bacteria.gd had 1.2)
   levelSpeedUp: 1.05,        // +5% per level
@@ -84,8 +85,11 @@ export const ITEMS = {
   nearSprout: { min: 70, max: 210 }, // how far from the sprout items appear
   blinkFrom: 3,
   pickupRadius: 22,
-  bagTime: 10,
-  bagBoost: 1.5,
+  // The bag: for a while Klayman throws quicker and walks faster, and his
+  // dirt counts more. It was 10 seconds and +50% throwing and walking; v21
+  // cut the time and both raises by 45% (x0.55): 5.5 seconds, +27.5%. It
+  // never changed how far he throws. Its dirt (x1.5) is as it was.
+  bag: { time: 10 * 0.55, fireRate: 1 + 0.5 * 0.55, speed: 1 + 0.5 * 0.55, dirt: 1.5 },
   sandclockTime: 5,
 };
 
@@ -113,7 +117,7 @@ export const BOSS = {
   foot: { rx: 80, ry: 44, lift: 16 },
   corner: 70,                // how far in from the rim, at a corner of the pot
   hpPerLevel: 10,
-  shotDamage: 1,             // a throw (the bag makes it 1.5)
+  shotDamage: 1,             // a throw (the bag makes it 1.5, the booster 3)
   ballDamage: 5,             // a rolling dirtball (thrown dirt doesn't break dirtballs while a boss is out)
   // Seconds between the bacteria it sends out: 2.5 at level 10, and 0.625
   // less every boss level after (1.875 at 15, 1.25 at 20), never under 1
@@ -205,8 +209,7 @@ export const SPROUTS = {
 };
 
 // Gadgets: bought once; one per game (two with the gadget slot). Used with
-// G (and H) on a computer, or the button in the bottom-left of a phone's
-// controls. After its effect, each takes `cooldown` seconds to be ready again.
+// G (and H) on a computer, or their buttons in the game's top-right corner. After its effect, each takes `cooldown` seconds to be ready again.
 export const GADGETS = {
   leaf: {
     price: 39,
@@ -230,14 +233,14 @@ export const GADGETS = {
     time: 0.75,              // he stands and digs this long
     cooldown: 20,
   },
-  syringe: {
+  booster: {
     price: 39,
-    // A shot of something: red, a little bigger and glowing, he throws twice
-    // as fast and twice as far, and his dirt counts double...
-    boost: { time: 5, fireRate: 2, range: 2, dirt: 2 },
-    // ...then it wears off: grey, he throws at half the speed and half the
-    // distance for 2 seconds.
-    crash: { time: 2, fireRate: 0.5, range: 0.5 },
+    // A shot of something: red, a little bigger and glowing. For 5 seconds
+    // he throws three times as fast and three times as far, walks three
+    // times as fast, and his dirt counts triple...
+    boost: { time: 5, fireRate: 3, range: 3, speed: 3, dirt: 3 },
+    // ...then it wears off: grey, and for 2 seconds all four drop to a third.
+    crash: { time: 2, fireRate: 1 / 3, range: 1 / 3, speed: 1 / 3, dirt: 1 / 3 },
     time: 5 + 2,
     cooldown: 20,            // counted from when he's himself again
   },

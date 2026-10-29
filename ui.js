@@ -115,7 +115,6 @@ export function createUI() {
     if (key === shown.gadgets) return;
     shown.gadgets = key;
     el.gadgetBar.hidden = list.length === 0;
-    el.app.classList.toggle('has-gadgets', list.length > 0);
     el.gadgetButtons.forEach((b, i) => {
       const look = looks[i];
       b.hidden = !look;

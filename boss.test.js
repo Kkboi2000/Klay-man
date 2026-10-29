@@ -132,11 +132,11 @@ test('throws take 1 HP (1.5 with the bag); a rolling dirtball takes 5', () => {
   game.update(STEP, { ...NO_INPUT, pressed: true });
   run(game, 0.5);
   assert.equal(boss.hp, 99);
-  game.boost = ITEMS.bagTime;
+  game.bag = ITEMS.bag.time;
   game.update(STEP, { ...NO_INPUT, pressed: true });
   run(game, 0.5);
   assert.equal(boss.hp, 97.5);
-  game.boost = 0;
+  game.bag = 0;
   const ball = game.addDirtball(boss.x, boss.y + 80);
   ball.push({ x: 0, y: -1 });
   run(game, 0.4);

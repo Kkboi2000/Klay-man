@@ -21,7 +21,6 @@ const ADMIN_KEY = 'klayman.admin';
 const $ = (id) => document.getElementById(id);
 
 const app = $('app');
-const frame = $('frame');
 const canvas = $('screen');
 const isPreview = Boolean(globalThis.KLAYMAN_ASSETS);
 
@@ -84,21 +83,30 @@ function listenForAdminTaps() {
 }
 
 // ----------------------------------------------------------------- layout
-// Portrait: the game on top, controls underneath. Landscape: controls on both
-// sides. Computer: the game fills the window, played with the keyboard.
-// The camera follows Klayman, so the game area can be any shape.
+// The game fills the screen, any shape: the camera follows Klayman. On a
+// phone (portrait or landscape) the controls float over it; on a computer
+// it's played with the keyboard and mouse.
 
 function layout() {
-  const r = frame.getBoundingClientRect();
-  app.dataset.layout = !touch ? 'desk' : r.height >= r.width ? 'portrait' : 'landscape';
+  app.dataset.layout = !touch ? 'desk' : innerHeight >= innerWidth ? 'portrait' : 'landscape';
   const stage = $('stage').getBoundingClientRect();
   const w = Math.floor(stage.width);
   const h = Math.floor(stage.height);
   if (!renderer) return;
   renderer.resize(w, h, Math.min(3, devicePixelRatio || 1));
-  renderer.markerBottom = app.dataset.layout === 'desk' ? 70 : 0;   // the gadget buttons sit there
   app.style.setProperty('--u', String(renderer.zoom));
+  clearHud();
   if (mode === 'setup') setup.resize();
+}
+
+/** The arrows to things off-screen keep clear of the score bar, and of the
+ *  gadget buttons under the hearts, however tall those are right now. */
+function clearHud() {
+  if (!renderer) return;
+  const top = $('stage').getBoundingClientRect().top;
+  const low = Math.max(...[...document.querySelectorAll('.hud-left, .hud-right')]
+    .map((el) => el.getBoundingClientRect().bottom));
+  renderer.markerTop = Math.max(0, low - top) + 10;
 }
 
 // ------------------------------------------------------------ game states
@@ -312,9 +320,9 @@ function handleEvents(events) {
         if (e.id === 'leaf') sound.play('throw', { volume: 0.6, rate: 1.4 });
         if (e.id === 'fertilizer') sound.play('break', { volume: 0.4, rate: 1.4 });
         if (e.id === 'shovel') sound.play('throw', { volume: 0.45, rate: 0.8 });
-        if (e.id === 'syringe') sound.play('buy', { volume: 0.55, rate: 1.6 });
+        if (e.id === 'booster') sound.play('buy', { volume: 0.55, rate: 1.6 });
         break;
-      case 'syringeCrash': sound.play('hit', { volume: 0.5, rate: 0.5 }); break;
+      case 'boosterCrash': sound.play('hit', { volume: 0.5, rate: 0.5 }); break;
       case 'dig':
         sound.play('break', { volume: 0.7, rate: 0.85 });
         sound.buzz(25);
@@ -490,6 +498,7 @@ async function boot() {
     stickBase: $('stick-base'),
     stickKnob: $('stick-knob'),
     throwZone: $('throw-zone'),
+    kStick: $('k-stick'),
     throwButton: $('throw'),
     autoButton: $('auto'),
     onPause: togglePause,
@@ -533,6 +542,11 @@ async function boot() {
     if (e.pointerType === 'touch' && !touch) { touch = true; layout(); }
   }, { capture: true });
   addEventListener('resize', layout);
+  // Gadget buttons come and go with the game, and hearts wrap to two rows.
+  if (globalThis.ResizeObserver) {
+    const watch = new ResizeObserver(clearHud);
+    for (const el of document.querySelectorAll('.hud-left, .hud-right')) watch.observe(el);
+  }
   globalThis.visualViewport?.addEventListener('resize', layout);
   // Leaving the app pauses the game and the music; the next tap brings the music back.
   document.addEventListener('visibilitychange', () => {

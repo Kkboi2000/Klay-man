@@ -4,6 +4,10 @@
 // the gadget buttons. read() returns the step's input once per game step
 // (see NO_INPUT in game.js). The K button, Space and a click do the same:
 // push a dirtball Klayman is touching, throw otherwise.
+//
+// The K button is a second stick, for aiming: it comes to where the thumb
+// lands, like the joystick. Dragged, Klayman aims that way, all the way
+// round; pressed without dragging, at the closest bacteria.
 
 const MOVE_KEYS = {
   ArrowLeft: [-1, 0], KeyA: [-1, 0],
@@ -14,10 +18,13 @@ const MOVE_KEYS = {
 const ACTION_KEY = 'Space';
 const GADGET_KEYS = { KeyG: 0, KeyH: 1 };
 const DEAD_ZONE = 0.22;
+const K_DEAD_ZONE = 0.4;          // of the K button's travel: less is a plain press
 const AUTO_KEY = 'klayman.autoThrow';
 
+const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+
 export function createInput({
-  stage, stickZone, stickBase, stickKnob, throwZone, throwButton, autoButton, gadgetButtons = [], onPause,
+  stage, stickZone, stickBase, stickKnob, throwZone, kStick, throwButton, autoButton, gadgetButtons = [], onPause,
 }) {
   const keys = new Set();
   let spaceDown = false;
@@ -25,10 +32,12 @@ export function createInput({
   let mouse = null;                // where the mouse is over the game, in CSS pixels
   let gadget = -1;                 // a gadget asked for since the last read
   let pressed = false;
-  let btnPointer = null;
   let auto = false;
   try { auto = localStorage.getItem(AUTO_KEY) === '1'; } catch { /* nothing saved */ }
   const stick = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
+  // The K button: where the thumb landed, the way it's dragged (null: not
+  // far enough to aim by hand), and whether it was pressed since the last read.
+  const k = { id: null, ox: 0, oy: 0, steer: null, tapped: false };
 
   // ------------------------------------------------------------ keyboard
   addEventListener('keydown', (e) => {
@@ -46,7 +55,7 @@ export function createInput({
     keys.delete(e.code);
     if (e.code === ACTION_KEY) spaceDown = false;
   });
-  addEventListener('blur', () => { keys.clear(); spaceDown = false; mouseDown = false; releaseStick(); releaseButton(); });
+  addEventListener('blur', () => { keys.clear(); spaceDown = false; mouseDown = false; releaseStick(); releaseK(); });
 
   // --------------------------------------------------------------- mouse
   // Klayman aims at the mouse; a click throws (hold to keep throwing).
@@ -131,21 +140,57 @@ export function createInput({
     stickZone.addEventListener(type, (e) => { if (e.pointerId === stick.id) releaseStick(); });
   }
 
-  // ------------------------------------------------------------ throw
-  function releaseButton() {
-    btnPointer = null;
-    throwButton.classList.remove('is-down');
+  // ---------------------------------------------------------- the K button
+  function kRadius() { return kStick.offsetWidth / 2 || 64; }
+  function kTravel() { return kRadius() * 0.5; }
+
+  /** The K button comes to the thumb; dragging is measured from where it landed. */
+  function placeK(clientX, clientY) {
+    const zone = throwZone.getBoundingClientRect();
+    const r = kRadius();
+    kStick.style.left = `${clamp(clientX - zone.left, r, zone.width - r)}px`;
+    kStick.style.top = `${clamp(clientY - zone.top, r, zone.height - r)}px`;
+    k.ox = clientX;
+    k.oy = clientY;
   }
+
+  function steerK(clientX, clientY) {
+    const travel = kTravel();
+    let dx = clientX - k.ox;
+    let dy = clientY - k.oy;
+    const d = Math.hypot(dx, dy);
+    k.steer = d < travel * K_DEAD_ZONE ? null : { x: dx / d, y: dy / d };
+    if (d > travel) { dx = (dx / d) * travel; dy = (dy / d) * travel; }
+    throwButton.style.setProperty('--dx', `${dx}px`);
+    throwButton.style.setProperty('--dy', `${dy}px`);
+  }
+
+  function releaseK() {
+    k.id = null;
+    k.steer = null;
+    throwButton.classList.remove('is-down');
+    throwButton.style.removeProperty('--dx');
+    throwButton.style.removeProperty('--dy');
+    kStick.style.left = '';
+    kStick.style.top = '';
+  }
+
   throwZone.addEventListener('pointerdown', (e) => {
-    if (btnPointer !== null) return;
-    btnPointer = e.pointerId;
+    if (k.id !== null) return;
+    k.id = e.pointerId;
+    k.tapped = true;
+    k.steer = null;
     throwZone.setPointerCapture(e.pointerId);
     throwButton.classList.add('is-down');
+    placeK(e.clientX, e.clientY);
     pressed = true;
     e.preventDefault();
   });
+  throwZone.addEventListener('pointermove', (e) => {
+    if (e.pointerId === k.id) steerK(e.clientX, e.clientY);
+  });
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-    throwZone.addEventListener(type, (e) => { if (e.pointerId === btnPointer) releaseButton(); });
+    throwZone.addEventListener(type, (e) => { if (e.pointerId === k.id) releaseK(); });
   }
 
   // ------------------------------------------------------- auto throw
@@ -180,9 +225,14 @@ export function createInput({
         x += MOVE_KEYS[code][0];
         y += MOVE_KEYS[code][1];
       }
-      const out = { x, y, pressed, held: spaceDown || mouseDown || btnPointer !== null, auto, aim: mouse, gadget };
+      const kDown = k.id !== null;
+      const out = {
+        x, y, pressed, held: spaceDown || mouseDown || kDown, auto, aim: mouse, gadget,
+        steer: k.steer, seek: (k.tapped || kDown) && !k.steer,
+      };
       pressed = false;
       gadget = -1;
+      k.tapped = false;
       return out;
     },
     clear() {
@@ -192,7 +242,8 @@ export function createInput({
       spaceDown = false;
       mouseDown = false;
       releaseStick();
-      releaseButton();
+      releaseK();
+      k.tapped = false;
     },
   };
 }

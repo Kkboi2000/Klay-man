@@ -28,11 +28,28 @@
             <p id="visor" class="visor" hidden><span class="visor-bac" aria-hidden="true"></span><span id="left">0</span><span class="visor-unit" aria-hidden="true">left</span></p>
           </div>
           <div class="hud-right">
-            <div id="hearts" class="hearts" role="img"></div>
-            <p id="level" class="hud-level">Level 1</p>
-            <button id="pause" class="hud-pause" type="button" aria-label="Pause">
-              <svg viewBox="0 0 8 8" aria-hidden="true"><rect x="1" y="1" width="2" height="6"/><rect x="5" y="1" width="2" height="6"/></svg>
-            </button>
+            <div class="hud-bar">
+              <div id="hearts" class="hearts" role="img"></div>
+              <p id="level" class="hud-level">Level 1</p>
+              <button id="pause" class="hud-pause" type="button" aria-label="Pause">
+                <svg viewBox="0 0 8 8" aria-hidden="true"><rect x="1" y="1" width="2" height="6"/><rect x="5" y="1" width="2" height="6"/></svg>
+              </button>
+            </div>
+            <!-- Gadgets: top-right, under the hearts (G and H on a computer). -->
+            <div id="gadget-bar" class="gadget-bar" role="group" aria-label="Gadgets" hidden>
+              <button class="gadget" type="button" data-gadget="0" hidden>
+                <span class="gadget-fill" aria-hidden="true"></span>
+                <span class="gadget-pic" aria-hidden="true"></span>
+                <span class="gadget-secs" aria-hidden="true"></span>
+                <span class="gadget-key" aria-hidden="true">G</span>
+              </button>
+              <button class="gadget" type="button" data-gadget="1" hidden>
+                <span class="gadget-fill" aria-hidden="true"></span>
+                <span class="gadget-pic" aria-hidden="true"></span>
+                <span class="gadget-secs" aria-hidden="true"></span>
+                <span class="gadget-key" aria-hidden="true">H</span>
+              </button>
+            </div>
           </div>
         </div>
         <div id="banner" class="banner" hidden aria-live="polite">
@@ -41,30 +58,17 @@
         </div>
       </div>
 
+      <!-- A phone's controls float over the game: the joystick on the left
+           half, the K button (an aiming stick too) on the right. -->
       <div id="stick-zone" class="pad pad-stick">
         <div id="stick-base" class="stick-base"><div id="stick-knob" class="stick-knob"></div></div>
-        <span class="pad-label" aria-hidden="true">Move</span>
       </div>
 
       <div id="throw-zone" class="pad pad-throw">
-        <button id="throw" class="throw" type="button" tabindex="-1" aria-label="Throw dirt, or push a dirtball you’re touching"><span aria-hidden="true">K</span></button>
+        <div id="k-stick" class="k-stick">
+          <button id="throw" class="throw" type="button" tabindex="-1" aria-label="Throw dirt, or push a dirtball you’re touching. Drag to aim."><span aria-hidden="true">K</span></button>
+        </div>
         <button id="auto" class="auto-toggle" type="button" aria-pressed="false">Auto throw: off</button>
-      </div>
-
-      <!-- Gadgets: bottom-left of the game on a computer (G, H), of the left pad on a phone. -->
-      <div id="gadget-bar" class="gadget-bar" role="group" aria-label="Gadgets" hidden>
-          <button class="gadget" type="button" data-gadget="0" hidden>
-            <span class="gadget-fill" aria-hidden="true"></span>
-            <span class="gadget-pic" aria-hidden="true"></span>
-            <span class="gadget-secs" aria-hidden="true"></span>
-            <span class="gadget-key" aria-hidden="true">G</span>
-          </button>
-          <button class="gadget" type="button" data-gadget="1" hidden>
-            <span class="gadget-fill" aria-hidden="true"></span>
-            <span class="gadget-pic" aria-hidden="true"></span>
-            <span class="gadget-secs" aria-hidden="true"></span>
-            <span class="gadget-key" aria-hidden="true">H</span>
-          </button>
       </div>
     </div>
 
@@ -166,14 +170,14 @@
           <summary>How to play</summary>
           <ul class="howto">
             <li>Hit a bacteria with dirt five times to turn it into a dirtball.</li>
-            <li>Klayman throws the way he walks; on a computer, where the mouse points.</li>
+            <li>Klayman throws the way he walks. On a phone, drag K to aim, or just press it to aim at the closest bacteria. On a computer, he throws where the mouse points.</li>
             <li>Walk right up to a dirtball and press K to push it into other bacteria. Auto throw pushes too.</li>
             <li>When the sprout is lost, you can revive it once a game for 49K.</li>
             <li>Walk over coins to pick them up. Spend them here.</li>
             <li>From level 3, special items appear near the sprout.</li>
             <li>From level 7, dirt thrown at a dirtball from afar breaks it.</li>
             <li>Levels 5, 10, 15 and on end with a boss bacteria. Wear it down with dirt, and push dirtballs into it, for a 10K coin. While it’s out, thrown dirt doesn’t break dirtballs.</li>
-            <li>A gadget’s button fills up as it recharges. Tap it (G on a computer) when it’s full.</li>
+            <li>A gadget’s button, top right, fills up as it recharges. Tap it (G on a computer) when it’s full.</li>
           </ul>
           <p class="keys">WASD or arrow keys to move, the mouse to aim. Click or Space to throw, or to push a dirtball you’re touching. G and H use your gadgets. P to pause.</p>
         </details>

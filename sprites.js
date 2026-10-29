@@ -466,7 +466,7 @@ export async function loadSprites() {
   ]);
   const info = readKlay(klay);
   // Klayman in any mix of tools, painted the first time it's needed: as he
-  // is, poisoned green, and (the syringe) red with power, then grey.
+  // is, poisoned green, and (the booster) red with power, then grey.
   const looks = new Map();
   const lookFor = (tools = []) => {
     const wear = DRESSABLE.filter((t) => tools.includes(t));

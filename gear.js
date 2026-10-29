@@ -5,7 +5,7 @@ import { GADGETS, ONCE, SLOTS, SPROUTS, TOOLS, TREE } from './config.js';
 
 export const TOOL_IDS = ['backpack', 'shoes', 'gloves', 'coat', 'glasses', 'gun'];
 export const SPROUT_IDS = ['sprout', 'daisy', 'sunflower', 'rose', 'corn', 'lilies', 'mushroom'];
-export const GADGET_IDS = ['leaf', 'spray', 'fertilizer', 'shovel', 'syringe'];
+export const GADGET_IDS = ['leaf', 'spray', 'fertilizer', 'shovel', 'booster'];
 export const SLOT_IDS = ['toolSlot', 'sproutSlot', 'gadgetSlot'];
 export const ONCE_IDS = ['skip3', 'skip7', 'skip10', 'revive'];
 // Sold on the setup page. Revive isn't: it's offered on the summary when the sprout is lost.
@@ -29,7 +29,7 @@ export const CATALOG = {
   spray: { name: 'Mist spray', says: 'Sprays the sprout twice: half a heart back.' },
   fertilizer: { name: 'Fertilizer', says: 'Every bacteria crawls 70% slower for 5 seconds.' },
   shovel: { name: 'Shovel', says: 'Klayman digs and throws dirt all round him: every bacteria near him gets a layer of dirt.' },
-  syringe: { name: 'Hypodermic syringe', says: 'For 5 seconds Klayman throws twice as fast and twice as far, and his dirt counts double. Then 2 seconds at half speed and half distance.' },
+  booster: { name: 'Booster', says: 'For 5 seconds Klayman throws 3 times as fast and as far, walks 3 times as fast, and his dirt counts triple. Then 2 seconds at a third of all four.' },
   toolSlot: { name: '2nd tool slot', says: 'Wear two tools at once.' },
   sproutSlot: { name: '2nd sprout slot', says: 'Pick a backup sprout. When the first is lost, carry on with it.' },
   gadgetSlot: { name: '2nd gadget slot', says: 'Take two gadgets into a game.' },
@@ -40,6 +40,10 @@ export const CATALOG = {
 };
 
 const SHOP = { ...TOOLS, ...SPROUTS, ...GADGETS, ...SLOTS, ...ONCE };
+
+// Things that were sold under another name. A save keeps what was bought.
+const RENAMED = { syringe: 'booster' };
+const current = (id) => RENAMED[id] ?? id;
 
 export const priceOf = (id) => SHOP[id]?.price ?? 0;
 export function kindOf(id) {
@@ -243,11 +247,11 @@ export class Wallet {
       const saved = JSON.parse(this.storage?.getItem(this.key));
       if (!saved) return false;
       if (Number.isInteger(saved.coins) && saved.coins >= 0) this.coins = saved.coins;
-      for (const id of saved.owned ?? []) if (kindOf(id)) this.owned.add(id);
+      for (const id of (saved.owned ?? []).map(current)) if (kindOf(id)) this.owned.add(id);
       // Saves from before the slots kept one `tool` and one `sprout`.
       const tools = Array.isArray(saved.tools) ? saved.tools : [saved.tool];
       this.tools = [...new Set(tools)].filter((id) => kindOf(id) === 'tool' && this.owns(id)).slice(-this.toolSlots);
-      const gadgets = Array.isArray(saved.gadgets) ? saved.gadgets : [];
+      const gadgets = Array.isArray(saved.gadgets) ? saved.gadgets.map(current) : [];
       this.gadgets = [...new Set(gadgets)].filter((id) => kindOf(id) === 'gadget' && this.owns(id)).slice(-this.gadgetSlots);
       const sprouts = Array.isArray(saved.sprouts) ? saved.sprouts : [saved.sprout];
       this.sprouts = [0, 1].map((i) => (kindOf(sprouts[i]) === 'sprout' && this.owns(sprouts[i]) ? sprouts[i] : 'sprout'));

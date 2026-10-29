@@ -569,7 +569,7 @@ test('prices match the brief', () => {
     {
       backpack: 19, shoes: 29, gloves: 29, coat: 49, glasses: 69, gun: 99,
       sprout: 0, daisy: 99, sunflower: 149, rose: 199, corn: 249, lilies: 249, mushroom: 299,
-      leaf: 39, spray: 39, fertilizer: 39, shovel: 39, syringe: 39,
+      leaf: 39, spray: 39, fertilizer: 39, shovel: 39, booster: 39,
       toolSlot: 199, sproutSlot: 399, gadgetSlot: 99,
       skip3: 29, skip7: 74, skip10: 99, revive: 49,
     },
@@ -864,68 +864,125 @@ test('the glasses’ sprout clocks: what comes next, and when', () => {
   assert.deepEqual(clocks('mushroom', (g) => { g.maxLives = 9; }), ['spores 25', 'heal 30'], 'fully grown: no more growing');
 });
 
-// ---------------------------------------------------------------- syringe
+// ---------------------------------------------------------------- booster
 
-/** Throws in `seconds` of auto throw, and how far the gun can reach meanwhile. */
+/** Throws in `seconds` of auto throw. */
 function throwsIn(game, seconds) {
   game.drainEvents();
   run(game, seconds, { ...NO_INPUT, auto: true });
   return game.drainEvents().filter((e) => e.type === 'throw').length;
 }
 
-test('syringe: 5 seconds red, throwing twice as fast and twice as far', () => {
+/** How far Klayman walks in `seconds`, heading right. */
+function walked(game, seconds) {
+  const x0 = game.klay.x;
+  run(game, seconds, right);
+  return game.klay.x - x0;
+}
+
+/** Whole throws it takes to make a dirtball, at the game's dirt power now. */
+function throwsToBall(game) {
+  const b = game.addBacteria(0, 0);
+  let n = 1;
+  while (!b.addDirt(game.dirtPower)) n += 1;
+  return n;
+}
+
+test('the booster was the hypodermic syringe: same price, new name', () => {
+  assert.equal(CATALOG.booster.name, 'Booster');
+  assert.equal(GADGETS.booster.price, 39);
+  assert.equal(GADGETS.syringe, undefined);
+});
+
+test('booster: 5 seconds red, throwing three times as fast and three times as far', () => {
   const plain = throwsIn(quietGame(), 4.8);
-  const game = quietGame(withGadgets('syringe'));
+  const game = quietGame(withGadgets('booster'));
   game.update(STEP, press(0));
-  assert.equal(game.syringe, 'boost');
-  assert.equal(game.shotRange, SHOT.range * 2);
+  assert.equal(game.booster, 'boost');
+  assert.equal(game.shotRange, SHOT.range * 3);
+  assert.equal(game.fireRate, 3);
   const boosted = throwsIn(game, 4.8);
-  // Throws land on whole 1/60s steps, so the ratio is close to 2, not exactly (as with the gloves).
-  assert.ok(boosted / plain > 1.75 && boosted / plain < 2.1, `${boosted} throws against ${plain}`);
+  // Throws land on whole 1/60s steps, so the ratio is close to 3, not exactly (as with the gloves).
+  assert.ok(boosted / plain > 2.6 && boosted / plain < 3.1, `${boosted} throws against ${plain}`);
 });
 
-test('syringe: while it works, bacteria turn into dirtballs twice as fast', () => {
-  const throwsToBall = (gadgets) => {
-    const game = quietGame(withGadgets(...gadgets));
-    if (gadgets.length) game.update(STEP, press(0));
-    const b = game.addBacteria(0, 0);
-    let n = 0;
-    while (!b.addDirt(game.dirtPower)) n += 1;
-    return n + 1;
-  };
-  assert.equal(throwsToBall([]), 5);
-  assert.equal(throwsToBall(['syringe']), 3, 'double dirt: 2 + 2 + 2 (whole throws, so 3 rather than 2.5)');
-  const game = quietGame(withGadgets('syringe'));
+test('booster: he walks three times as fast while it works', () => {
+  const plain = walked(quietGame(), 0.5);
+  const game = quietGame(withGadgets('booster'));
   game.update(STEP, press(0));
-  game.boost = ITEMS.bagTime;
-  assert.equal(game.dirtPower, ITEMS.bagBoost * 2, 'the bag on top: they stack');
+  const boosted = walked(game, 0.5);
+  assert.ok(Math.abs(boosted / plain - 3) < 0.05, `${boosted} against ${plain}`);
 });
 
-test('syringe: then 2 seconds grey, at half speed and half distance; then himself, and 20 seconds to recharge', () => {
-  const plain = throwsIn(quietGame(), 1.9);
-  const game = quietGame(withGadgets('syringe'));
+test('booster: while it works, bacteria turn into dirtballs three times as fast', () => {
+  assert.equal(throwsToBall(quietGame()), 5);
+  const game = quietGame(withGadgets('booster'));
+  game.update(STEP, press(0));
+  assert.equal(game.dirtPower, 3);
+  assert.equal(throwsToBall(game), 2, 'triple dirt: 3 + 3 (whole throws, so 2 rather than 1.4)');
+  game.bag = ITEMS.bag.time;
+  assert.equal(game.dirtPower, ITEMS.bag.dirt * 3, 'the bag on top: they stack');
+  assert.equal(throwsToBall(game), 1, 'with the bag too, one throw does it');
+});
+
+test('booster: then 2 seconds grey, at a third of everything; then himself, and 20 seconds to recharge', () => {
+  const plainThrows = throwsIn(quietGame(), 1.9);
+  const plainWalk = walked(quietGame(), 0.5);
+  const game = quietGame(withGadgets('booster'));
   game.update(STEP, press(0));
   game.drainEvents();
   run(game, 5);
-  assert.equal(game.syringe, 'crash');
-  assert.ok(game.drainEvents().some((e) => e.type === 'syringeCrash'), 'it says when it wears off');
-  assert.equal(game.shotRange, SHOT.range * 0.5);
-  assert.equal(game.dirtPower, 1, 'his dirt is back to normal');
+  assert.equal(game.booster, 'crash');
+  assert.ok(game.drainEvents().some((e) => e.type === 'boosterCrash'), 'it says when it wears off');
+  assert.ok(Math.abs(game.shotRange - SHOT.range / 3) < 1e-9);
+  assert.ok(Math.abs(game.dirtPower - 1 / 3) < 1e-9, 'a third of the dirt');
+  assert.ok(Math.abs(game.walkSpeed - 1 / 3) < 1e-9);
+  const crawl = walked(game, 0.5);
+  assert.ok(Math.abs(crawl / plainWalk - 1 / 3) < 0.05, `${crawl} against ${plainWalk}`);
   game.klay.cooldown = 0;
-  const crashed = throwsIn(game, 1.9);
-  assert.ok(crashed <= Math.ceil(plain / 2) && crashed >= Math.floor(plain / 2) - 1, `${crashed} throws against ${plain}`);
+  const crashed = throwsIn(game, 1.4);
+  const plainIn14 = plainThrows * (1.4 / 1.9);
+  assert.ok(crashed <= Math.ceil(plainIn14 / 3) + 1 && crashed >= Math.floor(plainIn14 / 3) - 1, `${crashed} throws against ${plainIn14}`);
   run(game, 0.2);
-  assert.equal(game.syringe, null, 'after 7 seconds in all');
+  assert.equal(game.booster, null, 'after 7 seconds in all');
   assert.equal(game.shotRange, SHOT.range);
+  assert.equal(game.walkSpeed, 1);
   const g = game.gadgets[0];
   assert.ok(g.wait > 19.5, 'then the 20 seconds start');
   game.update(STEP, press(0));
-  assert.equal(game.syringe, null, 'not ready yet');
+  assert.equal(game.booster, null, 'not ready yet');
 });
 
-test('syringe: with gloves, both count', () => {
-  const game = quietGame({ tools: ['gloves'], gadgets: ['syringe'] });
+test('booster: with gloves, both count', () => {
+  const game = quietGame({ tools: ['gloves'], gadgets: ['booster'] });
   game.update(STEP, press(0));
-  assert.ok(Math.abs(game.fireRate - 1.15 * 2) < 1e-9);
-  assert.ok(Math.abs(game.shotRange - SHOT.range * 1.15 * 2) < 1e-9);
+  assert.ok(Math.abs(game.fireRate - 1.15 * 3) < 1e-9);
+  assert.ok(Math.abs(game.shotRange - SHOT.range * 1.15 * 3) < 1e-9);
+});
+
+test('a save from before the rename keeps its syringe, as the booster', () => {
+  const storage = memory();
+  storage.setItem(SAVE, JSON.stringify({ coins: 5, owned: ['sprout', 'syringe'], gadgets: ['syringe'] }));
+  const w = new Wallet(storage);
+  assert.equal(w.owns('booster'), true);
+  assert.deepEqual(w.gadgets, ['booster']);
+  assert.deepEqual(w.loadout.gadgets, ['booster']);
+});
+
+// -------------------------------------------------------------------- bag
+
+test('bag (v21): 5.5 seconds, throwing and walking 27.5% up, dirt 1.5; distance as it was', () => {
+  assert.ok(Math.abs(ITEMS.bag.time - 5.5) < 1e-9, '45% shorter than 10 seconds');
+  assert.ok(Math.abs(ITEMS.bag.fireRate - 1.275) < 1e-9, 'its 50% raise cut by 45%');
+  assert.ok(Math.abs(ITEMS.bag.speed - 1.275) < 1e-9);
+  assert.equal(ITEMS.bag.dirt, 1.5);
+  const plain = walked(quietGame(), 0.5);
+  const game = quietGame();
+  game.useItem({ type: 'bag', x: 0, y: 0 });
+  assert.equal(game.shotRange, SHOT.range, 'it never stretched his throws');
+  const bagged = walked(game, 0.5);
+  assert.ok(Math.abs(bagged / plain - 1.275) < 0.02, `${bagged} against ${plain}`);
+  run(game, 5.1);
+  assert.equal(game.bag, 0, 'over after 5.5 seconds');
+  assert.equal(game.fireRate, 1);
 });

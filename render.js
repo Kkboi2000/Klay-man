@@ -26,9 +26,9 @@ const SWEAT = ['#8fe3ff', '#d4f0ff'];
 const HP = { full: '#6aa84f', half: '#ffd25a', low: '#d9483b' };
 const LEAF_SPIN = 2.8;            // the gadget leaves, radians a second round Klayman
 const DUG = ['#c9a46a', '#e0c08a', '#a07c45'];   // the shovel's light-brown dirt
-const RUSH = ['#ff5a4a', '#ffb070', '#ffe9a8'];   // the syringe: red sparks
+const RUSH = ['#ff5a4a', '#ffb070', '#ffe9a8'];   // the booster: red sparks
 const DULL = ['#8a8a8a', '#b0b0b0'];              // ...and grey once it wears off
-const BIG = 1.2;                  // how much bigger the syringe makes him
+const BIG = 1.2;                  // how much bigger the booster makes him
 // What the glasses call each of a sprout's powers, above the sprout.
 const POWER_WORDS = { coin: 'coin', item: 'item', closes: 'closes', opens: 'opens', spores: 'spores', heal: 'heal', grow: 'grow' };
 const ROLL = 0.5;                 // seconds a corn or lily takes to close up or open
@@ -228,7 +228,7 @@ export class Renderer {
         // -------------------------------------------------------- gadgets
         case 'gadget':
           if (e.id === 'leaf') this.burst(e.x, e.y - 18, 16, LEAF, 120, -30);
-          if (e.id === 'syringe') {
+          if (e.id === 'booster') {
             this.ring(e.x, e.y - 4, 70, 0.4, '#ff5a4a', '#ffd0c0');
             this.burst(e.x, e.y - 22, 18, RUSH, 130, -40);
           }
@@ -238,7 +238,7 @@ export class Renderer {
           }
           break;
         case 'mist': this.mist(); break;
-        case 'syringeCrash':
+        case 'boosterCrash':
           this.burst(e.x, e.y - 22, 14, DULL, 70, -10);
           this.popup('Worn off', e.x, e.y - 58, 1.1, '#c8c8c8');
           break;
@@ -388,6 +388,7 @@ export class Renderer {
     things.sort((a, b) => a.y - b.y);
     for (const t of things) t.draw();
     if (game.lock?.lockable && !game.over) this.drawLock(game.lock);
+    if (game.klay.steering && !game.over) this.drawAim(game.klay);
 
     if (game.frozen) this.drawFrost(game.freeze);
     if (game.gear.glasses && !game.over) this.drawGuides(game);
@@ -433,8 +434,8 @@ export class Renderer {
     const { ctx } = this;
     const W = this.cssW;
     const H = this.cssH;
-    const top = 80;               // keep clear of the score and coins...
-    const bottom = this.markerBottom ?? 0; // ...and of the gadget buttons, on a computer
+    const top = this.markerTop ?? 80;    // keep clear of the score bar and the gadget buttons
+    const bottom = 0;
     const pad = 16;
     const cx = W / 2;
     const cy = (H + top - bottom) / 2;
@@ -697,9 +698,9 @@ export class Renderer {
     const jitter = k.stun > 0 && !this.calm ? Math.sin(this.time * 70) * 1.5 : 0;
     const { ctx } = this;
 
-    // The syringe: red, bigger and glowing for its boost, then grey.
-    const shot = game.gadgets.find((g) => g.id === 'syringe' && g.active);
-    const phase = game.syringe;
+    // The booster: red, bigger and glowing for its boost, then grey.
+    const shot = game.gadgets.find((g) => g.id === 'booster' && g.active);
+    const phase = game.booster;
     let grow = 1;
     let red = 0;
     let grey = 0;
@@ -718,7 +719,7 @@ export class Renderer {
     if (red > 0) this.glow(k, red);
     if (grey > 0 && !this.calm && Math.random() < 0.1) this.burst(k.x, k.y - 30, 1, DULL, 20, 30);
 
-    if (game.boost > 0) {
+    if (game.bag > 0) {
       const pulse = 0.25 + 0.12 * Math.sin(this.time * 10);
       const { ctx } = this;
       ctx.fillStyle = `rgba(255,214,90,${pulse})`;
@@ -750,7 +751,7 @@ export class Renderer {
     ctx.restore();
   }
 
-  /** The syringe's glow round Klayman: red rings, pulsing, and sparks rising. */
+  /** The booster's glow round Klayman: red rings, pulsing, and sparks rising. */
   glow(k, strength) {
     const { ctx } = this;
     const pulse = this.calm ? 0.5 : 0.5 + 0.5 * Math.sin(this.time * 9);
@@ -868,6 +869,26 @@ export class Renderer {
         ctx.lineTo(x + sx * (half.w - arm), y + sy * half.h);
       }
       ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /** The K button steered by hand (a phone): four chalk dots stepping out
+   *  from his hand, fading, the way the next throw goes. */
+  drawAim(k) {
+    const { ctx } = this;
+    const a = k.aim;
+    const lift = SHOT.height;
+    ctx.save();
+    for (let i = 0; i < 4; i++) {
+      const d = 26 + i * 14;
+      const x = Math.round((k.x + a.x * d) / 2) * 2;
+      const y = Math.round((k.y + a.y * d - lift) / 2) * 2;
+      ctx.globalAlpha = 0.85 - i * 0.18;
+      ctx.fillStyle = '#2b1a0c';
+      ctx.fillRect(x - 3, y - 3, 6, 6);
+      ctx.fillStyle = '#fff4e3';
+      ctx.fillRect(x - 2, y - 2, 4, 4);
     }
     ctx.restore();
   }
