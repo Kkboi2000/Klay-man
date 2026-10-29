@@ -38,7 +38,7 @@ export const BACTERIA = {
   // Dirt that makes a dirtball, counted in throws (bacteria.gd had 7). It
   // was 4, then 15% more, then 10% less: 4.14. Throws are whole, so that's
   // still five plain throws, but three with medicine (it was four), and
-  // three with the booster.
+  // two with the booster.
   maxDirt: 4 * 1.15 * 0.9,
   decayTime: 2.5,            // seconds to shed one layer (bacteria.gd had 1.2)
   levelSpeedUp: 1.05,        // +5% per level
@@ -118,7 +118,7 @@ export const BOSS = {
   foot: { rx: 80, ry: 44, lift: 16 },
   corner: 70,                // how far in from the rim, at a corner of the pot
   hpPerLevel: 10,
-  shotDamage: 1,             // a throw (medicine makes it 1.5, the booster 2)
+  shotDamage: 1,             // a throw (medicine makes it 1.5, the booster 2.5)
   ballDamage: 5,             // a rolling dirtball (thrown dirt doesn't break dirtballs while a boss is out)
   // Seconds between the bacteria it sends out: 2.5 at level 10, and 0.625
   // less every boss level after (1.875 at 15, 1.25 at 20), never under 1
@@ -210,14 +210,18 @@ export const SPROUTS = {
 };
 
 // Gadgets: bought once; one per game (two with the gadget slot). Used with
-// G (and H) on a computer, or their buttons in the game's top-right corner. After its effect, each takes `cooldown` seconds to be ready again.
+// G (and H) on a computer, or their buttons in the game's top-right corner.
+// After its effect, each takes COOLDOWN seconds to be ready again (v23: 15,
+// for every gadget; it was 20).
+const COOLDOWN = 15;
+
 export const GADGETS = {
   leaf: {
     price: 39,
     reach: 25 * UNIT,        // three leaves spin out this far round Klayman...
     grow: 0.5,               // ...taking this long to spread
-    time: 7,                 // their wind keeps bacteria out for 7 seconds
-    cooldown: 20,
+    time: 5,                 // their wind keeps bacteria out for 5 seconds (v23: was 7)
+    cooldown: COOLDOWN,
     preview: { reach: 25 * UNIT * 0.7 }, // 30% smaller on the setup page, to fit its window
   },
   spray: {
@@ -225,47 +229,49 @@ export const GADGETS = {
     puffs: [0.2, 0.5],       // a mist bottle by the sprout sprays twice...
     heal: 0.5,               // ...and the sprout gets half a heart back
     time: 0.75,
-    cooldown: 20,
+    cooldown: COOLDOWN,
   },
   shovel: {
     price: 39,
-    reach: 60 * UNIT,        // Klayman digs; dirt flies over this far round him (v22: twice the 30 units)...
+    reach: 60 * UNIT * 0.7,  // Klayman digs; dirt flies over this far round him (42 units: v22's 60, 30% smaller)...
     dig: 0.4,                // ...the moment the blade comes up...
     dirt: 2,                 // ...and every bacteria in it gets two layers more (v22: was one)
     time: 0.75,              // he stands and digs this long
-    cooldown: 20,
+    cooldown: COOLDOWN,
     preview: { reach: 30 * UNIT * 0.7 }, // the setup page: 30% smaller than the old 30 units, to fit its window
   },
   booster: {
     price: 39,
     // A shot of something: red, a little bigger and glowing. For 4 seconds
-    // he throws twice as fast and twice as far, walks twice as fast, and his
-    // dirt counts double...
-    boost: { time: 4, fireRate: 2, range: 2, speed: 2, dirt: 2 },
+    // he throws 2.5 times as fast and as far, walks 2.5 times as fast, and
+    // his dirt counts 2.5 times. (The setup page still says twice, on
+    // purpose: the real thing is a little stronger than it promises.)...
+    boost: { time: 4, fireRate: 2.5, range: 2.5, speed: 2.5, dirt: 2.5 },
     // ...then it wears off: grey, and for 2 seconds all four drop to half.
     crash: { time: 2, fireRate: 0.5, range: 0.5, speed: 0.5, dirt: 0.5 },
     time: 4 + 2,
-    cooldown: 20,            // counted from when he's himself again
+    cooldown: COOLDOWN,      // counted from when he's himself again
   },
   fertilizer: {
     price: 39,
     slowFactor: 0.3,         // every bacteria crawls 70% slower...
     time: 5,                 // ...for 5 seconds
-    cooldown: 20,
+    cooldown: COOLDOWN,
   },
 };
 
 // Seasons: the weather over the pot. Bought once (169K each); one per game,
-// picked on the setup page under Plant > Vase. None of them touches a boss
+// picked on the setup page under Plant > Season. None of them touches a boss
 // (the bacteria it sends out are ordinary bacteria, so they do feel it).
 export const SEASONS = {
-  // Brighter. Every minute the sun spotlights the sprout and it grows half a
-  // heart, up to 2 hearts more than it could hold.
-  summer: { price: 169, sun: { every: 60, grow: 0.5, max: 2 } },
-  // Bluish. Every bacteria crawls 10% slower.
-  winter: { price: 169, bacteriaPace: 0.9 },
-  // A breeze now and then. Every sprout power comes round 10% sooner.
-  spring: { price: 169, sproutPace: 1.1 },
+  // Brighter. Every 50 seconds the sun spotlights the sprout and it grows
+  // half a heart, up to 2 hearts more than it could hold.
+  summer: { price: 169, sun: { every: 50, grow: 0.5, max: 2 } },
+  // Bluish. Every bacteria crawls 15% slower.
+  winter: { price: 169, bacteriaPace: 0.85 },
+  // A breeze now and then. Every sprout power comes round 15% sooner: its
+  // wait is 85% as long (a rose heals every 17 seconds, not 20).
+  spring: { price: 169, sproutWait: 0.85 },
   // Big trees' leaves and branches shade the pot. Dirtballs never crack open,
   // and dirt takes 50% longer to wear off a bacteria.
   autumn: { price: 169, dirtballsHold: true, decay: 1.5 },

@@ -721,9 +721,9 @@ test('gadgets cost 39K; the 2nd gadget slot 99K; the 2nd tool slot 199K; the 2nd
   assert.equal(SLOTS.sproutSlot.price, 399);
 });
 
-test('leaf: its wind keeps bacteria out of a ring 25 units round Klayman for 7 seconds, then 20 to cool down', () => {
+test('leaf (v23): its wind keeps bacteria out of a ring 25 units round Klayman for 5 seconds, then 15 to cool down', () => {
   assert.equal(GADGETS.leaf.reach, 150);
-  assert.equal(GADGETS.leaf.time, 7);
+  assert.equal(GADGETS.leaf.time, 5);
   const game = quietGame(withGadgets('leaf'));
   const k = game.klay;
   k.x = game.tree.x + 160; k.y = game.tree.y;              // standing in the way to the sprout
@@ -737,7 +737,7 @@ test('leaf: its wind keeps bacteria out of a ring 25 units round Klayman for 7 s
   const inRing = (p) => Math.hypot((p.x - k.x) / (reach + 13), (p.y - k.y) / (reach * RING_SQUASH + 13));
   assert.ok(inRing(b) >= 0.999, `pushed out (${inRing(b).toFixed(3)})`);
   let closest = Infinity;
-  for (let t = 0; t < 6; t += STEP) {
+  for (let t = 0; t < 4; t += STEP) {
     game.update(STEP);
     if (b.alive) closest = Math.min(closest, dist(b, k));
   }
@@ -745,8 +745,8 @@ test('leaf: its wind keeps bacteria out of a ring 25 units round Klayman for 7 s
   assert.equal(k.poisoned, false, 'it never got in');
   const leaf = game.gadgets[0];
   run(game, 0.5);
-  assert.equal(leaf.active, false, 'the wind stops after 7 seconds');
-  assert.ok(Math.abs(leaf.wait - 20) < 0.5, 'then it cools down for 20');
+  assert.equal(leaf.active, false, 'the wind stops after 5 seconds');
+  assert.ok(Math.abs(leaf.wait - 15) < 0.5, 'then it cools down for 15');
   game.update(STEP, press(0));
   assert.equal(leaf.active, false, 'it can’t be used while cooling down');
   run(game, leaf.wait + 0.05);
@@ -763,7 +763,7 @@ test('mist spray: sprays the sprout twice in 0.75 seconds, half a heart back', (
   const events = game.drainEvents();
   assert.equal(events.filter((e) => e.type === 'mist').length, 2);
   assert.equal(game.lives, 1.5);
-  assert.equal(game.gadgets[0].wait > 19, true, 'then 20 seconds to cool down');
+  assert.ok(Math.abs(game.gadgets[0].wait - 15) < 0.2, 'then 15 seconds to cool down');
   game.gadgets[0].wait = 0;
   game.lives = game.maxLives;
   game.update(STEP, press(0));
@@ -818,8 +818,9 @@ test('gadgets are saved with the wallet', () => {
   assert.deepEqual(again.loadout.gadgets, ['leaf', 'fertilizer']);
 });
 
-test('shovel (v22): Klayman digs for 0.75 seconds; every bacteria within 60 units gets two layers of dirt', () => {
-  assert.equal(GADGETS.shovel.reach, 360, 'twice the old 30 units');
+test('shovel (v23): Klayman digs for 0.75 seconds; every bacteria within 42 units gets two layers of dirt', () => {
+  assert.ok(Math.abs(GADGETS.shovel.reach - 360 * 0.7) < 1e-9, 'v22’s 60 units, 30% smaller');
+  assert.ok(Math.abs(GADGETS.shovel.preview.reach - 126) < 1e-9, 'the setup page’s ring as it was');
   assert.equal(GADGETS.shovel.dirt, 2);
   const game = quietGame(withGadgets('shovel'));
   const k = game.klay;
@@ -828,7 +829,7 @@ test('shovel (v22): Klayman digs for 0.75 seconds; every bacteria within 60 unit
   dirty.addDirt(2);
   const deep = game.addBacteria(k.x, k.y - 60);
   deep.addDirt(BACTERIA.maxDirt - 1);                 // one throw from a dirtball
-  const far = game.addBacteria(k.x + 400, k.y);
+  const far = game.addBacteria(k.x + 290, k.y);
   const ball = game.addDirtball(k.x + 60, k.y + 40);
   game.drainEvents();
   game.update(STEP, press(0));
@@ -847,7 +848,7 @@ test('shovel (v22): Klayman digs for 0.75 seconds; every bacteria within 60 unit
   assert.equal(game.dirtballs.length, 2);
   run(game, 0.3, { ...NO_INPUT, x: 1 });
   assert.ok(k.x > x0, 'done after 0.75 seconds: he walks again');
-  assert.ok(game.gadgets[0].wait > 19, 'and the shovel needs 20 seconds');
+  assert.ok(Math.abs(game.gadgets[0].wait - 15) < 0.5, 'and the shovel needs 15 seconds');
 });
 
 test('the glasses’ sprout clocks: what comes next, and when', () => {
@@ -897,39 +898,40 @@ test('the booster was the hypodermic syringe: same price, new name', () => {
   assert.equal(GADGETS.syringe, undefined);
 });
 
-test('booster (v22): 4 seconds red, throwing twice as fast and twice as far', () => {
+test('booster (v23): 4 seconds red, throwing 2.5 times as fast and as far (the setup page says twice)', () => {
   assert.equal(GADGETS.booster.boost.time, 4);
+  assert.match(CATALOG.booster.says, /twice as fast/, 'the shop still promises twice');
   const plain = throwsIn(quietGame(), 3.8);
   const game = quietGame(withGadgets('booster'));
   game.update(STEP, press(0));
   assert.equal(game.booster, 'boost');
-  assert.equal(game.shotRange, SHOT.range * 2);
-  assert.equal(game.fireRate, 2);
+  assert.equal(game.shotRange, SHOT.range * 2.5);
+  assert.equal(game.fireRate, 2.5);
   const boosted = throwsIn(game, 3.8);
-  // Throws land on whole 1/60s steps, so the ratio is close to 2, not exactly (as with the gloves).
-  assert.ok(boosted / plain > 1.75 && boosted / plain < 2.1, `${boosted} throws against ${plain}`);
+  // Throws land on whole 1/60s steps, so the ratio is close to 2.5, not exactly (as with the gloves).
+  assert.ok(boosted / plain > 2.2 && boosted / plain < 2.6, `${boosted} throws against ${plain}`);
 });
 
-test('booster: he walks twice as fast while it works', () => {
+test('booster: he walks 2.5 times as fast while it works', () => {
   const plain = walked(quietGame(), 0.5);
   const game = quietGame(withGadgets('booster'));
   game.update(STEP, press(0));
   const boosted = walked(game, 0.5);
-  assert.ok(Math.abs(boosted / plain - 2) < 0.05, `${boosted} against ${plain}`);
+  assert.ok(Math.abs(boosted / plain - 2.5) < 0.05, `${boosted} against ${plain}`);
 });
 
-test('booster: while it works, his dirt counts double', () => {
+test('booster: while it works, his dirt counts 2.5 times', () => {
   assert.equal(throwsToBall(quietGame()), 5);
   const game = quietGame(withGadgets('booster'));
   game.update(STEP, press(0));
-  assert.equal(game.dirtPower, 2);
-  assert.equal(throwsToBall(game), 3, 'double dirt: 2 + 2 + 2 (whole throws, so 3 rather than 2.07)');
+  assert.equal(game.dirtPower, 2.5);
+  assert.equal(throwsToBall(game), 2, '2.5 + 2.5 (whole throws, so 2 rather than 1.66)');
   game.medicine = ITEMS.medicine.time;
-  assert.equal(game.dirtPower, ITEMS.medicine.dirt * 2, 'medicine on top: they stack');
-  assert.equal(throwsToBall(game), 2, 'with medicine too, two throws do it');
+  assert.equal(game.dirtPower, ITEMS.medicine.dirt * 2.5, 'medicine on top: they stack');
+  assert.equal(throwsToBall(game), 2, 'with medicine too, still two (3.75 + 3.75)');
 });
 
-test('booster: then 2 seconds grey, at half of everything; then himself, and 20 seconds to recharge', () => {
+test('booster: then 2 seconds grey, at half of everything; then himself, and 15 seconds to recharge', () => {
   const plainThrows = throwsIn(quietGame(), 1.9);
   const plainWalk = walked(quietGame(), 0.5);
   const game = quietGame(withGadgets('booster'));
@@ -952,7 +954,7 @@ test('booster: then 2 seconds grey, at half of everything; then himself, and 20 
   assert.equal(game.shotRange, SHOT.range);
   assert.equal(game.walkSpeed, 1);
   const g = game.gadgets[0];
-  assert.ok(g.wait > 19.5, 'then the 20 seconds start');
+  assert.ok(Math.abs(g.wait - 15) < 0.5, 'then the 15 seconds start');
   game.update(STEP, press(0));
   assert.equal(game.booster, null, 'not ready yet');
 });
@@ -960,8 +962,12 @@ test('booster: then 2 seconds grey, at half of everything; then himself, and 20 
 test('booster: with gloves, both count', () => {
   const game = quietGame({ tools: ['gloves'], gadgets: ['booster'] });
   game.update(STEP, press(0));
-  assert.ok(Math.abs(game.fireRate - 1.15 * 2) < 1e-9);
-  assert.ok(Math.abs(game.shotRange - SHOT.range * 1.15 * 2) < 1e-9);
+  assert.ok(Math.abs(game.fireRate - 1.15 * 2.5) < 1e-9);
+  assert.ok(Math.abs(game.shotRange - SHOT.range * 1.15 * 2.5) < 1e-9);
+});
+
+test('every gadget recharges in 15 seconds (v23)', () => {
+  for (const id of GADGET_IDS) assert.equal(GADGETS[id].cooldown, 15, id);
 });
 
 test('a save from before the rename keeps its syringe, as the booster', () => {

@@ -102,19 +102,19 @@ test('a save from before seasons loads with none', () => {
 
 // ------------------------------------------------------------------ summer
 
-test('summer: every minute the sun grows the sprout half a heart, up to 2 more, then stops', () => {
+test('summer (v23): every 50 seconds the sun grows the sprout half a heart, up to 2 more, then stops', () => {
   const game = quietGame('summer');
-  assert.deepEqual(game.sproutClocks.map((c) => `${c.power} ${Math.ceil(c.secs)}`), ['sun 60'], 'the glasses count it down');
-  run(game, 59.9);
+  assert.deepEqual(game.sproutClocks.map((c) => `${c.power} ${Math.ceil(c.secs)}`), ['sun 50'], 'the glasses count it down');
+  run(game, 49.9);
   assert.equal(game.maxLives, 3);
   game.drainEvents();
   run(game, 0.2);
   assert.equal(game.maxLives, 3.5);
   assert.equal(game.lives, 3.5, 'and the new half heart comes full');
   assert.ok(game.drainEvents().some((e) => e.type === 'sunshine'));
-  run(game, 180);
-  assert.equal(game.maxLives, 5, '+2 after four minutes');
-  run(game, 120);
+  run(game, 150);
+  assert.equal(game.maxLives, 5, '+2 after four suns (200 seconds)');
+  run(game, 100);
   assert.equal(game.maxLives, 5, 'and no more');
   assert.deepEqual(game.sproutClocks, [], 'nothing left to count down');
 });
@@ -134,7 +134,7 @@ test('summer raises the sprout’s limit too, so water drops still grow it', () 
 
 // ------------------------------------------------------------------ winter
 
-test('winter: every bacteria crawls 10% slower', () => {
+test('winter (v23): every bacteria crawls 15% slower', () => {
   const crawled = (season) => {
     const game = quietGame(season);
     const b = game.addBacteria(game.tree.x + 300, game.tree.y);
@@ -144,34 +144,36 @@ test('winter: every bacteria crawls 10% slower', () => {
   };
   const plain = crawled(null);
   const cold = crawled('winter');
-  assert.ok(Math.abs(cold / plain - 0.9) < 0.02, `${cold.toFixed(1)} against ${plain.toFixed(1)}`);
+  assert.ok(Math.abs(cold / plain - 0.85) < 0.02, `${cold.toFixed(1)} against ${plain.toFixed(1)}`);
 });
 
 test('winter and the fertilizer slow bacteria together', () => {
   const game = quietGame('winter', { gadgets: ['fertilizer'] });
   game.update(STEP, { ...NO_INPUT, gadget: 0 });
-  assert.ok(Math.abs(game.pace - GADGETS.fertilizer.slowFactor * 0.9) < 1e-9);
+  assert.ok(Math.abs(game.pace - GADGETS.fertilizer.slowFactor * 0.85) < 1e-9);
   assert.equal(game.fertilized, true);
   assert.equal(quietGame('winter').fertilized, false, 'winter alone isn’t the fertilizer');
 });
 
 // ------------------------------------------------------------------ spring
 
-test('spring: every sprout power comes round 10% sooner', () => {
+test('spring (v23): every sprout power comes round 15% sooner (its wait is 85% as long)', () => {
   const plain = gearFor({ sprout: 'mushroom' });
   const spring = gearFor({ sprout: 'mushroom', season: 'spring' });
-  assert.ok(Math.abs(spring.spores.every - SPROUTS.mushroom.spores.every / 1.1) < 1e-9);
-  assert.ok(Math.abs(spring.heal.every - plain.heal.every / 1.1) < 1e-9);
-  assert.ok(Math.abs(spring.growEvery - plain.growEvery / 1.1) < 1e-9);
+  assert.ok(Math.abs(spring.spores.every - SPROUTS.mushroom.spores.every * 0.85) < 1e-9);
+  assert.ok(Math.abs(spring.heal.every - plain.heal.every * 0.85) < 1e-9);
+  assert.ok(Math.abs(spring.growEvery - plain.growEvery * 0.85) < 1e-9);
   assert.equal(spring.spores.reach, plain.spores.reach, 'only sooner, no bigger');
-  assert.ok(Math.abs(gearFor({ sprout: 'daisy', season: 'spring' }).coinEvery - 30 / 1.1) < 1e-9);
+  assert.ok(Math.abs(gearFor({ sprout: 'daisy', season: 'spring' }).coinEvery - 30 * 0.85) < 1e-9);
   const corn = gearFor({ sprout: 'corn', season: 'spring' });
-  assert.ok(Math.abs(corn.shield.every - 40 / 1.1) < 1e-9);
+  assert.ok(Math.abs(corn.shield.every - 40 * 0.85) < 1e-9);
   assert.equal(corn.shield.time, 15, 'and closed just as long');
   const game = quietGame('spring', { sprouts: ['rose'] });
   game.lives = 3;
-  run(game, 20 / 1.1 + 0.05);
-  assert.equal(game.lives, 4, 'a rose heals at 18 seconds, not 20');
+  run(game, 16.9);
+  assert.equal(game.lives, 3);
+  run(game, 0.2);
+  assert.equal(game.lives, 4, 'a rose heals at 17 seconds, not 20');
 });
 
 // ------------------------------------------------------------------ autumn
@@ -205,7 +207,7 @@ test('rainy: every minute lightning kills a bacteria on the spot', () => {
   const b = game.addBacteria(game.tree.x + 250, game.tree.y);
   b.speed = 0;
   run(game, 59.9);
-  assert.equal(b.alive, true);
+  assert.equal(b.alive, true, 'the storm keeps its minute');
   game.drainEvents();
   run(game, 0.2);
   const events = game.drainEvents();

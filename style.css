@@ -686,7 +686,7 @@ body {
 .setup-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-end;
   gap: 1rem;
 }
 
@@ -721,8 +721,69 @@ body {
   line-height: 1.3;
 }
 
-/* The shop in groups: Klayman (tool, gadget), Plant (sprout, vase), then
-   slots and level skips. A group's shelves sit indented on a clay rule. */
+/* Setup's own page, and Klayman's and the plant's: one shows at a time,
+   under the window into the pot. */
+.setup-view { display: grid; gap: 1rem; }
+.setup-view[hidden] { display: none; }
+
+/* The title, and above it on Klayman's and the plant's pages, the way back. */
+.setup-title { display: grid; justify-items: start; gap: 0.15rem; }
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  min-height: 2.2rem;
+  padding: 0 0.6em 0 0.35em;
+  margin-left: -0.35em;
+  border: 0;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255, 244, 227, 0.8);
+  background: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.back[hidden] { display: none; }
+.back svg { width: 0.6em; height: 0.8em; fill: var(--gold); shape-rendering: crispEdges; }
+.back:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+/* The doors into Klayman's page and the plant's: what's picked behind each. */
+.doors { display: grid; gap: 0.7rem; }
+.door {
+  display: grid;
+  grid-template-columns: 3.25rem 1fr auto;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+  min-height: 5rem;
+  margin: 0;
+  padding: 0.55rem 0.9rem 0.55rem 0.7rem;
+  border: 0;
+  font: inherit;
+  color: var(--chalk);
+  text-align: left;
+  background: rgba(255, 244, 227, 0.07);
+  box-shadow: 0 -3px var(--ink), 0 3px var(--ink), -3px 0 var(--ink), 3px 0 var(--ink),
+    inset 0 -0.25rem 0 rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.door:active { transform: translateY(2px); }
+.door:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+.door-pic { display: grid; place-items: center; width: 3.25rem; height: 3.25rem; }
+.door-pic canvas { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.door-text { display: grid; gap: 0.15rem; min-width: 0; }
+.door-name {
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--clay-light);
+}
+.door-says { font-size: 0.9rem; line-height: 1.3; color: rgba(255, 244, 227, 0.72); }
+.door-arrow { width: 0.75rem; height: 1rem; fill: var(--gold); shape-rendering: crispEdges; }
+
+/* Slots and level skips, on setup's own page. */
 .group { display: grid; gap: 0.8rem; margin-top: 0.4rem; }
 .group-name {
   margin: 0;
@@ -733,10 +794,6 @@ body {
   text-shadow: 2px 0 var(--ink), -2px 0 var(--ink), 0 2px var(--ink), 0 -2px var(--ink), 0 4px var(--ink);
 }
 .group-name .shelf-note { text-shadow: none; }
-.group > .shelf {
-  padding-left: 0.75rem;
-  box-shadow: inset 3px 0 rgba(217, 138, 69, 0.4);
-}
 .shelf { display: grid; gap: 0.5rem; }
 .shelf-head { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
 

@@ -13,6 +13,7 @@ import { SOIL, WORLD } from './world.js';
 const SUN_TIME = 2.4;            // seconds the sun spotlights the sprout
 const BOLT_TIME = 0.35;          // seconds a lightning bolt stays
 const SHADE = 5;                 // autumn's shade is drawn in blocks this big (world units)
+const BREEZE_PX = 4;             // spring's breeze is drawn in blocks this big (CSS pixels)
 
 /** The same "random" every time, so autumn's trees stand still between games. */
 function seeded(seed) {
@@ -248,7 +249,9 @@ export class Weather {
     ctx.restore();
   }
 
-  /** Spring: now and then a breeze blows across, with a few petals in it. */
+  /** Spring: now and then a breeze blows across, with a few petals in it.
+   *  It's drawn on a small canvas, a pixel per BREEZE_PX, then blown up
+   *  without smoothing, so every streak and petal is made of chunky pixels. */
   breeze(ctx, w, h, dt) {
     if (this.gust <= 0) {
       this.nextGust -= dt;
@@ -266,22 +269,41 @@ export class Weather {
     this.gust = Math.max(0, this.gust - dt);
     const fade = Math.min(1, this.gust / 0.6, (2.6 - this.gust) / 0.4);
     const speed = w / 1.4;
-    ctx.save();
-    ctx.fillStyle = `rgba(255, 250, 235, ${0.32 * fade})`;
+    const gw = Math.ceil(w / BREEZE_PX);
+    const gh = Math.ceil(h / BREEZE_PX);
+    this.pixels ??= document.createElement('canvas');
+    if (this.pixels.width !== gw || this.pixels.height !== gh) {
+      this.pixels.width = gw;
+      this.pixels.height = gh;
+    }
+    const g = this.pixels.getContext('2d');
+    g.clearRect(0, 0, gw, gh);
+    const cell = (x) => Math.floor(x / BREEZE_PX);
+    // Streaks: a wavy line a pixel thick, with a gap now and then.
+    g.fillStyle = 'rgba(255, 250, 235, 0.5)';
     for (const s of this.streaks) {
       s.x += speed * dt;
-      for (let i = 0; i < s.len; i += 4) {
-        const y = s.y + Math.sin((s.x + i) / 38 + s.phase) * 6;
-        ctx.fillRect(Math.round(s.x + i), Math.round(y), 4, 2);
+      const n = cell(s.len);
+      for (let i = 0; i < n; i++) {
+        if (i % 9 === 6) continue;
+        const x = s.x + i * BREEZE_PX;
+        g.fillRect(cell(x), cell(s.y + Math.sin(x / 38 + s.phase) * 6), 1, 1);
       }
     }
+    // Petals: two pixels, tumbling.
     for (const p of this.petals) {
       p.x += speed * 0.8 * dt;
       p.phase += dt * 5;
-      ctx.globalAlpha = fade;
-      ctx.fillStyle = p.color;
-      ctx.fillRect(Math.round(p.x), Math.round(p.y + Math.sin(p.phase) * 10), 4, 3);
+      const x = cell(p.x);
+      const y = cell(p.y + Math.sin(p.phase) * 10);
+      g.fillStyle = p.color;
+      if (Math.cos(p.phase) > 0) g.fillRect(x, y, 2, 1);
+      else g.fillRect(x, y, 1, 2);
     }
+    ctx.save();
+    ctx.globalAlpha = fade;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(this.pixels, 0, 0, gw * BREEZE_PX, gh * BREEZE_PX);
     ctx.restore();
   }
 }

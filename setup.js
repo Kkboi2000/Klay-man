@@ -1,7 +1,9 @@
-// The setup page: what Klayman takes (tools, gadgets), the plant (sprouts,
-// and the vase's season), buying each the first time; slots and level
-// skips; auto throw; and a window into the pot showing it all. (Revive isn't
-// sold here: the summary offers it when the sprout is lost.)
+// The setup page, with two pages of its own: Klayman's (tools, gadgets) and
+// the plant's (sprouts, the season), each opened from a door on setup's
+// first page, buying things the first time they're tapped. Setup's first
+// page also has slots, level skips and auto throw, and every page keeps the
+// window into the pot showing it all, and Start. (Revive isn't sold here:
+// the summary offers it when the sprout is lost.)
 import {
   CATALOG, TOOL_IDS, SPROUT_IDS, GADGET_IDS, SEASON_IDS, SLOT_IDS, SKIP_IDS, priceOf, kindOf, formatK,
 } from './gear.js';
@@ -19,6 +21,8 @@ const NONE = { none: NO_TOOL, noGadget: NO_GADGET, noSeason: NO_SEASON };
 /** Where Klayman's head sits in his first idle frame (the title face, and the app icon). */
 export const FACE = { x: 15, y: 19, w: 18, h: 17 };
 const SLOT_NAMES = ['1st', '2nd'];
+/** Setup's own pages: the door that opens each, and the title it shows. */
+const PAGES = { klayman: 'Klayman', plant: 'Plant' };
 
 export function pixelCanvas(source, sx, sy, sw, sh) {
   const c = document.createElement('canvas');
@@ -148,11 +152,20 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     auto: $('setup-auto'),
     admin: $('admin'),
     start: $('start'),
+    screen: $('setup'),
+    title: $('setup-name'),
+    back: $('setup-back'),
+    home: $('setup-home'),
+    pages: { klayman: $('page-klayman'), plant: $('page-plant') },
+    doors: { klayman: $('door-klayman'), plant: $('door-plant') },
+    doorPics: { klayman: document.querySelector('[data-pic="klayman"]'), plant: document.querySelector('[data-pic="plant"]') },
   };
   const showcase = new Showcase($('showcase'), sprites);
   const rows = new Map();
   let armed = null;                // tapped once: tap again to buy
   let sproutSlot = 0;              // which sprout a tap picks: 1st or 2nd
+  let page = null;                 // the page open: 'klayman', 'plant', or null for setup's own
+  el.doorPics.klayman.append(pixelCanvas(sprites.klay, 16, 19, 16, 25));
 
   function makeRow(id) {
     const info = NONE[id] ?? CATALOG[id];
@@ -284,8 +297,67 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     }
     const level = startLevel();
     el.start.textContent = level > 1 ? `Start at level ${level}` : 'Start';
+    renderPages();
     showcase.show(wallet.loadout);
   }
+
+  // ------------------------------------------------------- setup's pages
+
+  const nameOf = (id) => CATALOG[id].name;
+  const listOf = (ids) => (ids.length ? ids.map(nameOf).join(', ') : 'none');
+
+  /** Which page shows, its title and back button, and what each door says
+   *  is picked behind it. */
+  function renderPages() {
+    el.home.hidden = page !== null;
+    for (const [name, view] of Object.entries(el.pages)) view.hidden = page !== name;
+    el.title.textContent = page ? PAGES[page] : 'Setup';
+    el.back.hidden = page === null;
+    if (page) el.admin.hidden = true;
+    const { tools, gadgets, sprouts, season } = wallet.loadout;
+    el.doors.klayman.replaceChildren(`Tool: ${listOf(tools)}`, document.createElement('br'), `Gadget: ${listOf(gadgets)}`);
+    const backup = sprouts.length > 1 ? ` (2nd: ${nameOf(sprouts[1])})` : '';
+    el.doors.plant.replaceChildren(`Sprout: ${nameOf(sprouts[0])}${backup}`, document.createElement('br'),
+      `Season: ${season ? nameOf(season) : 'none'}`);
+    if (el.doorPics.plant.dataset.id !== sprouts[0]) {
+      el.doorPics.plant.dataset.id = sprouts[0];
+      el.doorPics.plant.replaceChildren(iconFor(sprouts[0], sprites));
+    }
+  }
+
+  /** Opens Klayman's or the plant's page. It's a step in the browser's
+   *  history too, so a phone's back gesture comes back to setup. */
+  function open(name) {
+    page = name;
+    armed = null;
+    say('');
+    try { history.pushState({ setupPage: name }, ''); } catch { /* no history here: the button still works */ }
+    render();
+    el.screen.scrollTop = 0;
+    el.back.focus({ preventScroll: true });
+  }
+
+  /** Back to setup's own page. `fromHistory`: the browser already stepped back. */
+  function close(fromHistory = false) {
+    if (page === null) return;
+    const was = page;
+    page = null;
+    armed = null;
+    say('');
+    if (!fromHistory && history.state?.setupPage) history.back();
+    render();
+    el.screen.scrollTop = 0;
+    document.querySelector(`[data-open="${was}"]`)?.focus({ preventScroll: true });
+  }
+
+  for (const door of document.querySelectorAll('[data-open]')) {
+    door.addEventListener('click', () => open(door.dataset.open));
+  }
+  el.back.addEventListener('click', () => close());
+  addEventListener('popstate', () => close(true));
+  addEventListener('keydown', (e) => {
+    if (e.code === 'Escape' && page !== null && !el.screen.hidden) close();
+  });
 
   el.sproutSlots.addEventListener('click', (e) => {
     const b = e.target.closest('[data-slot]');
@@ -326,12 +398,16 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
   });
 
   return {
+    /** Shows setup from its own page (coming back from a game, say). */
     render() {
       armed = null;
       say('');
-      render();
+      if (page !== null) close();
+      else render();
       showcase.resize();
     },
+    /** Leaving setup (a game starts): back to its own page for next time. */
+    leave() { close(); },
     resize: () => showcase.resize(),
     update: (dt) => showcase.update(dt),
   };

@@ -24,18 +24,20 @@ Every file sits in one folder, with no subfolders, so uploading is simple.
 ### Updating
 
 Upload the changed files the same way. Also open `sw.js` and bump `VERSION`
-(`klayman-v22` → `klayman-v23`): phones keep an offline copy, and this is how
+(`klayman-v23` → `klayman-v24`): phones keep an offline copy, and this is how
 they know to fetch the new one.
 
 ## Pages
 
 1. **Title:** Klayman’s face, over faded dirtballs rolling in from every side
    (two that meet break). Tap **Play**.
-2. **Setup:** the shop comes in groups: **Klayman** (his **Tool** and
-   **Gadget**), **Plant** (the **Sprout**, and the **Vase**: its season), then
-   **Slots** and **Level skips**. Pick, buy, switch **Auto throw**, then
-   **Start**. The window at the top shows Klayman dressed for the game, his
-   sprout's power, his gadget at work, and the pot in its season. The leaf's
+2. **Setup:** two doors, **Klayman** and **Plant**, each saying what's picked
+   behind it, then **Slots**, **Level skips** and **Auto throw**. Klayman's
+   page has his **Tool** and **Gadget**; the plant's has the **Sprout** and
+   the **Season**. **‹ Setup** (or the phone's back gesture, or Esc) comes
+   back. Pick, buy, then **Start**, from any of the three. The window at the
+   top shows Klayman dressed for the game, his sprout's power, his gadget at
+   work, and the pot in its season. The leaf's
    and the shovel's rings are drawn 30% smaller there (`preview` in
    `config.js`), but on a phone the window is so short that they still reach
    past its edges.
@@ -86,11 +88,11 @@ On the setup page, tap something you don’t own, then tap again to buy it.
 
 | Gadget | Price | What it does |
 | --- | --- | --- |
-| Leaf | 39K | Three leaves spin out round Klayman (150, the brief’s 25 units); their wind pushes bacteria out and keeps them out for 7 s. Then 20 s to recharge |
-| Mist spray | 39K | A bottle by the sprout sprays it twice in 0.75 s: half a heart back. Then 20 s to recharge |
-| Fertilizer | 39K | Every bacteria crawls 70% slower for 5 s. Then 20 s to recharge |
-| Shovel | 39K | Klayman stops and digs for 0.75 s, the shovel swinging above his head; light-brown dirt flies over a ring 360 round him (60 units: twice the old 30), and every bacteria in it gets two more layers of dirt (one already dirty enough becomes a dirtball). Dirtballs don’t mind. Then 20 s to recharge |
-| Booster | 39K | For 4 s Klayman turns red, a little bigger and glowing: he throws twice as fast and twice as far, walks twice as fast, and his dirt counts double (three throws to a dirtball; double on a boss too). Then he turns grey for 2 s: all four drop to half. Then 20 s to recharge. It stacks with gloves and medicine (booster and medicine together: two throws to a dirtball). It was the hypodermic syringe; one bought before keeps working |
+| Leaf | 39K | Three leaves spin out round Klayman (150, the brief’s 25 units); their wind pushes bacteria out and keeps them out for 5 s. Then 15 s to recharge |
+| Mist spray | 39K | A bottle by the sprout sprays it twice in 0.75 s: half a heart back. Then 15 s to recharge |
+| Fertilizer | 39K | Every bacteria crawls 70% slower for 5 s. Then 15 s to recharge |
+| Shovel | 39K | Klayman stops and digs for 0.75 s, the shovel swinging above his head; light-brown dirt flies over a ring 252 round him (42 units: v22's 60, 30% smaller), and every bacteria in it gets two more layers of dirt (one already dirty enough becomes a dirtball). Dirtballs don’t mind. Then 15 s to recharge |
+| Booster | 39K | For 4 s Klayman turns red, a little bigger and glowing: he throws 2.5 times as fast and as far, walks 2.5 times as fast, and his dirt counts 2.5 times (two throws to a dirtball; 2.5 on a boss too). The setup page says twice, on purpose: the real thing is a little stronger than it promises. Then he turns grey for 2 s: all four drop to half. Then 15 s to recharge. It stacks with gloves and medicine (booster and medicine together: still two throws to a dirtball). It was the hypodermic syringe; one bought before keeps working |
 
 In a game, a gadget’s button sits in the top-right corner, under the hearts
 and the pause button. It fills up as the gadget recharges and turns
@@ -99,14 +101,14 @@ computer, **G** uses the 1st gadget and **H** the 2nd.
 
 | Season | Price | What it does (never to a boss; the bacteria it sends out do feel it) |
 | --- | --- | --- |
-| Summer | 169K | The pot is brighter. Every minute the sun spotlights the sprout and it grows half a heart, up to 2 hearts more; then the sun stops. It raises the sprout's limit too, so water drops still grow it |
-| Winter | 169K | The pot is a little blue. Every bacteria crawls 10% slower |
-| Spring | 169K | A breeze blows across now and then, with petals in it. Every sprout power (coins, items, healing, spores, growing, closing) comes round 10% sooner; how long it lasts doesn't change |
+| Summer | 169K | The pot is brighter. Every 50 s the sun spotlights the sprout and it grows half a heart, up to 2 hearts more; then the sun stops. It raises the sprout's limit too, so water drops still grow it |
+| Winter | 169K | The pot is a little blue. Every bacteria crawls 15% slower |
+| Spring | 169K | A breeze blows across now and then, with petals in it. Every sprout power (coins, items, healing, spores, growing, closing) comes round 15% sooner (its wait is 85% as long: a rose heals every 17 s, not 20); how long it lasts doesn't change |
 | Autumn | 169K | Big trees round the pot shade its edges, and leaves drift down. Dirtballs never crack open, and dirt takes 50% longer to wear off a bacteria |
 | Rainy | 169K | A light rain falls. Every minute lightning strikes a bacteria or a dirtball, at random. A bacteria dies on the spot (100 points); a dirtball rolls straight at the closest bacteria, or, with none about, into the pot's rim |
 
 Seasons are bought once and kept. Pick one on the setup page (Plant, then
-Vase), or **No season**; the pick is remembered. The numbers are in
+Season), or **No season**; the pick is remembered. The numbers are in
 `config.js` (`SEASONS`); `storm.strikes` is how many things lightning hits
 each minute (1).
 
@@ -154,7 +156,7 @@ walk through it. It sends a bacteria out of its side every 3.125 s at level 5,
 2.5 s at 10, 1.875 s at 15, 1.25 s at 20, and 1 s from 25 on.
 
 It has level × 10 HP (50 at level 5, 100 at 10...). A throw takes 1 (1.5
-with medicine, 2 with the booster) and a rolling dirtball 5. While a boss is out, thrown dirt flies
+with medicine, 2.5 with the booster) and a rolling dirtball 5. While a boss is out, thrown dirt flies
 past dirtballs instead of breaking them (and the dirt gun leaves them be):
 they’re for pushing into the boss. Only the glasses show its HP: a bar,
 green, yellow from half, red from a fifth, with what’s left out of its full HP.

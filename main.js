@@ -143,6 +143,7 @@ function startLevel() {
 function start() {
   orientation.prefer('landscape');
   sound.unlock();
+  setup.leave();                    // next time, setup opens on its own page
   document.activeElement?.blur();   // Space throws, rather than pressing a button
   const level = startLevel();
   // A level skip is spent when the game it starts begins (admin's levels are free).

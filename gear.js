@@ -26,14 +26,14 @@ export const CATALOG = {
   corn: { name: 'Corn', says: '6 hearts, up to 11. Every 40 seconds its leaves close and keep bacteria out for 15 seconds.' },
   lilies: { name: 'Lilies', says: 'Every 40 seconds it closes for 15 seconds. Bacteria lose sight of it and wander.' },
   mushroom: { name: 'Mushroom', says: 'Spores push bacteria and dirtballs back, and give bacteria a layer of dirt. Heals half a heart every 30 seconds. Grows to 9 hearts.' },
-  leaf: { name: 'Leaf', says: 'Three leaves spin round Klayman. Their wind keeps bacteria away for 7 seconds.' },
+  leaf: { name: 'Leaf', says: 'Three leaves spin round Klayman. Their wind keeps bacteria away for 5 seconds.' },
   spray: { name: 'Mist spray', says: 'Sprays the sprout twice: half a heart back.' },
   fertilizer: { name: 'Fertilizer', says: 'Every bacteria crawls 70% slower for 5 seconds.' },
   shovel: { name: 'Shovel', says: 'Klayman digs and throws dirt all round him: every bacteria near him gets two layers of dirt.' },
   booster: { name: 'Booster', says: 'For 4 seconds Klayman throws twice as fast and as far, walks twice as fast, and his dirt counts double. Then 2 seconds at half of all four.' },
-  summer: { name: 'Summer', says: 'Brighter. Every minute the sun shines on the sprout: it grows half a heart, up to 2 more.' },
-  winter: { name: 'Winter', says: 'A little blue. Every bacteria crawls 10% slower.' },
-  spring: { name: 'Spring', says: 'A breeze now and then. The sprout’s powers come round 10% sooner.' },
+  summer: { name: 'Summer', says: 'Brighter. Every 50 seconds the sun shines on the sprout: it grows half a heart, up to 2 more.' },
+  winter: { name: 'Winter', says: 'A little blue. Every bacteria crawls 15% slower.' },
+  spring: { name: 'Spring', says: 'A breeze now and then. The sprout’s powers come round 15% sooner.' },
   autumn: { name: 'Autumn', says: 'In the shade of big trees. Dirtballs never crack open; dirt wears off bacteria 50% slower.' },
   rainy: { name: 'Rainy', says: 'A light rain. Every minute lightning strikes a bacteria, or sends a dirtball rolling at one.' },
   toolSlot: { name: '2nd tool slot', says: 'Wear two tools at once.' },
@@ -65,10 +65,10 @@ export function kindOf(id) {
 /** "1,250K": coins are counted in K. */
 export const formatK = (n) => `${n.toLocaleString('en-US')}K`;
 
-/** A sprout power's clock, `pace` times as quick: every N seconds becomes N / pace. */
-function sooner(power, pace) {
-  if (!power || pace === 1) return power ?? null;
-  return { ...power, every: power.every / pace };
+/** A sprout power's clock with its wait scaled: every N seconds becomes N x wait. */
+function sooner(power, wait) {
+  if (!power || wait === 1) return power ?? null;
+  return { ...power, every: power.every * wait };
 }
 
 /** What the worn tools, a sprout and the season change in the rules. No
@@ -77,7 +77,7 @@ export function gearFor({ tools = [], sprout = 'sprout', season = null } = {}) {
   const worn = [...new Set(tools)].filter((id) => TOOLS[id]);
   const s = SPROUTS[sprout] ? sprout : 'sprout';
   const ss = SPROUTS[s];
-  const pace = SEASONS[season]?.sproutPace ?? 1;
+  const wait = SEASONS[season]?.sproutWait ?? 1;
   const times = (key) => worn.reduce((k, id) => k * (TOOLS[id][key] ?? 1), 1);
   const lives = ss.lives ?? TREE.lives;
   return Object.freeze({
@@ -93,15 +93,15 @@ export function gearFor({ tools = [], sprout = 'sprout', season = null } = {}) {
     magnet: worn.includes('backpack') ? TOOLS.backpack.magnet : 0,   // how far coins are pulled from
     lives,
     maxLives: Math.max(lives, ss.maxLives ?? TREE.maxLives),
-    itemEvery: ss.itemEvery ? ss.itemEvery / pace : null, // sunflower: items pop out of the flower...
+    itemEvery: ss.itemEvery ? ss.itemEvery * wait : null, // sunflower: items pop out of the flower...
     drop: ss.drop ?? null,           // ...or daisy's coins, and land this far off
-    coinEvery: ss.coinEvery ? ss.coinEvery / pace : null, // daisy
+    coinEvery: ss.coinEvery ? ss.coinEvery * wait : null, // daisy
     coins: ss.coins ?? null,
-    heal: sooner(ss.heal, pace),
-    spores: sooner(ss.spores, pace),
-    growEvery: ss.growEvery ? ss.growEvery / pace : null,
-    shield: sooner(ss.shield, pace),
-    hide: sooner(ss.hide, pace),
+    heal: sooner(ss.heal, wait),
+    spores: sooner(ss.spores, wait),
+    growEvery: ss.growEvery ? ss.growEvery * wait : null,
+    shield: sooner(ss.shield, wait),
+    hide: sooner(ss.hide, wait),
   });
 }
 
