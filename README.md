@@ -24,7 +24,7 @@ Every file sits in one folder, with no subfolders, so uploading is simple.
 ### Updating
 
 Upload the changed files the same way. Also open `sw.js` and bump `VERSION`
-(`klayman-v23` → `klayman-v24`): phones keep an offline copy, and this is how
+(`klayman-v24` → `klayman-v25`): phones keep an offline copy, and this is how
 they know to fetch the new one.
 
 ## Pages
@@ -32,15 +32,24 @@ they know to fetch the new one.
 1. **Title:** Klayman’s face, over faded dirtballs rolling in from every side
    (two that meet break). Tap **Play**.
 2. **Setup:** two doors, **Klayman** and **Plant**, each saying what's picked
-   behind it, then **Slots**, **Level skips** and **Auto throw**. Klayman's
-   page has his **Tool** and **Gadget**; the plant's has the **Sprout** and
-   the **Season**. **‹ Setup** (or the phone's back gesture, or Esc) comes
-   back. Pick, buy, then **Start**, from any of the three. The window at the
-   top shows Klayman dressed for the game, his sprout's power, his gadget at
-   work, and the pot in its season. The leaf's
-   and the shovel's rings are drawn 30% smaller there (`preview` in
-   `config.js`), but on a phone the window is so short that they still reach
-   past its edges.
+   behind it, then **Slots**, **Level skips**, **Orientation** and **Auto
+   throw**. Klayman's page has two tabs, **Tools** and **Gadgets**; the
+   plant's has **Sprouts** and **Seasons**. **‹ Setup** (or the phone's back
+   gesture, or Esc) comes back. Pick, buy, then **Start**, from any of the
+   three.
+
+   The window into the pot: on setup's own page it's wide and shows the game
+   you'll play (Klayman dressed for it, by his sprout, his gadget at work,
+   the pot in its season). On Klayman's and the plant's pages it's square,
+   stays in view while the list scrolls under it, and shows just Klayman, or
+   just the sprout (the mist spray works on the sprout, so it shows the
+   sprout, with Klayman peeking in at the edge). There, **tap anything to see
+   it at work, bought or not**: what you own goes on, what you don't is tried
+   on. Tap it again to buy it. Every few seconds the little scene starts
+   over, so a sprout's power, a gadget, the summer sun or a lightning bolt
+   comes round again. The window takes in more of the pot for the leaf and
+   the shovel, whose rings are also drawn 30% smaller there (`preview` in
+   `config.js`).
 3. **Game:** when the sprout is gone you see your score and the coins you
    picked up. With a backup sprout you can carry on with it; once there's no
    backup left, you can revive the sprout just lost for 49K: half its hearts
@@ -52,10 +61,15 @@ they know to fetch the new one.
 setup page and the pause screen. Music is off until you switch it on, and
 both are remembered between visits.
 
-The title and setup pages open upright and a game opens sideways; turn the
-phone and the screen follows. Only the installed app on Android can turn the
-screen by itself. On an iPhone, or in a browser tab, the screen follows the
-phone, and every page works either way.
+**Orientation** (v24): the title and setup pages are always upright. A game
+is sideways (**Landscape**) unless you pick **Portrait**, on the setup page
+or in pause (switching in pause turns the game on the spot). Tilting the
+phone never turns anything. The installed app on Android locks the screen.
+An iPhone, or a browser tab, can't be locked, so when the phone holds the
+screen the wrong way round the page turns itself a quarter turn instead: a
+sideways game on an upright phone is turned so you turn the phone to the
+left to play, and the joystick, K button and every tap follow the turn. On a
+computer nothing turns, and there's no orientation to pick.
 
 ## Coins and the shop
 
@@ -65,7 +79,9 @@ boss leaves a 10K coin. Every coin lasts 18 seconds and blinks for its last 3;
 with the glasses on, arrows at the screen edge point to coins you can’t see.
 Coins are saved the moment you pick them up.
 
-On the setup page, tap something you don’t own, then tap again to buy it.
+On the setup page, tap something you don’t own, then tap again to buy it. On
+Klayman’s and the plant’s pages the first tap also tries it on in the window,
+so you see it at work before you pay (even when you can’t afford it yet).
 
 | Tool | Price | What it does |
 | --- | --- | --- |
@@ -73,7 +89,7 @@ On the setup page, tap something you don’t own, then tap again to buy it.
 | Shoes | 29K | 15% faster; walks through the sprout |
 | Gloves | 29K | Throws 15% faster and 15% farther, with three pixel streaks off the hand |
 | Coat | 49K | Bacteria can’t get into Klayman; one that touches him crawls 30% slower for 5 s |
-| Glasses | 69K | A light-blue visor: arrows to bacteria, the boss, items and coins off-screen; seconds left on items and coins; bacteria left this level; a ring wherever bacteria, an item, a coin or a boss will appear in the next 3 s (with a see-through picture of which item, or the coin); the boss’s HP; the seconds until the sprout’s next power (above the sprout, and on its arrow when it’s off-screen); and the seconds until each gadget is ready |
+| Glasses | 69K | A light-blue visor: arrows to bacteria, the boss, items and coins off-screen; seconds left on items and coins; bacteria left this level; a ring wherever bacteria, an item, a coin or a boss will appear in the next 3 s (with a see-through picture of which item, or the coin); the boss’s HP; the seconds until the sprout’s next power (above the sprout); the seconds until each gadget is ready; and in the rainy season, a ring and a bolt on what lightning will strike, 2 s before it does |
 | Dirt gun | 99K | Locks on to the closest thing it can hit (red brackets): a bacteria, the boss, or from level 7 a dirtball. Keeps Klayman facing it; throws, range and walking 5% up |
 
 | Sprout | Price | What it does |
@@ -101,16 +117,22 @@ computer, **G** uses the 1st gadget and **H** the 2nd.
 
 | Season | Price | What it does (never to a boss; the bacteria it sends out do feel it) |
 | --- | --- | --- |
-| Summer | 169K | The pot is brighter. Every 50 s the sun spotlights the sprout and it grows half a heart, up to 2 hearts more; then the sun stops. It raises the sprout's limit too, so water drops still grow it |
+| Summer | 169K | The pot is brighter, and the sprout wears tiny sunglasses low on its stem. Every 50 s the sun spotlights the sprout and it grows half a heart, up to 2 hearts more; then the sun stops. It raises the sprout's limit too, so water drops still grow it |
 | Winter | 169K | The pot is a little blue. Every bacteria crawls 15% slower |
-| Spring | 169K | A breeze blows across now and then, with petals in it. Every sprout power (coins, items, healing, spores, growing, closing) comes round 15% sooner (its wait is 85% as long: a rose heals every 17 s, not 20); how long it lasts doesn't change |
-| Autumn | 169K | Big trees round the pot shade its edges, and leaves drift down. Dirtballs never crack open, and dirt takes 50% longer to wear off a bacteria |
-| Rainy | 169K | A light rain falls. Every minute lightning strikes a bacteria or a dirtball, at random. A bacteria dies on the spot (100 points); a dirtball rolls straight at the closest bacteria, or, with none about, into the pot's rim |
+| Spring | 169K | A breeze blows across now and then, with petals in it, and tiny stars twinkle as they fly round the sprout. Every sprout power (coins, items, healing, spores, growing, closing) comes round 15% sooner (its wait is 85% as long: a rose heals every 17 s, not 20); how long it lasts doesn't change |
+| Autumn | 169K | Big trees round the pot shade its edges, and leaves drift down; a fallen leaf sticks to every dirtball, somewhere random, and flutters up and away when the ball is pushed. Dirtballs take 2.5 times as long to crack open (the setup page says twice, on purpose, like the booster), and dirt takes 50% longer to wear off a bacteria |
+| Rainy | 169K | A light rain falls. Every minute lightning strikes whatever is nearest Klayman, so you see it. A bacteria dies on the spot (100 points); a dirtball rolls straight at the closest bacteria, or, with none about, into the pot's rim. It picks its target 2 s early, and the glasses mark it; if that one is beaten first, the next nearest is marked instead |
+
+**Every season gets 1% better each level**, compounding: the sun and the
+lightning come 1% sooner, winter's bacteria are 1% slower still, spring's
+waits 1% shorter, and autumn's dirtballs and dirt hold on 1% longer. At level
+25 that's about 21% sooner or slower, or 27% longer, than at level 1.
 
 Seasons are bought once and kept. Pick one on the setup page (Plant, then
-Season), or **No season**; the pick is remembered. The numbers are in
-`config.js` (`SEASONS`); `storm.strikes` is how many things lightning hits
-each minute (1).
+Seasons), or **No season**; the pick is remembered. The numbers are in
+`config.js` (`SEASONS`, level 1's, and `SEASON_LEVEL_UP`); `storm.strikes` is
+how many things lightning hits each minute (1), and `storm.warn` how early it
+picks them (2 s).
 
 | Slot | Price | What it does |
 | --- | --- | --- |
@@ -218,9 +240,8 @@ Godot numbers); bacteria use your original speed. `POT_SCALE` sets how big the
 pot is: the camera follows Klayman, so you only see part of it. Since v22 the
 pot is seen from straight above, a perfect circle (`bg.png`, drawn by
 `make-pot.py`), and every ring on the soil (leaf, shovel, spores) is round
-too. An arrow at the
-screen edge points to the sprout when it’s off-screen (and, with the glasses,
-to bacteria, items and coins).
+too. With the glasses, arrows at the screen edge point to bacteria, items and
+coins off-screen. (Since v24 there's no arrow to the sprout: it never moves.)
 
 ## Files
 
@@ -234,10 +255,10 @@ to bacteria, items and coins).
 | `weather.js` | How each season looks: summer's light and sun, winter's blue, spring's breeze, autumn's tree shade and leaves, rain and lightning (what they do is in `game.js`) |
 | `gadgets.js` | A gadget’s clock: ready, working, recharging (what each does is in `game.js`) |
 | `gear.js` | Tools, sprouts, gadgets, seasons, slots and used-once items: names, what they change, and the saved wallet |
-| `setup.js` | The setup page and the title face |
+| `setup.js` | The setup page (its tabs, and the window that tries things on) and the title face |
 | `titleballs.js` | The dirtballs rolling behind the title |
-| `orientation.js` | Which way round the screen opens, and following the phone after that |
-| `art.js` | Pixel art drawn in code: sprouts (open and closed), tool, gadget, season and shop icons, coin, dirt guns, the backpack as worn, a gadget leaf, the mist bottle |
+| `orientation.js` | Which way round each page is shown: the lock, or the page's own quarter turn, and touches turned to match |
+| `art.js` | Pixel art drawn in code: sprouts (open and closed), tool, gadget, season and shop icons, coin, dirt guns, the backpack as worn, a gadget leaf, the mist bottle, summer's sunglasses, autumn's dirtball leaf, the glasses' lightning bolt |
 | `game.js` | Rules: levels, spawning, collisions, score |
 | `world.js` | The pot: soil edge, sprout spot, where items appear |
 | `render.js`, `sprites.js` | Drawing and sprite-sheet frames; shoes, gloves, coat and glasses are painted onto Klayman’s frames the first time they’re worn; the gun and backpack are drawn on him |

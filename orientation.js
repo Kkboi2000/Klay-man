@@ -1,92 +1,123 @@
-// Which way round the screen is. The title and setup pages open upright; a
-// game opens sideways. After that, turning the phone wins: the screen
-// follows the way it's held.
+// Which way round each page is shown (v24). The title and setup pages are
+// always upright. A game is sideways unless the player picks upright, on the
+// setup page or in pause. Tilting the phone never turns anything.
 //
-// Only an installed app on Android can turn the screen itself
-// (screen.orientation.lock). On an iPhone, or in a browser tab, the screen
-// simply follows the phone, as before, and every page works either way.
+// Where the screen can be locked (an installed app on Android), it's locked.
+// Elsewhere (an iPhone, a browser tab) the phone turns the screen when it's
+// turned, so a page that comes out the wrong way round is turned a quarter
+// turn in CSS (#app[data-turn]), and touches are turned back to match it
+// (point, rect). On a computer nothing is turned.
 
-const SETTLE = 0.35;             // seconds the phone must stay turned before the screen follows
+export const GAME_WAYS = ['landscape', 'portrait'];
+const KEY = 'klayman.orientation';
 
-/** The rule on its own, so it can be tested without a phone. */
-export class OrientationRule {
-  constructor() {
-    this.locked = null;          // the way the screen is turned
-    this.baseline = null;        // the way the phone was held when we last chose
-    this.held = null;
-  }
-
-  /** A page asks for its usual way round. Returns the lock to apply. */
-  prefer(kind) {
-    this.locked = kind;
-    this.baseline = this.held;
-    return kind;
-  }
-
-  /** The phone is held `kind` ('portrait', 'landscape', or null when lying
-   *  flat). Returns a lock to apply now, or null. Only a change in how it's
-   *  held counts: holding it upright while a game opens sideways does not
-   *  undo the game's choice, but turning it afterwards does. */
-  sense(kind) {
-    if (!kind) return null;
-    this.held = kind;
-    if (this.baseline === null) { this.baseline = kind; return null; }
-    if (kind === this.baseline) return null;
-    this.baseline = kind;
-    if (kind === this.locked) return null;
-    this.locked = kind;
-    return kind;
-  }
+/** The way a page is shown: a game the player's way, every other page upright. */
+export function wayFor(inGame, gameWay) {
+  return inGame ? gameWay : 'portrait';
 }
 
-/** Which way a phone is held, from gravity in the device's own axes. */
-export function heldWay(ax, ay, naturalPortrait = true) {
-  const x = Math.abs(ax);
-  const y = Math.abs(ay);
-  if (Math.max(x, y) < 5) return null;           // lying flat, or being shaken
-  let way = null;
-  if (y > x * 1.4) way = 'portrait';
-  else if (x > y * 1.4) way = 'landscape';
-  if (!way || naturalPortrait) return way;
-  return way === 'portrait' ? 'landscape' : 'portrait';   // a tablet that's wide by nature
+/** How far to turn the page, in degrees clockwise (0, 90 or -90), so that
+ *  a screen `w` x `h` shows `want`. `angle` is how far the phone has turned
+ *  the screen from its own upright (screen.orientation.angle).
+ *
+ *  Wanted upright but the screen is wide: the phone is held sideways, so the
+ *  page is turned back to line up with the phone (and you turn it upright).
+ *  Wanted sideways but the screen is tall: the phone is held upright, so the
+ *  page is turned clockwise, and you turn the phone a quarter to the left to
+ *  play (the way most phone games go). */
+export function turnFor(want, w, h, angle = 0) {
+  const shape = w > h ? 'landscape' : 'portrait';
+  if (shape === want) return 0;
+  const a = ((Math.round(angle / 90) * 90) % 360 + 360) % 360;
+  if (want === 'portrait') return a === 270 ? 90 : -90;
+  return a === 180 ? -90 : 90;
 }
 
-export function createOrientation() {
+/** A point on the screen (clientX, clientY) as a point on the page turned
+ *  by `turn`, for a screen `w` x `h`. */
+export function toLocal(turn, w, h, x, y) {
+  if (turn === 90) return { x: y, y: w - x };
+  if (turn === -90) return { x: h - y, y: x };
+  return { x, y };
+}
+
+function loadWay() {
+  try {
+    const saved = localStorage.getItem(KEY);
+    if (GAME_WAYS.includes(saved)) return saved;
+  } catch { /* nothing saved */ }
+  return 'landscape';
+}
+
+/** `handheld`: a phone or tablet (the only place a page is turned).
+ *  `onChange`: lay the page out again (the way, or the turn, changed). */
+export function createOrientation({ handheld = false, onChange = () => {} } = {}) {
   const screenWay = globalThis.screen?.orientation;
-  const rule = new OrientationRule();
-  let canLock = typeof screenWay?.lock === 'function';
-  let listening = false;
-  let candidate = null;
-  let since = 0;
+  let canLock = handheld && typeof screenWay?.lock === 'function';
+  let pending = false;             // a lock asked for and not answered yet
+  let wanted = null;               // nothing asked for yet: the first page's ask always counts
+  let gameWay = loadWay();
+  let turn = 0;
 
-  const naturalPortrait = () => {
-    const upright = (screenWay?.angle ?? 0) % 180 === 0;
-    return upright === String(screenWay?.type ?? 'portrait').startsWith('portrait');
-  };
+  const view = () => ({ w: globalThis.innerWidth || 1, h: globalThis.innerHeight || 1 });
+  const angle = () => screenWay?.angle ?? Number(globalThis.orientation ?? 0);
 
-  function onMotion(e) {
-    const a = e.accelerationIncludingGravity;
-    if (!a || a.x === null) return;
-    const way = heldWay(a.x, a.y, naturalPortrait());
-    const now = e.timeStamp / 1000;
-    if (way !== candidate) { candidate = way; since = now; return; }
-    if (now - since < SETTLE) return;
-    apply(rule.sense(way));
-  }
-
-  function listen() {
-    if (listening) return;
-    listening = true;
-    addEventListener('devicemotion', onMotion);
-  }
-
-  function apply(kind) {
-    if (!kind || !canLock) return;
-    // A browser tab or a computer says no; from then on the screen just follows the phone.
-    screenWay.lock(kind).then(listen, () => { canLock = false; });
+  function lock(kind) {
+    if (!canLock) return;
+    pending = true;
+    // A browser tab or an iPhone says no; from then on the page turns itself.
+    screenWay.lock(kind).catch(() => { canLock = false; }).finally(() => {
+      pending = false;
+      onChange();
+    });
   }
 
   return {
-    prefer(kind) { apply(rule.prefer(kind)); },
+    get gameWay() { return gameWay; },
+    get wanted() { return wanted ?? 'portrait'; },
+
+    /** A page asks to be shown `kind` ('portrait' or 'landscape'). */
+    want(kind) {
+      if (kind === wanted) return;
+      wanted = kind;
+      lock(kind);
+      onChange();
+    },
+
+    /** The player picks how a game is shown. Remembered between visits. */
+    setGameWay(kind) {
+      if (!GAME_WAYS.includes(kind)) return;
+      gameWay = kind;
+      try { localStorage.setItem(KEY, kind); } catch { /* private mode */ }
+    },
+
+    /** Works out the turn for the screen as it is now (0 while a lock is
+     *  on its way: the phone is about to turn the screen itself). */
+    measure() {
+      const { w, h } = view();
+      turn = handheld && !pending ? turnFor(wanted ?? 'portrait', w, h, angle()) : 0;
+      return { turn, w: turn ? h : w, h: turn ? w : h, viewW: w, viewH: h };
+    },
+
+    get turn() { return turn; },
+
+    /** Where a pointer event is, on the page. */
+    point(e) {
+      const { w, h } = view();
+      return toLocal(turn, w, h, e.clientX, e.clientY);
+    },
+
+    /** An element's box, on the page (getBoundingClientRect, turned back). */
+    rect(el) {
+      const r = el.getBoundingClientRect();
+      if (!turn) return { left: r.left, top: r.top, width: r.width, height: r.height, bottom: r.bottom };
+      const { w, h } = view();
+      const a = toLocal(turn, w, h, r.left, r.top);
+      const b = toLocal(turn, w, h, r.right, r.bottom);
+      const left = Math.min(a.x, b.x);
+      const top = Math.min(a.y, b.y);
+      const bottom = Math.max(a.y, b.y);
+      return { left, top, width: Math.max(a.x, b.x) - left, height: bottom - top, bottom };
+    },
   };
 }

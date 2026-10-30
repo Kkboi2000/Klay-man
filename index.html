@@ -93,6 +93,8 @@
 
     <section id="setup" class="screen screen-setup" hidden aria-labelledby="setup-name">
       <div class="setup">
+        <!-- Over the notch, so the list never shows through it under the window. -->
+        <div class="setup-cap" aria-hidden="true"></div>
         <header class="setup-head">
           <div class="setup-title">
             <button id="setup-back" class="back" type="button" hidden>
@@ -124,8 +126,22 @@
           <button class="admin-btn admin-leave" type="button" data-admin="leave">Leave admin mode</button>
         </section>
 
-        <canvas id="showcase" class="showcase" aria-hidden="true"></canvas>
-        <p id="shop-news" class="shop-news" aria-live="polite"></p>
+        <!-- A window into the pot. On setup's own page it's wide and shows
+             the game you'll play; on Klayman's and the plant's it's square,
+             shows just him or just the sprout, and stays in view, over the
+             tabs, while the list scrolls under it. -->
+        <div id="window" class="window">
+          <div class="peek"><canvas id="showcase" class="showcase" aria-hidden="true"></canvas></div>
+          <div class="tabs" role="tablist" aria-label="Klayman" data-for="klayman" hidden>
+            <button id="tab-tools" class="tab" type="button" role="tab" data-tab="tools" aria-controls="panel-tools">Tools</button>
+            <button id="tab-gadgets" class="tab" type="button" role="tab" data-tab="gadgets" aria-controls="panel-gadgets">Gadgets</button>
+          </div>
+          <div class="tabs" role="tablist" aria-label="Plant" data-for="plant" hidden>
+            <button id="tab-sprouts" class="tab" type="button" role="tab" data-tab="sprouts" aria-controls="panel-sprouts">Sprouts</button>
+            <button id="tab-seasons" class="tab" type="button" role="tab" data-tab="seasons" aria-controls="panel-seasons">Seasons</button>
+          </div>
+          <p id="shop-news" class="shop-news" aria-live="polite"></p>
+        </div>
 
         <!-- Setup's own page: a door into Klayman and one into the plant,
              then slots, level skips and settings. -->
@@ -153,6 +169,13 @@
           </section>
 
           <div class="settings">
+            <div class="setting setting-orient">
+              <span id="orient-name" class="setting-name">Orientation <span class="shelf-note">how a game is shown; title and setup stay upright</span></span>
+              <div class="choice" role="radiogroup" aria-labelledby="orient-name">
+                <button type="button" role="radio" data-orient="landscape" aria-checked="true">Landscape</button>
+                <button type="button" role="radio" data-orient="portrait" aria-checked="false">Portrait</button>
+              </div>
+            </div>
             <div class="setting">
               <span id="auto-name" class="setting-name">Auto throw <span class="shelf-note">keeps Klayman throwing and pushing</span></span>
               <button id="setup-auto" class="switch" type="button" role="switch" aria-checked="false" aria-labelledby="auto-name">Off</button>
@@ -171,6 +194,7 @@
             <summary>How to play</summary>
             <ul class="howto">
               <li>Hit a bacteria with dirt five times to turn it into a dirtball.</li>
+              <li>Tap anything in Klayman’s or the plant’s pages to see it at work in the window, bought or not. Tap again to buy it.</li>
               <li>Klayman throws the way he walks. On a phone, drag K to aim, or just press it to aim at the closest bacteria. On a computer, he throws where the mouse points.</li>
               <li>Walk right up to a dirtball and press K to roll it into other bacteria, whichever way you aim. Auto throw pushes too.</li>
               <li>When the sprout is lost, you can revive it once a game for 49K.</li>
@@ -185,34 +209,34 @@
           </details>
         </div>
 
-        <!-- Klayman's page: what he wears, and the gadgets he takes. -->
+        <!-- Klayman's page: what he wears, and the gadgets he takes, a tab each. -->
         <section id="page-klayman" class="setup-view" hidden aria-labelledby="setup-name">
-          <section class="shelf" aria-labelledby="tools-name">
-            <h3 id="tools-name" class="shelf-name">Tool <span id="tools-note" class="shelf-note">one per game</span></h3>
-            <div id="tools" class="shelf-list" role="group" aria-labelledby="tools-name"></div>
-          </section>
-          <section class="shelf" aria-labelledby="gadgets-name">
-            <h3 id="gadgets-name" class="shelf-name">Gadget <span id="gadgets-note" class="shelf-note">one per game</span></h3>
-            <div id="gadgets" class="shelf-list" role="group" aria-labelledby="gadgets-name"></div>
-          </section>
+          <div id="panel-tools" class="panel" role="tabpanel" aria-labelledby="tab-tools">
+            <p id="tools-note" class="panel-note">one per game</p>
+            <div id="tools" class="shelf-list"></div>
+          </div>
+          <div id="panel-gadgets" class="panel" role="tabpanel" aria-labelledby="tab-gadgets" hidden>
+            <p id="gadgets-note" class="panel-note">one per game</p>
+            <div id="gadgets" class="shelf-list"></div>
+          </div>
         </section>
 
-        <!-- The plant's page: the sprout, and the season over its pot. -->
+        <!-- The plant's page: the sprout, and the season over its pot, a tab each. -->
         <section id="page-plant" class="setup-view" hidden aria-labelledby="setup-name">
-          <section class="shelf" aria-labelledby="sprouts-name">
-            <div class="shelf-head">
-              <h3 id="sprouts-name" class="shelf-name">Sprout <span id="sprouts-note" class="shelf-note"></span></h3>
+          <div id="panel-sprouts" class="panel" role="tabpanel" aria-labelledby="tab-sprouts">
+            <div class="panel-head">
+              <p id="sprouts-note" class="panel-note">one per game</p>
               <div id="sprout-slots" class="slot-tabs" role="group" aria-label="Pick the 1st or the 2nd sprout" hidden>
                 <button type="button" data-slot="0" aria-pressed="true">1st</button>
                 <button type="button" data-slot="1" aria-pressed="false">2nd</button>
               </div>
             </div>
-            <div id="sprouts" class="shelf-list" role="group" aria-labelledby="sprouts-name"></div>
-          </section>
-          <section class="shelf" aria-labelledby="season-name">
-            <h3 id="season-name" class="shelf-name">Season <span class="shelf-note">one per game</span></h3>
-            <div id="seasons" class="shelf-list" role="group" aria-labelledby="season-name"></div>
-          </section>
+            <div id="sprouts" class="shelf-list"></div>
+          </div>
+          <div id="panel-seasons" class="panel" role="tabpanel" aria-labelledby="tab-seasons" hidden>
+            <p class="panel-note">one per game, 1% stronger every level</p>
+            <div id="seasons" class="shelf-list"></div>
+          </div>
         </section>
 
         <div class="setup-go">
@@ -231,6 +255,13 @@
           <button class="btn-quiet" type="button" data-music aria-pressed="false">Music off</button>
           <button id="restart" class="btn-quiet" type="button">Restart</button>
           <button class="btn-quiet" type="button" data-to-setup>Setup</button>
+        </div>
+        <div class="pause-orient">
+          <span id="pause-orient-name" class="pause-orient-name">Orientation</span>
+          <div class="choice" role="radiogroup" aria-labelledby="pause-orient-name">
+            <button type="button" role="radio" data-orient="landscape" aria-checked="true">Landscape</button>
+            <button type="button" role="radio" data-orient="portrait" aria-checked="false">Portrait</button>
+          </div>
         </div>
       </div>
     </section>

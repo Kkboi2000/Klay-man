@@ -4,6 +4,7 @@
 import {
   SPROUT_PALETTE, SPROUT_ROWS, CLOSING_ROWS, SPROUT_SWAY, ART_PALETTE, TOOL_ICON_ROWS, SHOP_ICON_ROWS,
   GADGET_ICON_ROWS, SEASON_ICON_ROWS, COIN_ROWS, GUN_ART, GUN_ART_SMALL, PACK_ART, LEAF_ROWS, BOTTLE_ROWS, SHOVEL_ROWS, SHOVEL_GRIP,
+  SHADES_ROWS, SHADES_PALETTE, DIRT_LEAF_ROWS, DIRT_LEAF_PALETTES, BOLT_ROWS, BOLT_PALETTE,
 } from './art.js';
 
 /** In the single-file preview build, assets arrive inline as data URLs. */
@@ -539,6 +540,9 @@ export async function loadSprites() {
       frozen: tinted(boss, 'rgba(150, 215, 255, 0.55)'),   // a sandclock
     },
     shovel: { img: pixelArt(SHOVEL_ROWS, ART_PALETTE), grip: SHOVEL_GRIP },
+    shades: pixelArt(SHADES_ROWS, SHADES_PALETTE),           // summer: the sprout's sunglasses
+    dirtLeaves: DIRT_LEAF_PALETTES.map((p) => pixelArt(DIRT_LEAF_ROWS, p)), // autumn: a leaf on a dirtball
+    bolt: pixelArt(BOLT_ROWS, BOLT_PALETTE),                 // the glasses: lightning's next target
     heart: heartArt('full'),
     halfHeart: heartArt('half'),
     icons,

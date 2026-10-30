@@ -943,3 +943,47 @@ export const SHOVEL_ROWS = [
   '..k..',
 ];
 export const SHOVEL_GRIP = { x: 2, y: 4 };
+
+// Summer (v24): the sprout's tiny sunglasses, worn low on its stem, and
+// where they sit on each sprout (the middle of the bridge, in the sprout's
+// own 32 x 48 art pixels; a mushroom wears them on its stalk).
+export const SHADES_PALETTE = { k: '#1c1410', l: '#2c4a63', w: '#e6fbff' };
+export const SHADES_ROWS = [
+  'kkkkkkkkk',
+  'kwllkwllk',
+  '.klk.klk.',
+];
+export const SHADES_SPOTS = {
+  sprout: { x: 15, y: 28 }, daisy: { x: 16, y: 29 }, sunflower: { x: 16, y: 29 }, corn: { x: 16, y: 30 },
+  rose: { x: 16, y: 29 }, lilies: { x: 16, y: 29 }, mushroom: { x: 16, y: 27 },
+};
+
+// Autumn (v24): a fallen leaf stuck to a dirtball, in three colours. It
+// flies off when the ball is pushed.
+export const DIRT_LEAF_ROWS = [
+  '....kk.',
+  '..kkOok',
+  '.kOOvOk',
+  'kOvOOk.',
+  'kvkkk..',
+  'k......',
+];
+export const DIRT_LEAF_PALETTES = [
+  { k: '#2b1a0c', O: '#d98a45', o: '#f0b070', v: '#8a4a12' },
+  { k: '#2b1a0c', O: '#b8761a', o: '#e0a040', v: '#6e3c13' },
+  { k: '#2b1a0c', O: '#9e2a22', o: '#d9483b', v: '#5c1410' },
+];
+
+// The glasses (v24): a bolt over what the next lightning will strike.
+export const BOLT_PALETTE = { k: '#0c2b3a', C: '#7fdcff' };
+export const BOLT_ROWS = [
+  '...kkkk',
+  '..kCCCk',
+  '..kCCk.',
+  '.kCCkkk',
+  '.kCCCCk',
+  'kkkCCk.',
+  '..kCk..',
+  '..kk...',
+  '.kk....',
+];

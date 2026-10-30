@@ -261,24 +261,35 @@ export const GADGETS = {
 };
 
 // Seasons: the weather over the pot. Bought once (169K each); one per game,
-// picked on the setup page under Plant > Season. None of them touches a boss
+// picked on the setup page under Plant > Seasons. None of them touches a boss
 // (the bacteria it sends out are ordinary bacteria, so they do feel it).
+// These are level 1's numbers: every level after, each one moves 1% further
+// the player's way (v24), compounding (SEASON_LEVEL_UP, and seasonAt() in gear.js).
 export const SEASONS = {
-  // Brighter. Every 50 seconds the sun spotlights the sprout and it grows
-  // half a heart, up to 2 hearts more than it could hold.
+  // Brighter, and the sprout wears tiny sunglasses. Every 50 seconds the sun
+  // spotlights the sprout and it grows half a heart, up to 2 hearts more
+  // than it could hold. (Each level: the sun comes 1% sooner.)
   summer: { price: 169, sun: { every: 50, grow: 0.5, max: 2 } },
-  // Bluish. Every bacteria crawls 15% slower.
+  // Bluish. Every bacteria crawls at 85% of its speed. (Each level: 1% slower still.)
   winter: { price: 169, bacteriaPace: 0.85 },
-  // A breeze now and then. Every sprout power comes round 15% sooner: its
-  // wait is 85% as long (a rose heals every 17 seconds, not 20).
+  // A breeze now and then, and tiny stars twinkle round the sprout. Every
+  // sprout power comes round 15% sooner: its wait is 85% as long (a rose
+  // heals every 17 seconds, not 20). (Each level: 1% shorter still.)
   spring: { price: 169, sproutWait: 0.85 },
-  // Big trees' leaves and branches shade the pot. Dirtballs never crack open,
-  // and dirt takes 50% longer to wear off a bacteria.
-  autumn: { price: 169, dirtballsHold: true, decay: 1.5 },
-  // A light rain. Every minute lightning strikes a bacteria (it dies) or a
-  // dirtball (it rolls at the closest bacteria, or into the pot's rim).
-  rainy: { price: 169, storm: { every: 60, strikes: 1 } },
+  // Big trees' leaves and branches shade the pot, and a leaf sticks to every
+  // dirtball. Dirtballs take 2.5 times as long to crack open (v24; the setup
+  // page says twice, on purpose, like the booster), and dirt takes 50% longer
+  // to wear off a bacteria. (Each level: both 1% longer.)
+  autumn: { price: 169, crackHold: 2.5, decay: 1.5 },
+  // A light rain. Every minute lightning strikes whatever is nearest Klayman
+  // (v24; it was anything, anywhere): a bacteria dies, a dirtball rolls at the
+  // closest bacteria (or into the pot's rim). The target is picked `warn`
+  // seconds early, so the glasses can mark it. (Each level: 1% sooner.)
+  rainy: { price: 169, storm: { every: 60, strikes: 1, warn: 2 } },
 };
+
+// How much better every season gets each level: 1%, compounding.
+export const SEASON_LEVEL_UP = 0.01;
 
 // Slots: bought once. A second tool to wear, a backup sprout, a second gadget.
 export const SLOTS = {

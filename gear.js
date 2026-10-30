@@ -1,7 +1,7 @@
 // Tools, sprouts, gadgets, seasons, slots and one-use items: what they're
 // called, what they do to the rules, and the wallet that remembers your coins
 // and everything you own between games.
-import { GADGETS, ONCE, SEASONS, SLOTS, SPROUTS, TOOLS, TREE } from './config.js';
+import { GADGETS, ONCE, SEASONS, SEASON_LEVEL_UP, SLOTS, SPROUTS, TOOLS, TREE } from './config.js';
 
 export const TOOL_IDS = ['backpack', 'shoes', 'gloves', 'coat', 'glasses', 'gun'];
 export const SPROUT_IDS = ['sprout', 'daisy', 'sunflower', 'rose', 'corn', 'lilies', 'mushroom'];
@@ -17,7 +17,7 @@ export const CATALOG = {
   shoes: { name: 'Shoes', says: '15% faster. Walk right through the sprout.' },
   gloves: { name: 'Gloves', says: 'Throw 15% faster and 15% farther.' },
   coat: { name: 'Coat', says: 'Bacteria can’t get into Klayman. One that touches him slows down 30% for 5 seconds.' },
-  glasses: { name: 'Glasses', says: 'Points to bacteria, items and coins, times items and coins, counts what’s left, and shows what appears next and where.' },
+  glasses: { name: 'Glasses', says: 'Points to bacteria, items and coins, times items and coins, counts what’s left, and shows what appears next and where, and what lightning will strike.' },
   gun: { name: 'Dirt gun', says: 'Locks on to the closest bacteria, boss or dirtball. Throws, range and walking 5% up.' },
   sprout: { name: 'Sprout', says: '3 hearts, up to 7 with water.' },
   daisy: { name: 'Daisy', says: 'Every 30 seconds a coin pops out of the flower: 1K, sometimes 5K, rarely 10K.' },
@@ -31,11 +31,11 @@ export const CATALOG = {
   fertilizer: { name: 'Fertilizer', says: 'Every bacteria crawls 70% slower for 5 seconds.' },
   shovel: { name: 'Shovel', says: 'Klayman digs and throws dirt all round him: every bacteria near him gets two layers of dirt.' },
   booster: { name: 'Booster', says: 'For 4 seconds Klayman throws twice as fast and as far, walks twice as fast, and his dirt counts double. Then 2 seconds at half of all four.' },
-  summer: { name: 'Summer', says: 'Brighter. Every 50 seconds the sun shines on the sprout: it grows half a heart, up to 2 more.' },
+  summer: { name: 'Summer', says: 'Brighter, and the sprout wears shades. Every 50 seconds the sun shines on it: it grows half a heart, up to 2 more.' },
   winter: { name: 'Winter', says: 'A little blue. Every bacteria crawls 15% slower.' },
-  spring: { name: 'Spring', says: 'A breeze now and then. The sprout’s powers come round 15% sooner.' },
-  autumn: { name: 'Autumn', says: 'In the shade of big trees. Dirtballs never crack open; dirt wears off bacteria 50% slower.' },
-  rainy: { name: 'Rainy', says: 'A light rain. Every minute lightning strikes a bacteria, or sends a dirtball rolling at one.' },
+  spring: { name: 'Spring', says: 'A breeze now and then, and stars twinkle round the sprout. Its powers come round 15% sooner.' },
+  autumn: { name: 'Autumn', says: 'In the shade of big trees. Dirtballs take twice as long to crack open; dirt wears off bacteria 50% slower.' },
+  rainy: { name: 'Rainy', says: 'A light rain. Every minute lightning strikes the bacteria nearest Klayman, or sends a dirtball rolling at one.' },
   toolSlot: { name: '2nd tool slot', says: 'Wear two tools at once.' },
   sproutSlot: { name: '2nd sprout slot', says: 'Pick a backup sprout. When the first is lost, carry on with it.' },
   gadgetSlot: { name: '2nd gadget slot', says: 'Take two gadgets into a game.' },
@@ -71,13 +71,33 @@ function sooner(power, wait) {
   return { ...power, every: power.every * wait };
 }
 
+/** A season's numbers at `level`: level 1's from config.js, each moved 1%
+ *  further the player's way for every level after (compounding). Waits and
+ *  paces shrink, holds grow. No season: nothing (an empty object). */
+export function seasonAt(id, level = 1) {
+  const s = SEASONS[id];
+  if (!s) return Object.freeze({});
+  const steps = Math.max(0, level - 1);
+  const less = (v) => v * (1 - SEASON_LEVEL_UP) ** steps;   // a shorter wait, a slower bacteria
+  const more = (v) => v * (1 + SEASON_LEVEL_UP) ** steps;   // a longer hold
+  const out = { ...s };
+  if (s.sun) out.sun = Object.freeze({ ...s.sun, every: less(s.sun.every) });
+  if (s.bacteriaPace) out.bacteriaPace = less(s.bacteriaPace);
+  if (s.sproutWait) out.sproutWait = less(s.sproutWait);
+  if (s.crackHold) out.crackHold = more(s.crackHold);
+  if (s.decay) out.decay = more(s.decay);
+  if (s.storm) out.storm = Object.freeze({ ...s.storm, every: less(s.storm.every) });
+  return Object.freeze(out);
+}
+
 /** What the worn tools, a sprout and the season change in the rules. No
- *  tool is plain Klayman. Spring brings every sprout power round sooner. */
-export function gearFor({ tools = [], sprout = 'sprout', season = null } = {}) {
+ *  tool is plain Klayman. Spring brings every sprout power round sooner,
+ *  and a little sooner still at every level. */
+export function gearFor({ tools = [], sprout = 'sprout', season = null, level = 1 } = {}) {
   const worn = [...new Set(tools)].filter((id) => TOOLS[id]);
   const s = SPROUTS[sprout] ? sprout : 'sprout';
   const ss = SPROUTS[s];
-  const wait = SEASONS[season]?.sproutWait ?? 1;
+  const wait = seasonAt(season, level).sproutWait ?? 1;
   const times = (key) => worn.reduce((k, id) => k * (TOOLS[id][key] ?? 1), 1);
   const lives = ss.lives ?? TREE.lives;
   return Object.freeze({

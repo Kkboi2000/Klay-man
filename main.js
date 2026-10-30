@@ -13,7 +13,7 @@ import { Wallet, SAVE, ADMIN_SAVE, CATALOG } from './gear.js';
 import { ONCE } from './config.js';
 import { createSetup, createFace } from './setup.js';
 import { createTitleBalls } from './titleballs.js';
-import { createOrientation } from './orientation.js';
+import { createOrientation, wayFor } from './orientation.js';
 
 const STEP = 1 / 60;
 const BEST_KEY = 'klayman.best';
@@ -27,7 +27,10 @@ const isPreview = Boolean(globalThis.KLAYMAN_ASSETS);
 let mode = 'loading';            // loading | title | setup | playing | paused | over
 let touch = matchMedia('(pointer: coarse)').matches;
 let game, renderer, input, sound, ui, best, wallet, setup, face, titleBalls, sprites;
-const orientation = createOrientation();
+// A phone or tablet: the only place a page is ever turned (orientation.js).
+const handheld = touch && matchMedia('(hover: none)').matches;
+const orientation = createOrientation({ handheld, onChange: () => layout() });
+const IN_GAME = new Set(['playing', 'paused', 'over']);
 let overDelay = 0;
 let adminLevel = 1;              // admin mode can start a game further in
 const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -85,13 +88,22 @@ function listenForAdminTaps() {
 // ----------------------------------------------------------------- layout
 // The game fills the screen, any shape: the camera follows Klayman. On a
 // phone (portrait or landscape) the controls float over it; on a computer
-// it's played with the keyboard and mouse.
+// it's played with the keyboard and mouse. On a phone the page may be
+// turned a quarter in CSS, to show the way it should (orientation.js): then
+// it's laid out at the turned size, and its safe areas follow the turn.
 
 function layout() {
-  app.dataset.layout = !touch ? 'desk' : innerHeight >= innerWidth ? 'portrait' : 'landscape';
-  const stage = $('stage').getBoundingClientRect();
-  const w = Math.floor(stage.width);
-  const h = Math.floor(stage.height);
+  const view = orientation.measure();
+  app.dataset.turn = String(view.turn);
+  app.style.setProperty('--view-w', `${view.viewW}px`);
+  app.style.setProperty('--view-h', `${view.viewH}px`);
+  app.style.setProperty('--cw', `${view.w}px`);
+  app.style.setProperty('--ch', `${view.h}px`);
+  app.classList.toggle('is-short', view.h <= 520);
+  app.dataset.layout = !touch ? 'desk' : view.h >= view.w ? 'portrait' : 'landscape';
+  const stage = $('stage');
+  const w = stage.clientWidth;
+  const h = stage.clientHeight;
   if (!renderer) return;
   renderer.resize(w, h, Math.min(3, devicePixelRatio || 1));
   app.style.setProperty('--u', String(renderer.zoom));
@@ -103,28 +115,34 @@ function layout() {
  *  gadget buttons under the hearts, however tall those are right now. */
 function clearHud() {
   if (!renderer) return;
-  const top = $('stage').getBoundingClientRect().top;
+  const top = orientation.rect($('stage')).top;
   const low = Math.max(...[...document.querySelectorAll('.hud-left, .hud-right')]
-    .map((el) => el.getBoundingClientRect().bottom));
+    .map((el) => orientation.rect(el).bottom));
   renderer.markerTop = Math.max(0, low - top) + 10;
 }
 
 // ------------------------------------------------------------ game states
 
+/** Every page has its way round: title and setup upright, a game the player's way. */
 function setMode(m) {
   mode = m;
   app.dataset.mode = m;
+  orientation.want(wayFor(IN_GAME.has(m), orientation.gameWay));
 }
 
-// The title and setup pages open upright; a game opens sideways.
+/** The player picks how a game is shown (the setup page, or pause). */
+function setGameWay(way) {
+  orientation.setGameWay(way);
+  ui.setOrientation(orientation.gameWay);
+  orientation.want(wayFor(IN_GAME.has(mode), orientation.gameWay));
+}
+
 function showTitle() {
-  orientation.prefer('portrait');
   setMode('title');
   ui.show('title');
 }
 
 function showSetup() {
-  orientation.prefer('portrait');
   sound.unlock();
   input.clear();
   overDelay = 0;
@@ -141,7 +159,6 @@ function startLevel() {
 }
 
 function start() {
-  orientation.prefer('landscape');
   sound.unlock();
   setup.leave();                    // next time, setup opens on its own page
   document.activeElement?.blur();   // Space throws, rather than pressing a button
@@ -509,6 +526,7 @@ async function boot() {
     throwButton: $('throw'),
     autoButton: $('auto'),
     onPause: togglePause,
+    frame: orientation,
   });
 
   setup = createSetup({
@@ -537,6 +555,10 @@ async function boot() {
       ui.setSound(sound.muted);
     });
   }
+  ui.setOrientation(orientation.gameWay);
+  for (const b of document.querySelectorAll('[data-orient]')) {
+    b.addEventListener('click', () => setGameWay(b.dataset.orient));
+  }
   for (const b of document.querySelectorAll('[data-music]')) {
     b.addEventListener('click', () => {
       sound.setMusic(!sound.musicOn);
@@ -549,6 +571,7 @@ async function boot() {
     if (e.pointerType === 'touch' && !touch) { touch = true; layout(); }
   }, { capture: true });
   addEventListener('resize', layout);
+  globalThis.screen?.orientation?.addEventListener?.('change', layout);
   // Gadget buttons come and go with the game, and hearts wrap to two rows.
   if (globalThis.ResizeObserver) {
     const watch = new ResizeObserver(clearHud);

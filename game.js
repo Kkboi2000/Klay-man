@@ -13,7 +13,7 @@ import { DirtShot } from './dirtshot.js';
 import { Boss, bossHp, bossSpawnEvery, isBossLevel } from './boss.js';
 import { Gadget } from './gadgets.js';
 import { Coin, Item, pickItem } from './items.js';
-import { gearFor } from './gear.js';
+import { gearFor, seasonAt } from './gear.js';
 
 /** x, y: which way to walk. pressed/held: the action button (the K button on
  *  a phone, Space or a click on a computer): it pushes a dirtball Klayman is
@@ -86,7 +86,9 @@ export class Game {
       season: SEASONS[loadout?.season] ? loadout.season : null,
     };
     this.season = this.loadout.season;
+    this.level = level;            // set early: the season and the sprout's powers depend on it
     this.stormTimer = this.weather.storm?.every;
+    this.stormTargets = [];        // rainy: what the next lightning will strike, once picked
     this.items = [];               // special items out on the soil (or flying)
     this.potItems = itemSource('pot', ITEMS.every);
     this.sproutIndex = 0;
@@ -116,7 +118,7 @@ export class Game {
   /** Puts a sprout in the pot: its hearts and its powers' clocks (spring
    *  brings them round sooner), and summer's sun on it. */
   plant(sprout) {
-    this.gear = gearFor({ tools: this.loadout.tools, sprout, season: this.loadout.season });
+    this.gear = gearFor({ tools: this.loadout.tools, sprout, season: this.season, level: this.level });
     const g = this.gear;
     this.lives = g.lives;
     this.maxLives = g.lives;
@@ -136,8 +138,25 @@ export class Game {
 
   // ---------------------------------------------------------------- state
 
-  /** What this game's season does (nothing, with no season). */
-  get weather() { return SEASONS[this.season] ?? PLAIN; }
+  /** What this game's season does at this level (nothing, with no season):
+   *  every level it gets 1% better (seasonAt in gear.js). */
+  get weather() {
+    const key = `${this.season}@${this.level}`;
+    if (this.weatherKey !== key) {
+      this.weatherKey = key;
+      this.weatherNow = seasonAt(this.season, this.level);
+    }
+    return this.weatherNow;
+  }
+
+  /** The sprout's powers at this level: spring brings them round a little
+   *  sooner every level. A power already counting down keeps its count; the
+   *  next one waits the new, shorter time. */
+  regear() {
+    this.gear = gearFor({ tools: this.loadout.tools, sprout: this.gear.sprout, season: this.season, level: this.level });
+    if (this.flowerItems) this.flowerItems.every = this.gear.itemEvery;
+    if (this.flowerCoins) this.flowerCoins.every = this.gear.coinEvery;
+  }
 
   /** The most hearts the sprout can hold: its own limit, and what summer's sun grew on top. */
   get heartCap() { return this.gear.maxLives + this.sunGrown; }
@@ -262,6 +281,7 @@ export class Game {
 
   startLevel(n) {
     this.level = n;
+    this.regear();
     this.toSpawn = this.levelSize(n);
     this.spawnEvery = this.spawnEveryFor(n);
     this.spawnTimer = 0.4;
@@ -302,7 +322,7 @@ export class Game {
 
   addDirtball(x, y) {
     const d = new Dirtball(x, y);
-    if (this.weather.dirtballsHold) d.hold = Infinity; // autumn: never cracks open
+    d.hold *= this.weather.crackHold ?? 1;           // autumn: it takes far longer to crack open
     this.dirtballs.push(d);
     return d;
   }
@@ -914,11 +934,36 @@ export class Game {
     }
     if (storm) {
       this.stormTimer -= dt;
+      // A moment before it strikes, the lightning picks what it will hit
+      // (the glasses mark it), and keeps that pick up to date.
+      if (this.stormTimer <= storm.warn) this.aimStorm(storm.strikes);
       if (this.stormTimer <= 0) {
         this.stormTimer += storm.every;
-        for (let i = 0; i < storm.strikes; i++) this.lightning();
+        for (const target of this.stormTargets) this.lightning(target);
+        this.stormTargets = [];
       }
     }
+  }
+
+  /** What lightning can strike: bacteria and dirtballs, never the boss. */
+  get strikables() {
+    return [...this.bacteria.filter((b) => b.alive), ...this.dirtballs.filter((d) => d.solid)];
+  }
+
+  /** `t` can still be struck: still out there, and still what it was. */
+  strikable(t) {
+    return t instanceof Dirtball ? t.solid && this.dirtballs.includes(t) : Boolean(t?.alive) && this.bacteria.includes(t);
+  }
+
+  /** Rainy: picks the `n` things nearest Klayman for the next strike. One
+   *  that's gone meanwhile (beaten, or set rolling) gives way to the next
+   *  nearest, so what the glasses mark is what gets struck. */
+  aimStorm(n) {
+    const k = this.klay;
+    this.stormTargets = this.stormTargets.filter((t) => this.strikable(t));
+    const pool = this.strikables.filter((t) => !this.stormTargets.includes(t));
+    pool.sort((a, b) => dist(a, k) - dist(b, k));
+    while (this.stormTargets.length < n && pool.length) this.stormTargets.push(pool.shift());
   }
 
   /** Summer: the sun spotlights the sprout and it grows half a heart (up to 2 more in all). */
@@ -930,13 +975,13 @@ export class Game {
     this.emit('sunshine', { x: this.tree.x, y: this.tree.y, amount: add });
   }
 
-  /** Rainy: lightning strikes a bacteria or a dirtball, at random, never the
-   *  boss. A bacteria dies on the spot. A dirtball rolls at the closest
-   *  bacteria, or, with none about, straight into the pot's rim. */
-  lightning() {
-    const targets = [...this.bacteria.filter((b) => b.alive), ...this.dirtballs.filter((d) => d.solid)];
-    if (!targets.length) return;
-    const hit = targets[Math.floor(this.rng() * targets.length) % targets.length];
+  /** Rainy: lightning strikes `target` (what it picked a moment ago), or
+   *  whatever is nearest Klayman: a bacteria or a dirtball, never the boss.
+   *  A bacteria dies on the spot. A dirtball rolls at the closest bacteria,
+   *  or, with none about, straight into the pot's rim. */
+  lightning(target = null) {
+    const hit = this.strikable(target) ? target : this.nearestOf(this.strikables, this.klay);
+    if (!hit) return;
     this.emit('lightning', { x: hit.x, y: hit.y });
     if (hit instanceof Dirtball) {
       const prey = this.nearestOf(this.bacteria.filter((b) => b.alive), hit);

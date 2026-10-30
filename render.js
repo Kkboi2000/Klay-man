@@ -1,11 +1,12 @@
 // Draws a Game onto the canvas. Reads the game; never changes it.
 // With the glasses on, it also draws what they show, all in one light blue:
 // arrows to bacteria, the boss, items and coins, seconds left on items and
-// coins, where the next bacteria, item, coin or boss is about to appear, and
-// the boss's HP.
+// coins, where the next bacteria, item, coin or boss is about to appear, the
+// boss's HP, and what the next lightning will strike.
 import { SPRITE_SCALE as S, SHOT, POT_SCALE, COINS, KLAYMAN, LOOKAHEAD, ITEM_FLIGHT, BOSS } from './config.js';
 import { SOIL, WORLD, CAMERA_BOUNDS as BOUNDS, TREE_SPOT, RING_SQUASH } from './world.js';
 import { KLAY, BAC, TREE_ART, BOSS_ART } from './sprites.js';
+import { SHADES_SPOTS } from './art.js';
 import { BREAK_TIME, ABSORB_TIME } from './bacteria.js';
 import { DIRTBALL_BREAK_TIME } from './dirtball.js';
 import { ITEM_INFO } from './items.js';
@@ -35,6 +36,16 @@ const POWER_WORDS = { coin: 'coin', item: 'item', closes: 'closes', opens: 'open
 const ROLL = 0.5;                 // seconds a corn or lily takes to close up or open
 const VISOR = '#7fdcff';          // everything the glasses show
 const VISOR_INK = '#0c2b3a';
+// Spring's tiny stars, flying round the sprout: where each loops (art
+// pixels from the sprout's middle), how fast, and its colour.
+const STARS = [
+  { rx: 15, ry: 9, speed: 1.1, phase: 0, color: '#fff4e3' },
+  { rx: 12, ry: 13, speed: -0.9, phase: 1.7, color: '#ffc8d2' },
+  { rx: 18, ry: 7, speed: 0.75, phase: 3.1, color: '#ffe9a8' },
+  { rx: 10, ry: 11, speed: 1.35, phase: 4.4, color: '#fff4e3' },
+  { rx: 16, ry: 12, speed: -0.6, phase: 5.6, color: '#cfe39a' },
+];
+const LEAF_FLIGHT = 0.9;          // seconds a dirtball's leaf takes to fly off
 
 // The camera shows about this much of the world (in world units), so
 // Klayman stays the same size whatever the screen.
@@ -71,6 +82,8 @@ export class Renderer {
     this.kick = 0;                 // seconds the corn still shudders from closing
     this.feed = 0;                 // seconds of fertilizer still raining down
     this.patches = [];             // the shovel's dirt, settling on the soil
+    this.flyingLeaves = [];        // autumn: leaves knocked off pushed dirtballs
+    this.ballLeaves = new WeakMap(); // ...and the one each dirtball wears
     this.shake = 0;
     this.weather?.clear();
   }
@@ -389,10 +402,11 @@ export class Renderer {
     const slowAll = game.fertilized;
     const things = [];
     things.push({ y: TREE_SPOT.y, draw: () => this.drawTree(game) });
+    if (game.season === 'spring' && !game.over) this.stars(game, things);
     if (game.boss) things.push({ y: game.boss.y, draw: () => this.drawBoss(game.boss, game) });
     for (const b of game.bacteria) things.push({ y: b.y, draw: () => this.drawBacteria(b, game.frozen, slowAll) });
     for (const c of game.coins) things.push({ y: c.y, draw: () => this.drawCoin(c) });
-    for (const d of game.dirtballs) things.push({ y: d.y, draw: () => this.drawDirtball(d, game.frozen) });
+    for (const d of game.dirtballs) things.push({ y: d.y, draw: () => this.drawDirtball(d, game.frozen, game.season === 'autumn') });
     for (const item of game.items) things.push({ y: item.y, draw: () => this.drawItem(item) });
     for (const shot of game.shots) things.push({ y: shot.y, draw: () => this.drawShot(shot) });
     things.push({ y: game.klay.y, draw: () => this.drawKlayman(game) });
@@ -409,6 +423,7 @@ export class Renderer {
     this.rain(dt);
     this.drawRings(dt);
     this.drawParticles(dt);
+    this.drawFlyingLeaves(dt);
     this.drawSparkles(dt);
     this.drawFloaters(dt);
     this.weather.over(ctx, dt);
@@ -421,11 +436,12 @@ export class Renderer {
 
   // ------------------------------------------------- off-screen pointers
 
-  /** Arrows at the screen edge pointing at things the camera can't see:
-   *  the sprout always; bacteria, the boss, items and coins only through the glasses. */
+  /** Arrows at the screen edge pointing at things the camera can't see,
+   *  through the glasses: bacteria, the boss, items and coins. (Since v24
+   *  there's no arrow to the sprout: it never moves, so you know where it is.) */
   drawMarkers(game) {
     const marks = [];
-    if (game.gear.glasses) {
+    if (game.gear.glasses && !game.over) {
       for (const b of game.bacteria) {
         if (b.crawling) marks.push({ x: b.x, y: b.y - 12, color: '#5aa266', size: 7 });
       }
@@ -439,12 +455,6 @@ export class Renderer {
         if (c.blinking && Math.floor(c.t * 10) % 2 === 0) continue;
         marks.push({ x: c.x, y: c.y - 12, color: GOLD, size: 8, icon: 'coin', secs: Math.ceil(c.life) });
       }
-    }
-    if (!game.over) {
-      // Through the glasses, the sprout's arrow also says when its next power comes.
-      const clocks = game.gear.glasses ? game.sproutClocks.map((c) => c.secs) : [];
-      const secs = clocks.length ? Math.max(0, Math.ceil(Math.min(...clocks))) : null;
-      marks.push({ x: TREE_SPOT.x, y: TREE_SPOT.y - 30, color: '#8cc152', size: 10, icon: 'heart', secs });
     }
 
     const { ctx } = this;
@@ -470,9 +480,8 @@ export class Renderer {
       ctx.save();
       ctx.translate(x, y);
       if (m.icon) {
-        const icon = m.icon === 'heart' ? this.sprites.heart
-          : m.icon === 'coin' ? this.sprites.coin : this.sprites.icons[m.icon];
-        const size = m.icon === 'heart' || m.icon === 'coin' ? 14 : 18;
+        const icon = m.icon === 'coin' ? this.sprites.coin : this.sprites.icons[m.icon];
+        const size = m.icon === 'coin' ? 14 : 18;
         ctx.drawImage(icon, -Math.cos(a) * 14 - size / 2, -Math.sin(a) * 14 - size / 2, size, (size * icon.height) / icon.width);
         if (m.secs !== null && m.secs !== undefined) {
           this.label(String(m.secs), -Math.cos(a) * 34, -Math.sin(a) * 34, 13);
@@ -529,6 +538,12 @@ export class Renderer {
     // Corn shudders as its leaves snap shut.
     const sx = this.kick > 0 && !this.calm ? Math.round(Math.sin(this.time * 60) * this.kick * 6) : 0;
     this.sprite(look.sheet, frame * 32, 0, 32, 48, x + sx, y, a.x, a.y, { scale });
+    if (game.season === 'summer') {
+      // Summer: tiny sunglasses, low on the stem (the bridge sits on the spot).
+      const spot = SHADES_SPOTS[game.gear.sprout] ?? SHADES_SPOTS.sprout;
+      const img = this.sprites.shades;
+      this.sprite(img, 0, 0, img.width, img.height, x + sx, y, a.x - spot.x + 4, a.y - spot.y + 1, { scale });
+    }
     if (this.bloom > 0) {
       const flash = this.calm ? 0.5 : 0.35 + 0.35 * Math.abs(Math.sin(this.time * 24));
       this.sprite(look.glow, frame * 32, 0, 32, 48, x, y, a.x, a.y, { scale, alpha: flash * Math.min(1, this.bloom / 0.3) });
@@ -577,9 +592,13 @@ export class Renderer {
     });
   }
 
-  drawDirtball(d, frozen) {
+  /** `autumn`: a fallen leaf sticks to it, somewhere random, and flies off
+   *  when it's pushed (or struck, or breaks). */
+  drawDirtball(d, frozen, autumn = false) {
     const sp = this.sprites;
     const a = BAC.anchor;
+    const leaf = autumn ? this.leafOn(d) : null;
+    if (leaf && !leaf.off && d.state !== 'idle') this.knockLeaf(d, leaf);
     if (d.state === 'breaking') {
       const f = Math.min(4, Math.floor((d.fx / DIRTBALL_BREAK_TIME) * 5));
       this.sprite(sp.bac, f * 32, BAC.ballBreakY, 32, 32, d.x, d.y, a.x, a.y);
@@ -593,6 +612,90 @@ export class Renderer {
       jy = -Math.abs(Math.sin(this.time * 30)) * 2;
     }
     this.sprite(sp.bac, 0, BAC.ballY, 32, 32, d.x + jx, d.y + jy, a.x, a.y);
+    if (leaf && !leaf.off) {
+      const img = leaf.img;
+      this.sprite(img, 0, 0, img.width, img.height, d.x + jx + leaf.dx, d.y + jy + leaf.dy, img.width / 2, img.height / 2, { flip: leaf.flip });
+    }
+  }
+
+  /** The leaf a dirtball wears in autumn: picked the first time it's drawn,
+   *  at a random spot on its upper half, any of three colours. */
+  leafOn(d) {
+    let leaf = this.ballLeaves.get(d);
+    if (!leaf) {
+      const angle = -Math.PI * (0.1 + Math.random() * 0.8);       // somewhere over the top half
+      const r = 3 + Math.random() * 5;                             // art pixels from its middle
+      const leaves = this.sprites.dirtLeaves;
+      leaf = {
+        img: leaves[Math.floor(Math.random() * leaves.length)],
+        dx: Math.round(Math.cos(angle) * r) * S,
+        dy: Math.round(-7 + Math.sin(angle) * r) * S,             // the ball's middle is 7 art pixels up
+        flip: Math.random() < 0.5,
+        off: false,
+      };
+      this.ballLeaves.set(d, leaf);
+    }
+    return leaf;
+  }
+
+  /** Pushed: the leaf lets go and flutters up and away a little. */
+  knockLeaf(d, leaf) {
+    leaf.off = true;
+    const away = Math.sign(-(d.vx || (leaf.flip ? 1 : -1))) || 1;  // the other way from where it rolls
+    this.flyingLeaves.push({
+      img: leaf.img, x: d.x + leaf.dx, y: d.y + leaf.dy, vx: away * (24 + Math.random() * 20), vy: -95, t: 0, flip: leaf.flip,
+    });
+  }
+
+  /** Leaves knocked off dirtballs: up, slowing, swaying, fading out. */
+  drawFlyingLeaves(dt) {
+    for (const l of this.flyingLeaves) {
+      l.t += dt;
+      l.vy += 150 * dt;
+      l.x += l.vx * dt;
+      l.y += l.vy * dt;
+      const k = l.t / LEAF_FLIGHT;
+      const flip = this.calm ? l.flip : Math.floor(l.t * 8) % 2 === 0 ? l.flip : !l.flip;
+      const img = l.img;
+      this.sprite(img, 0, 0, img.width, img.height, l.x, l.y, img.width / 2, img.height / 2, {
+        flip, alpha: Math.max(0, Math.min(1, (1 - k) * 2)),
+      });
+    }
+    this.flyingLeaves = this.flyingLeaves.filter((l) => l.t < LEAF_FLIGHT);
+  }
+
+  /** Spring: tiny stars flying loops round the sprout, twinkling. Each is
+   *  sorted in by where it is, so they pass behind the sprout and in front. */
+  stars(game, things) {
+    const scale = S * game.treeScale;
+    const mid = { x: TREE_SPOT.x, y: TREE_SPOT.y - 20 * scale };
+    STARS.forEach((s, i) => {
+      const t = this.calm ? 0 : this.time;
+      const a = t * s.speed + s.phase;
+      const x = mid.x + Math.cos(a) * s.rx * scale;
+      const y = mid.y + Math.sin(a * 1.6) * s.ry * scale;
+      const depth = Math.sin(a);                                   // > 0: in front of the sprout
+      const twinkle = this.calm ? 1 : Math.abs(Math.sin(this.time * 3.2 + i * 1.9));
+      things.push({ y: TREE_SPOT.y + depth * 4, draw: () => this.star(x, y, twinkle, s.color) });
+    });
+  }
+
+  /** A tiny four-point star on the 2-unit pixel grid: a dot, with arms when it twinkles. */
+  star(x, y, k, color) {
+    const { ctx } = this;
+    const px = Math.round(x / 2) * 2;
+    const py = Math.round(y / 2) * 2;
+    const arm = k > 0.75 ? 4 : k > 0.35 ? 2 : 0;
+    ctx.save();
+    ctx.globalAlpha = 0.55 + 0.45 * k;
+    ctx.fillStyle = color;
+    if (arm) {
+      ctx.fillRect(px - arm, py, arm * 2 + 2, 2);
+      ctx.fillRect(px, py - arm, 2, arm * 2 + 2);
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(px, py, 2, 2);
+    ctx.restore();
   }
 
   drawItem(item) {
@@ -1010,6 +1113,12 @@ export class Renderer {
       this.target(daisy.next, k, { picture: this.sprites.coin, scale: this.coinSize(daisy.next.value) });
     }
     if (game.bossPlan) this.target(game.bossPlan, 1 - game.bossWarn / BOSS.warn, { size: 4 });
+    // Rainy: what the next lightning will strike, marked from the moment it's picked.
+    const storm = game.weather.storm;
+    for (const t of game.stormTargets ?? []) {
+      const k = 1 - Math.min(1, Math.max(0, game.stormTimer) / storm.warn);
+      this.target(t, k, { picture: this.sprites.bolt, lift: 40 });
+    }
     for (const item of game.items) {
       if (!item.landed || (item.blinking && Math.floor(item.t * 8) % 2 === 0)) continue;
       this.label(String(Math.ceil(item.life)), item.x, item.y - 46, 13);
@@ -1059,8 +1168,9 @@ export class Renderer {
   /** A dotted ring on the soil that closes in as the moment comes, with a
    *  see-through `picture` of what's coming (an item, a coin) in the middle,
    *  or a dot for a bacteria. `size` makes the ring bigger (the boss's);
-   *  `scale` the picture (a bigger coin). */
-  target(p, k, { picture = null, size = 1, scale = 1 } = {}) {
+   *  `scale` the picture (a bigger coin); `lift` raises the picture (over a
+   *  bacteria's head, for lightning). */
+  target(p, k, { picture = null, size = 1, scale = 1, lift = 14 * scale } = {}) {
     const { ctx } = this;
     const r = Math.round((26 - 12 * k) * size);
     const blink = !this.calm && k > 0.8 && Math.floor(this.time * 14) % 2 === 0;
@@ -1085,7 +1195,7 @@ export class Renderer {
     if (picture) {
       const bob = this.calm ? 0 : Math.round(Math.sin(this.time * 4) * 2);
       const { width: w, height: h } = picture;
-      this.sprite(picture, 0, 0, w, h, p.x, p.y - 14 * scale + bob, w / 2, h / 2, {
+      this.sprite(picture, 0, 0, w, h, p.x, p.y - lift + bob, w / 2, h / 2, {
         alpha: blink ? 0.3 : 0.55 + 0.3 * k,
         scale: S * scale,
       });

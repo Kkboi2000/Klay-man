@@ -81,12 +81,47 @@ body {
 
 /* ------------------------------------------------------------- layout */
 
+/* The page's safe areas (the notch, the home bar), named by the page's own
+   sides. When the page is turned a quarter in CSS (orientation.js), each
+   side's inset comes from the side of the screen it now sits against. */
 #app {
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
   position: relative;
   height: 100%;
-  padding-left: env(safe-area-inset-left, 0px);
-  padding-right: env(safe-area-inset-right, 0px);
+  padding-left: var(--safe-l);
+  padding-right: var(--safe-r);
 }
+
+/* Turned: laid out at the screen's size swapped, then turned into place. */
+#app[data-turn="90"],
+#app[data-turn="-90"] {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--view-h);
+  height: var(--view-w);
+  transform-origin: 0 0;
+}
+#app[data-turn="90"] {
+  --safe-t: env(safe-area-inset-right, 0px);
+  --safe-r: env(safe-area-inset-bottom, 0px);
+  --safe-b: env(safe-area-inset-left, 0px);
+  --safe-l: env(safe-area-inset-top, 0px);
+  transform: translateX(var(--view-w)) rotate(90deg);
+}
+#app[data-turn="-90"] {
+  --safe-t: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-right, 0px);
+  --safe-l: env(safe-area-inset-bottom, 0px);
+  transform: translateY(var(--view-h)) rotate(-90deg);
+}
+/* A swipe on a turned page runs across the screen: let either way scroll. */
+#app[data-turn="90"] .screen,
+#app[data-turn="-90"] .screen { touch-action: pan-x pan-y; }
 
 #frame {
   position: relative;
@@ -103,10 +138,10 @@ body {
    the controls keep clear of the notch and the home bar instead. */
 [data-layout="portrait"],
 [data-layout="landscape"] {
-  --edge-t: env(safe-area-inset-top, 0px);
-  --edge-l: env(safe-area-inset-left, 0px);
-  --edge-r: env(safe-area-inset-right, 0px);
-  --edge-b: env(safe-area-inset-bottom, 0px);
+  --edge-t: var(--safe-t);
+  --edge-l: var(--safe-l);
+  --edge-r: var(--safe-r);
+  --edge-b: var(--safe-b);
   --see-through: 0.4;            /* every control on a phone */
 }
 [data-layout="portrait"] #frame,
@@ -511,7 +546,9 @@ body {
   z-index: 10;
   display: grid;
   place-items: center;
-  padding: calc(env(safe-area-inset-top, 0px) + 1.5rem) 1.5rem calc(env(safe-area-inset-bottom, 0px) + 1.5rem);
+  --pad-x-l: calc(var(--safe-l) + 1.5rem);
+  --pad-x-r: calc(var(--safe-r) + 1.5rem);
+  padding: calc(var(--safe-t) + 1.5rem) var(--pad-x-r) calc(var(--safe-b) + 1.5rem) var(--pad-x-l);
   overflow-y: auto;
   background: var(--veil);
   touch-action: pan-y;
@@ -540,7 +577,7 @@ body {
 
 /* Title: just Klayman's face, big. */
 .face {
-  width: clamp(6rem, min(38vw, 30vh), 11.5rem);
+  width: clamp(6rem, min(calc(var(--cw, 100vw) * 0.38), calc(var(--ch, 100vh) * 0.3)), 11.5rem);
   height: auto;
   aspect-ratio: 18 / 17;
   image-rendering: pixelated;
@@ -557,8 +594,8 @@ body {
     3px 3px var(--ink), -3px 3px var(--ink), 3px -3px var(--ink), -3px -3px var(--ink),
     0 7px var(--ink), 3px 7px var(--ink), -3px 7px var(--ink);
 }
-.title-name { font-size: clamp(3.2rem, 16vw, 5rem); letter-spacing: 0.02em; }
-.screen-name { font-size: clamp(2rem, 9vw, 2.8rem); }
+.title-name { font-size: clamp(3.2rem, calc(var(--cw, 100vw) * 0.16), 5rem); letter-spacing: 0.02em; }
+.screen-name { font-size: clamp(2rem, calc(var(--cw, 100vw) * 0.09), 2.8rem); }
 
 .lede { font-size: 1.2rem; font-weight: 600; }
 
@@ -703,19 +740,81 @@ body {
 }
 .purse .coin-icon { width: 1.25em; height: 1.25em; }
 
-/* A window into the pot: Klayman dressed for the game, beside his sprout. */
-.showcase {
-  display: block;
+/* A window into the pot. On setup's own page: wide, Klayman dressed for the
+   game beside his sprout. On Klayman's and the plant's pages: square, just
+   him or just the sprout, and it stays in view (with the tabs under it)
+   while the list scrolls under it. */
+.window { display: grid; gap: 0.8rem; }
+.peek {
+  position: relative;
   width: 100%;
   height: 11rem;
+  margin: 0 auto;
   background: var(--soil);
   box-shadow: 0 -3px var(--ink), 0 3px var(--ink), -3px 0 var(--ink), 3px 0 var(--ink),
     0 6px 0 3px rgba(0, 0, 0, 0.25);
 }
+.showcase { display: block; position: absolute; inset: 0; }
+
+.screen-setup:not([data-page="home"]) .window {
+  position: sticky;
+  z-index: 2;
+  top: var(--safe-t);
+  margin: -0.5rem calc(-1 * var(--pad-x-r)) -0.4rem calc(-1 * var(--pad-x-l));
+  padding: 0.5rem var(--pad-x-r) 0.4rem var(--pad-x-l);
+  background: rgb(30, 21, 11);
+  box-shadow: 0 0.6rem 0.5rem -0.3rem rgb(30, 21, 11);
+}
+.screen-setup:not([data-page="home"]) .peek {
+  --square: clamp(10.5rem, calc(var(--ch, 800px) * 0.3), 16.5rem);
+  width: min(100%, var(--square));
+  height: auto;
+  aspect-ratio: 1 / 1;
+}
+/* Over the notch: the list scrolling up under the window never shows above it. */
+.setup-cap { display: none; }
+.screen-setup:not([data-page="home"]) .setup-cap {
+  display: block;
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  height: var(--safe-t);
+  margin: calc(-1 * var(--safe-t)) calc(-1 * var(--pad-x-r)) -1rem calc(-1 * var(--pad-x-l));
+  background: rgb(30, 21, 11);
+}
+
+/* Tools and gadgets, sprouts and seasons: two tabs under the window. */
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.tabs[hidden] { display: none; }
+.tab {
+  min-height: 2.75rem;
+  margin: 0 3px;
+  border: 0;
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: rgba(255, 244, 227, 0.75);
+  background: rgba(255, 244, 227, 0.06);
+  box-shadow: 0 -3px var(--ink), 0 3px var(--ink), -3px 0 var(--ink), 3px 0 var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.tab[aria-selected="true"] {
+  color: var(--ink);
+  background: var(--gold);
+  box-shadow: 0 -3px var(--ink), 0 3px var(--ink), -3px 0 var(--ink), 3px 0 var(--ink),
+    inset 0 -0.22rem 0 #c99a2e;
+}
+.tab:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+
+.panel { display: grid; gap: 0.5rem; }
+.panel[hidden] { display: none; }
+.panel-head { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; min-height: 2.4rem; }
+.panel-note { margin: 0; font-size: 0.9rem; color: rgba(255, 244, 227, 0.6); }
 
 .shop-news {
   min-height: 1.3em;
-  margin: -0.35rem 0 -0.2rem !important;
+  margin: -0.35rem 0 -0.2rem;
   color: var(--gold);
   font-size: 0.95rem;
   line-height: 1.3;
@@ -794,8 +893,6 @@ body {
   text-shadow: 2px 0 var(--ink), -2px 0 var(--ink), 0 2px var(--ink), 0 -2px var(--ink), 0 4px var(--ink);
 }
 .group-name .shelf-note { text-shadow: none; }
-.shelf { display: grid; gap: 0.5rem; }
-.shelf-head { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
 
 /* With the 2nd sprout slot: which sprout a tap picks. */
 .slot-tabs { display: flex; flex: none; gap: 0.4rem; }
@@ -814,12 +911,6 @@ body {
 }
 .slot-tabs button[aria-pressed="true"] { color: var(--ink); background: var(--gold); }
 .slot-tabs button:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
-.shelf-name {
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: var(--clay-light);
-}
 .shelf-note {
   margin-left: 0.3em;
   font-size: 0.9rem;
@@ -905,6 +996,10 @@ body {
   75% { transform: translateX(4px); }
 }
 
+/* Tried on in the window (yours to buy, or not yet): a dashed gold edge. */
+.gear.is-trying { outline: 2px dashed var(--gold); outline-offset: 3px; }
+.gear.is-trying[data-state="confirm"] { outline: 0; }
+
 /* Tapped once: tap again to buy. */
 .gear[data-state="confirm"] {
   box-shadow: 0 -2px var(--gold), 0 2px var(--gold), -2px 0 var(--gold), 2px 0 var(--gold);
@@ -978,6 +1073,36 @@ body {
 }
 .switch:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
 
+/* Orientation: two buttons side by side, the one on in gold. On the setup
+   page it sits under its name; in pause, in a row of its own. */
+.setting-orient { display: grid; gap: 0.55rem; }
+.choice { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.choice button {
+  min-height: 2.6rem;
+  margin: 0 2px;
+  border: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--chalk);
+  background: rgba(255, 244, 227, 0.1);
+  box-shadow: 0 -2px var(--ink), 0 2px var(--ink), -2px 0 var(--ink), 2px 0 var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.choice button[aria-checked="true"] {
+  color: var(--ink);
+  background: var(--gold);
+  box-shadow: 0 -2px var(--ink), 0 2px var(--ink), -2px 0 var(--ink), 2px 0 var(--ink),
+    inset 0 -0.2rem 0 #c99a2e;
+}
+.choice button:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+.pause-orient { display: grid; gap: 0.45rem; width: min(17rem, 100%); }
+.pause-orient-name { font-weight: 600; color: rgba(255, 244, 227, 0.8); }
+.is-short .pause-orient { grid-template-columns: auto 1fr; align-items: center; gap: 0.8rem; width: min(24rem, 100%); }
+/* A computer's game is played in its window, whichever shape: no orientation to pick. */
+[data-layout="desk"] .setting-orient,
+[data-layout="desk"] .pause-orient { display: none; }
+
 .howto-box summary {
   cursor: pointer;
   font-weight: 600;
@@ -990,14 +1115,15 @@ body {
 
 /* Start stays in reach while the shop scrolls under it. */
 .setup-go {
-  --below: calc(1.5rem + env(safe-area-inset-bottom, 0px));   /* the page's bottom padding */
+  --below: calc(1.5rem + var(--safe-b));   /* the page's bottom padding */
   position: sticky;
+  z-index: 3;
   bottom: calc(-1 * var(--below));
   display: grid;
   justify-items: center;
   gap: 0.2rem;
-  margin: 0 -1.5rem calc(-1 * var(--below));
-  padding: 1.2rem 1.5rem var(--below);
+  margin: 0 calc(-1 * var(--pad-x-r)) calc(-1 * var(--below)) calc(-1 * var(--pad-x-l));
+  padding: 1.2rem var(--pad-x-r) var(--below) var(--pad-x-l);
   background: linear-gradient(rgba(30, 21, 11, 0), rgb(30, 21, 11) 1.1rem);
 }
 .setup-go .btn { width: 100%; margin: 0.3rem 0 0; }
@@ -1008,17 +1134,18 @@ body {
   .gadget.is-fresh, .gadget[data-state="active"] .gadget-pic { animation: none; }
 }
 
-/* A phone held sideways is short: the pause and summary screens, which open
-   mid-game, tighten up so every button fits without scrolling. */
-@media (max-height: 520px) {
-  #paused, #over { padding-top: calc(env(safe-area-inset-top, 0px) + 0.6rem); padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.6rem); }
-  #paused .screen-body, #over .screen-body { width: min(34rem, 100%); gap: 0.4rem; }
-  #paused .screen-name, #over .screen-name { font-size: 1.8rem; }
-  #over .final { font-size: 1.05rem; }
-  #over #final-score { display: inline; font-size: 1.9rem; margin-left: 0.25em; vertical-align: -0.1em; }
-  #over .final-best, #over .final-level, #over .final-coins { font-size: 0.95rem; }
-  #over .chance { grid-auto-flow: column; width: min(36rem, 100%); }
-  #over .btn { min-height: 2.6rem; margin-top: 0.2rem; padding: 0.35em 1.4em 0.45em; font-size: 1.1rem; }
-  #over .btn-chance { font-size: 1rem; padding: 0.25em 0.9em 0.3em 0.5em; }
-  #over .chance-pic { width: 2rem; height: 2.3rem; }
-}
+/* A short page (a phone held sideways, or a game shown sideways on an
+   upright phone; main.js measures it, turned or not): the pause and summary
+   screens, which open mid-game, tighten up so every button fits without
+   scrolling. */
+.is-short #paused, .is-short #over { padding-top: calc(var(--safe-t) + 0.6rem); padding-bottom: calc(var(--safe-b) + 0.6rem); }
+.is-short #paused .screen-body, .is-short #over .screen-body { width: min(34rem, 100%); gap: 0.4rem; }
+.is-short #paused .screen-name, .is-short #over .screen-name { font-size: 1.8rem; }
+.is-short #over .final { font-size: 1.05rem; }
+.is-short #over #final-score { display: inline; font-size: 1.9rem; margin-left: 0.25em; vertical-align: -0.1em; }
+.is-short #over .final-best, .is-short #over .final-level, .is-short #over .final-coins { font-size: 0.95rem; }
+.is-short #over .chance { grid-auto-flow: column; width: min(36rem, 100%); }
+.is-short #over .btn { min-height: 2.6rem; margin-top: 0.2rem; padding: 0.35em 1.4em 0.45em; font-size: 1.1rem; }
+.is-short #over .btn-chance { font-size: 1rem; padding: 0.25em 0.9em 0.3em 0.5em; }
+.is-short #over .chance-pic { width: 2rem; height: 2.3rem; }
+.is-short #paused .btn { min-height: 2.6rem; margin-top: 0.1rem; padding: 0.35em 1.8em 0.45em; font-size: 1.2rem; }

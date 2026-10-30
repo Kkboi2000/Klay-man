@@ -243,6 +243,10 @@ export function createUI() {
     },
 
     setSound(muted) { showSwitch(el.soundButtons, 'Sound', !muted); },
+    /** How a game is shown: the setup page's and the pause screen's two buttons. */
+    setOrientation(way) {
+      for (const b of document.querySelectorAll('[data-orient]')) b.setAttribute('aria-checked', String(b.dataset.orient === way));
+    },
     setMusic(on) { showSwitch(el.musicButtons, 'Music', on); },
 
     reset() {

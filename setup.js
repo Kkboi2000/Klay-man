@@ -1,9 +1,16 @@
-// The setup page, with two pages of its own: Klayman's (tools, gadgets) and
-// the plant's (sprouts, the season), each opened from a door on setup's
-// first page, buying things the first time they're tapped. Setup's first
-// page also has slots, level skips and auto throw, and every page keeps the
-// window into the pot showing it all, and Start. (Revive isn't sold here:
-// the summary offers it when the sprout is lost.)
+// The setup page, with two pages of its own: Klayman's (tools and gadgets)
+// and the plant's (sprouts and seasons), each opened from a door on setup's
+// first page and split into two tabs. Setup's first page also has slots,
+// level skips and the settings (orientation, auto throw, sound, music).
+// Every page keeps a window into the pot, and Start. (Revive isn't sold
+// here: the summary offers it when the sprout is lost.)
+//
+// The window: on setup's own page it's wide and shows the game you'll play.
+// On Klayman's and the plant's pages it's square and shows just him, or just
+// the sprout (the mist spray, which works on the sprout, shows it, with
+// Klayman at the edge), with whatever you tapped last in place: something you
+// own goes on, something you don't is tried on, so you can see it at work
+// before you buy it. Tap it again to buy it.
 import {
   CATALOG, TOOL_IDS, SPROUT_IDS, GADGET_IDS, SEASON_IDS, SLOT_IDS, SKIP_IDS, priceOf, kindOf, formatK,
 } from './gear.js';
@@ -21,8 +28,11 @@ const NONE = { none: NO_TOOL, noGadget: NO_GADGET, noSeason: NO_SEASON };
 /** Where Klayman's head sits in his first idle frame (the title face, and the app icon). */
 export const FACE = { x: 15, y: 19, w: 18, h: 17 };
 const SLOT_NAMES = ['1st', '2nd'];
-/** Setup's own pages: the door that opens each, and the title it shows. */
+/** Setup's own pages: the title each shows, and its tabs (the first opens first). */
 const PAGES = { klayman: 'Klayman', plant: 'Plant' };
+const TABS = { klayman: ['tools', 'gadgets'], plant: ['sprouts', 'seasons'] };
+/** Things you can try on in the window before buying them. */
+const TRIES = new Set(['tool', 'gadget', 'sprout', 'season']);
 
 export function pixelCanvas(source, sx, sy, sw, sh) {
   const c = document.createElement('canvas');
@@ -47,27 +57,62 @@ function iconFor(id, sprites) {
 }
 
 // ----------------------------------------------------------------- showcase
-// A close-up of the pot: the first sprout, and Klayman in the chosen tools,
-// throwing now and then so gloves and the gun show what they do. A sprout's
-// power and the first gadget show what they do too, over and over, and the
-// pot wears the season. The leaf's and the shovel's rings are drawn smaller
-// here (their `preview` in config.js), so they fit the window.
+// A little game that plays itself in the window, over and over: every LOOP
+// seconds it starts again, so a sprout's power, a gadget, the summer sun or
+// a lightning bolt comes round again and again, a moment after it starts.
+//
+// Views (where the camera looks, and how much of the pot it takes in):
+//   home     setup's own page, wide: Klayman by the sprout, in everything picked.
+//   klayman  square: just Klayman, far from the sprout, in his tools, throwing
+//            now and then, with the gadget (if any) at work.
+//   spray    square: the sprout and the mist bottle, Klayman just in at the edge.
+//   plant    square: just the sprout, its power, and the season over it.
+
+const LOOP = 5.5;                  // seconds before the little game starts again
+const SOON = 1;                    // a sprout's power comes this soon after a start
+const THROW_EVERY = 2.2;           // Klayman throws now and then (home and klayman views)
+const SPAN = { klayman: 122, spray: 176, plant: 168 };     // world units across the square
+const GADGET_SPAN = { leaf: 262, shovel: 290, booster: 150, fertilizer: 150 };
+const HOME_ZOOM = 2.1;
+
+/** One string for a scene, to tell whether it changed. */
+const keyOf = (scene) => JSON.stringify(scene);
 
 class Showcase {
-  constructor(canvas, sprites) {
+  constructor(canvas, box, sprites) {
     this.canvas = canvas;
-    this.renderer = new Renderer(canvas, sprites, { zoom: 2.1, markers: false, smallGun: false });
+    this.box = box;
+    this.renderer = new Renderer(canvas, sprites, { zoom: HOME_ZOOM, markers: false, smallGun: false });
     this.game = null;
-    this.clock = 0;
+    this.scene = null;
+    this.key = '';
   }
 
-  show(loadout) {
-    const game = new Game({
-      rng: () => 0.5,
-      loadout: {
-        tools: loadout.tools, sprouts: loadout.sprouts.slice(0, 1), gadgets: loadout.gadgets.slice(0, 1), season: loadout.season,
-      },
-    });
+  /** Shows `scene` ({ view, tools, gadgets, sprouts, season }). The same
+   *  scene again only starts over when `replay` (a tap on it). */
+  show(scene, replay = false) {
+    const key = keyOf(scene);
+    if (key === this.key && !replay) return;
+    this.key = key;
+    this.scene = scene;
+    this.renderer.clearEffects();
+    this.renderer.snapCamera = true;
+    this.build();
+    this.resize();
+  }
+
+  /** How many world units the window takes in across (null: the home view's fixed zoom). */
+  get span() {
+    const { view, gadgets } = this.scene;
+    if (view === 'home') return null;
+    if (view === 'klayman' && gadgets[0]) return GADGET_SPAN[gadgets[0]] ?? SPAN.klayman;
+    return SPAN[view];
+  }
+
+  /** Starts the little game again, the same scene, with what's in flight left to finish. */
+  build() {
+    const { view, tools, gadgets, sprouts, season } = this.scene;
+    const game = new Game({ rng: () => 0.5, loadout: { tools, sprouts, gadgets, season } });
     for (const gadget of game.gadgets) {
       if (gadget.spec.preview) gadget.spec = { ...gadget.spec, ...gadget.spec.preview };
     }
@@ -75,60 +120,101 @@ class Showcase {
     game.toSpawn = 0;
     game.coinTimer = Infinity;
     game.potItems.timer = Infinity;
-    game.klay.x = game.tree.x + 46;
-    game.klay.y = game.tree.y + 10;
-    // Show the sprout's power straight away rather than in a minute.
-    const g = game.gear;
-    const soon = 1.2;
-    if (g.spores) game.sporeTimer = soon;
-    if (g.heal) { game.lives -= 1; game.healTimer = soon; }
-    if (g.shield) game.shieldTimer = soon;
-    if (g.hide) game.hideTimer = soon;
-    if (game.flowerItems) game.flowerItems.timer = soon;
-    if (game.flowerCoins) game.flowerCoins.timer = soon;
-    if (game.weather.sun) game.sunTimer = soon;
+    game.stormTimer = Infinity;    // the window's lightning is for show (update)
+    const t = game.tree;
+    const k = game.klay;
+    // Where Klayman stands, and the point the window is centred on.
+    let center;
+    if (view === 'home') {
+      k.x = t.x + 46; k.y = t.y + 10;
+      center = { x: (t.x + k.x) / 2, y: t.y - 25 };
+    } else if (view === 'klayman') {
+      k.x = t.x - 185; k.y = t.y + 120;                        // well clear of the sprout and the rim
+      const ring = gadgets[0] === 'leaf' || gadgets[0] === 'shovel';
+      center = { x: k.x, y: k.y - (ring ? 10 : 24) };
+    } else if (view === 'spray') {
+      center = { x: t.x - 16, y: t.y - 28 };
+      k.x = center.x + SPAN.spray / 2 - 2; k.y = t.y + 12;    // only his near side in the window
+    } else {
+      k.x = t.x + 330; k.y = t.y - 60;                         // well out of the window
+      center = { x: t.x, y: t.y - 30 };
+    }
+    this.center = center;
+    this.preparePowers(game, view);
     game.drainEvents();
     this.game = game;
-    this.clock = 0.9;
-    this.rest = 0.6;               // the gadget's first go comes quickly
-    this.renderer.clearEffects();
-    this.renderer.snapCamera = true;
+    this.t = 0;
+    this.throwAt = view === 'home' || view === 'klayman' ? 0.9 : Infinity;
+    this.loop = Math.max(LOOP, (game.gadgets[0]?.spec.time ?? 0) + 1.6);
+    this.bolted = false;
+    this.coined = false;
+  }
+
+  /** The sprout's power (and summer's sun) a moment after the start, and
+   *  short enough to see whole before the next start. */
+  preparePowers(game, view) {
+    if (view === 'klayman') return;              // the sprout isn't in the window
+    const g = game.gear;
+    if (g.spores) game.sporeTimer = SOON;
+    if (g.heal) { game.lives = Math.max(0.5, game.lives - 1); game.healTimer = g.spores ? SOON + 1.2 : SOON; }
+    if (g.growEvery) game.growTimer = SOON + 2.4;
+    if (g.shield) game.shieldTimer = SOON;
+    if (g.hide) game.hideTimer = SOON;
+    if (game.flowerItems) game.flowerItems.timer = SOON;
+    if (game.flowerCoins) game.flowerCoins.timer = SOON;
+    if (game.weather.sun) game.sunTimer = SOON;
+    // Corn and lilies close for long in a game; here, for a few seconds.
+    const short = (p) => p && { ...p, time: 2.6 };
+    if (g.shield || g.hide) game.gear = Object.freeze({ ...g, shield: short(g.shield), hide: short(g.hide) });
   }
 
   resize() {
-    const r = this.canvas.getBoundingClientRect();
-    if (r.width < 1) return;
-    this.renderer.resize(Math.floor(r.width), Math.floor(r.height), Math.min(3, devicePixelRatio || 1));
+    const w = this.box.clientWidth;
+    const h = this.box.clientHeight;
+    if (w < 1 || !this.scene) return;
+    const span = this.span;
+    this.renderer.fixedZoom = span ? w / span : HOME_ZOOM;
+    this.renderer.resize(w, h, Math.min(3, devicePixelRatio || 1));
   }
 
   update(dt) {
     const { game } = this;
     if (!game) return;
-    this.clock -= dt;
-    const pressed = this.clock <= 0;
-    if (pressed) this.clock = 2.2;
-    // The gadget, again and again: a short rest instead of its real cooldown.
-    const gadget = game.gadgets[0];
+    this.t += dt;
+    if (this.t >= this.loop) {
+      this.build();
+      return this.update(0);
+    }
+    const pressed = this.t >= this.throwAt;
+    if (pressed) this.throwAt += THROW_EVERY;
+    // The gadget, a moment after each start.
     let use = -1;
-    if (gadget) {
-      if (gadget.wait > 0) gadget.wait = Math.min(gadget.wait, this.rest);
-      if (gadget.ready) {
-        if (gadget.id === 'spray') game.lives = Math.max(0.5, game.maxLives - 0.5);
-        use = 0;
-        this.rest = 1.4;
-      }
+    const gadget = game.gadgets[0];
+    if (gadget?.ready && this.t >= 0.6) {
+      if (gadget.id === 'spray') game.lives = Math.max(0.5, game.maxLives - 0.5);
+      use = 0;
     }
     game.update(dt, { ...NO_INPUT, pressed, gadget: use });
-    // Summer: the sun comes round again and again, and the sprout stays its size.
-    const sun = game.weather.sun;
-    if (sun && game.sunGrown > 0) {
-      game.maxLives -= game.sunGrown;
-      game.lives = Math.min(game.lives, game.maxLives);
-      game.sunGrown = 0;
-      game.sunTimer = 4;
+    // Coins and items blink out before the next start rather than vanish.
+    for (const c of game.coins) if (c.landed) c.life = Math.min(c.life, 3.2);
+    for (const item of game.items) if (item.landed) item.life = Math.min(item.life, 3.2);
+    // The backpack: a coin turns up near Klayman, and comes running.
+    if (game.gear.magnet && this.scene.view === 'klayman' && !this.coined && this.t >= 1.4) {
+      this.coined = true;
+      game.dropCoin({ x: game.klay.x + 92, y: game.klay.y - 30 }, 1);
     }
-    this.renderer.handle(game.drainEvents());
-    this.renderer.draw(game, dt, { x: (game.tree.x + game.klay.x) / 2, y: game.tree.y - 25 });
+    // Rainy: a bolt comes down by the sprout, for show (nothing to strike).
+    const events = game.drainEvents().filter((e) => e.type !== 'coin');   // no "+1K": these coins aren't yours
+    if (game.weather.storm && this.scene.view !== 'klayman' && !this.bolted && this.t >= 2.4) {
+      this.bolted = true;
+      events.push({ type: 'lightning', x: game.tree.x + 52, y: game.tree.y + 34 });
+    }
+    this.renderer.handle(events);
+    // The camera's follow puts its target a little below the middle; in the
+    // square, aim it so the centre lands mid-window.
+    const c = this.center;
+    const lead = this.scene.view === 'home' ? 0 : 0.08 * this.renderer.cam.h;
+    this.renderer.draw(game, dt, { x: c.x, y: c.y + lead });
   }
 }
 
@@ -159,12 +245,16 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     pages: { klayman: $('page-klayman'), plant: $('page-plant') },
     doors: { klayman: $('door-klayman'), plant: $('door-plant') },
     doorPics: { klayman: document.querySelector('[data-pic="klayman"]'), plant: document.querySelector('[data-pic="plant"]') },
+    tablists: [...document.querySelectorAll('.tabs[data-for]')],
+    tabs: [...document.querySelectorAll('[data-tab]')],
   };
-  const showcase = new Showcase($('showcase'), sprites);
+  const showcase = new Showcase($('showcase'), document.querySelector('.peek'), sprites);
   const rows = new Map();
   let armed = null;                // tapped once: tap again to buy
   let sproutSlot = 0;              // which sprout a tap picks: 1st or 2nd
   let page = null;                 // the page open: 'klayman', 'plant', or null for setup's own
+  const tabOf = { klayman: 'tools', plant: 'sprouts' };   // each page's open tab, kept while you're on setup
+  let look = null;                 // what was tapped last on this tab: the window shows it
   el.doorPics.klayman.append(pixelCanvas(sprites.klay, 16, 19, 16, 25));
 
   function makeRow(id) {
@@ -225,19 +315,22 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
 
   function choose(id) {
     const name = (NONE[id] ?? CATALOG[id]).name;
+    const tries = page !== null && TRIES.has(kindOf(id));     // shown in the window, bought or not
+    look = id;
     if (NONE[id] || wallet.owns(id)) {
       armed = null;
       say(use(id));
     } else if (!wallet.canAfford(id)) {
       armed = null;
-      say(`You need ${formatK(priceOf(id) - wallet.coins)} more for ${name}.`);
+      const short = formatK(priceOf(id) - wallet.coins);
+      say(tries ? `Trying ${name}. You need ${short} more to buy it.` : `You need ${short} more for ${name}.`);
       const { row } = rows.get(id);
       row.classList.remove('is-short');
       void row.offsetWidth;
       row.classList.add('is-short');
     } else if (armed !== id) {
       armed = id;
-      say(`Tap ${name} again to buy it for ${formatK(priceOf(id))}.`);
+      say(tries ? `Trying ${name}. Tap again to buy it for ${formatK(priceOf(id))}.` : `Tap ${name} again to buy it for ${formatK(priceOf(id))}.`);
     } else {
       armed = null;
       wallet.buy(id, sproutSlot);
@@ -245,7 +338,7 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
       sound.play('buy', { volume: 0.6 });
       say(afterBuying(id));
     }
-    render();
+    render(true);
   }
 
   /** The tag on the right of a row you own: what it's doing for you now. */
@@ -260,7 +353,40 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     return { on, text: on ? 'On' : 'Use' };
   }
 
-  function render() {
+  // ------------------------------------------------------- the window
+
+  /** What the window shows. On setup's own page: the game you'll play. On
+   *  Klayman's and the plant's: him, or the sprout, with what you tapped
+   *  last in place (something you don't own is tried on, not bought). */
+  function scene() {
+    const lo = wallet.loadout;
+    const sprout = lo.sprouts[0];
+    if (page === null) {
+      return { view: 'home', tools: lo.tools, gadgets: lo.gadgets.slice(0, 1), sprouts: [sprout], season: lo.season };
+    }
+    const tried = look && !NONE[look] && !wallet.owns(look) ? look : null;
+    const tab = tabOf[page];
+    if (tab === 'tools') {
+      const tools = tried ? [...lo.tools, tried].slice(-wallet.toolSlots) : lo.tools;
+      return { view: 'klayman', tools, gadgets: [], sprouts: [sprout], season: null };
+    }
+    if (tab === 'gadgets') {
+      let gadget = lo.gadgets.at(-1) ?? null;           // the one put on last
+      if (tried) gadget = tried;
+      else if (look === 'noGadget') gadget = null;
+      else if (lo.gadgets.includes(look)) gadget = look;
+      return { view: gadget === 'spray' ? 'spray' : 'klayman', tools: lo.tools, gadgets: gadget ? [gadget] : [], sprouts: [sprout], season: null };
+    }
+    if (tab === 'sprouts') {
+      const shown = kindOf(look) === 'sprout' ? look : lo.sprouts[sproutSlot] ?? sprout;
+      return { view: 'plant', tools: [], gadgets: [], sprouts: [shown], season: lo.season };
+    }
+    const season = look === 'noSeason' ? null : kindOf(look) === 'season' ? look : lo.season;
+    return { view: 'plant', tools: [], gadgets: [], sprouts: [sprout], season };
+  }
+
+  /** `replay`: a row was tapped, so the window starts its little show again. */
+  function render(replay = false) {
     el.purse.textContent = formatK(wallet.coins);
     for (const [id, { row, tag }] of rows) {
       let state;
@@ -278,13 +404,14 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
         text = state === 'confirm' ? 'Buy?' : formatK(priceOf(id));
       }
       row.dataset.state = state;
+      row.classList.toggle('is-trying', page !== null && look === id && state !== 'on' && state !== 'owned');
       row.setAttribute('aria-pressed', String(state === 'on'));
       tag.textContent = text;
     }
     el.toolsNote.textContent = wallet.toolSlots > 1 ? 'two per game' : 'one per game';
     el.gadgetsNote.textContent = wallet.gadgetSlots > 1 ? 'two per game' : 'one per game';
     el.sproutSlots.hidden = !wallet.hasBackup;
-    el.sproutsNote.textContent = wallet.hasBackup ? 'the 2nd takes over if the 1st is lost' : '';
+    el.sproutsNote.textContent = wallet.hasBackup ? 'the 2nd takes over if the 1st is lost' : 'one per game';
     if (!wallet.hasBackup) sproutSlot = 0;
     for (const b of el.sproutSlots.querySelectorAll('[data-slot]')) {
       b.setAttribute('aria-pressed', String(Number(b.dataset.slot) === sproutSlot));
@@ -298,7 +425,7 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     const level = startLevel();
     el.start.textContent = level > 1 ? `Start at level ${level}` : 'Start';
     renderPages();
-    showcase.show(wallet.loadout);
+    showcase.show(scene(), replay);
   }
 
   // ------------------------------------------------------- setup's pages
@@ -306,14 +433,22 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
   const nameOf = (id) => CATALOG[id].name;
   const listOf = (ids) => (ids.length ? ids.map(nameOf).join(', ') : 'none');
 
-  /** Which page shows, its title and back button, and what each door says
-   *  is picked behind it. */
+  /** Which page shows, its title and back button, its tabs, and what each
+   *  door says is picked behind it. */
   function renderPages() {
+    el.screen.dataset.page = page ?? 'home';
     el.home.hidden = page !== null;
     for (const [name, view] of Object.entries(el.pages)) view.hidden = page !== name;
     el.title.textContent = page ? PAGES[page] : 'Setup';
     el.back.hidden = page === null;
     if (page) el.admin.hidden = true;
+    for (const list of el.tablists) list.hidden = list.dataset.for !== page;
+    for (const b of el.tabs) {
+      const open = page !== null && tabOf[page] === b.dataset.tab;
+      b.setAttribute('aria-selected', String(open));
+      b.tabIndex = open ? 0 : -1;
+      $(b.getAttribute('aria-controls')).hidden = !open;
+    }
     const { tools, gadgets, sprouts, season } = wallet.loadout;
     el.doors.klayman.replaceChildren(`Tool: ${listOf(tools)}`, document.createElement('br'), `Gadget: ${listOf(gadgets)}`);
     const backup = sprouts.length > 1 ? ` (2nd: ${nameOf(sprouts[1])})` : '';
@@ -325,12 +460,18 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     }
   }
 
+  /** Forgets what was tapped: a new page or tab starts from what's picked. */
+  function fresh() {
+    look = null;
+    armed = null;
+    say('');
+  }
+
   /** Opens Klayman's or the plant's page. It's a step in the browser's
    *  history too, so a phone's back gesture comes back to setup. */
   function open(name) {
     page = name;
-    armed = null;
-    say('');
+    fresh();
     try { history.pushState({ setupPage: name }, ''); } catch { /* no history here: the button still works */ }
     render();
     el.screen.scrollTop = 0;
@@ -342,16 +483,36 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     if (page === null) return;
     const was = page;
     page = null;
-    armed = null;
-    say('');
+    fresh();
     if (!fromHistory && history.state?.setupPage) history.back();
     render();
     el.screen.scrollTop = 0;
     document.querySelector(`[data-open="${was}"]`)?.focus({ preventScroll: true });
   }
 
+  /** Opens a tab on the page that's open. */
+  function openTab(name, focus = false) {
+    if (!page || !TABS[page].includes(name) || tabOf[page] === name) return;
+    tabOf[page] = name;
+    fresh();
+    render();
+    // Back to the top of the list, under the window.
+    el.screen.scrollTop = Math.min(el.screen.scrollTop, $('window').offsetTop);
+    if (focus) document.querySelector(`[data-tab="${name}"]`)?.focus({ preventScroll: true });
+  }
+
   for (const door of document.querySelectorAll('[data-open]')) {
     door.addEventListener('click', () => open(door.dataset.open));
+  }
+  for (const b of el.tabs) {
+    b.addEventListener('click', () => openTab(b.dataset.tab));
+    // Arrow keys move between a page's two tabs.
+    b.addEventListener('keydown', (e) => {
+      if (e.code !== 'ArrowLeft' && e.code !== 'ArrowRight') return;
+      const [first, second] = TABS[page] ?? [];
+      openTab(tabOf[page] === first ? second : first, true);
+      e.preventDefault();
+    });
   }
   el.back.addEventListener('click', () => close());
   addEventListener('popstate', () => close(true));
@@ -363,7 +524,7 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     const b = e.target.closest('[data-slot]');
     if (!b) return;
     sproutSlot = Number(b.dataset.slot);
-    armed = null;
+    fresh();
     say(sproutSlot === 1 ? 'Tap a sprout to make it your 2nd.' : 'Tap a sprout to make it your 1st.');
     render();
   });
@@ -400,8 +561,7 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
   return {
     /** Shows setup from its own page (coming back from a game, say). */
     render() {
-      armed = null;
-      say('');
+      fresh();
       if (page !== null) close();
       else render();
       showcase.resize();

@@ -8,6 +8,9 @@
 // The K button is a second stick, for aiming: it comes to where the thumb
 // lands, like the joystick. Dragged, Klayman aims that way, all the way
 // round; pressed without dragging, at the closest bacteria.
+//
+// Every position is read through `frame` (orientation.js): when the page is
+// turned a quarter in CSS, touches on the screen are turned back onto it.
 
 const MOVE_KEYS = {
   ArrowLeft: [-1, 0], KeyA: [-1, 0],
@@ -23,8 +26,15 @@ const AUTO_KEY = 'klayman.autoThrow';
 
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
+/** The page as the screen shows it: nothing turned. */
+const UNTURNED = {
+  point: (e) => ({ x: e.clientX, y: e.clientY }),
+  rect: (el) => el.getBoundingClientRect(),
+};
+
 export function createInput({
   stage, stickZone, stickBase, stickKnob, throwZone, kStick, throwButton, autoButton, gadgetButtons = [], onPause,
+  frame = UNTURNED,
 }) {
   const keys = new Set();
   let spaceDown = false;
@@ -60,8 +70,9 @@ export function createInput({
   // --------------------------------------------------------------- mouse
   // Klayman aims at the mouse; a click throws (hold to keep throwing).
   function placeMouse(e) {
-    const r = stage.getBoundingClientRect();
-    mouse = { x: e.clientX - r.left, y: e.clientY - r.top };
+    const r = frame.rect(stage);
+    const p = frame.point(e);
+    mouse = { x: p.x - r.left, y: p.y - r.top };
   }
   stage.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') placeMouse(e); });
   stage.addEventListener('pointerdown', (e) => {
@@ -90,21 +101,22 @@ export function createInput({
   // ------------------------------------------------------------ joystick
   function baseRadius() { return stickBase.offsetWidth / 2 || 56; }
 
-  function placeBase(clientX, clientY) {
-    const zone = stickZone.getBoundingClientRect();
+  /** x, y: where the thumb is, on the page (frame.point). */
+  function placeBase(px, py) {
+    const zone = frame.rect(stickZone);
     const r = baseRadius();
-    const x = Math.min(Math.max(clientX - zone.left, r), zone.width - r);
-    const y = Math.min(Math.max(clientY - zone.top, r), zone.height - r);
+    const x = Math.min(Math.max(px - zone.left, r), zone.width - r);
+    const y = Math.min(Math.max(py - zone.top, r), zone.height - r);
     stickBase.style.left = `${x}px`;
     stickBase.style.top = `${y}px`;
     stick.ox = zone.left + x;
     stick.oy = zone.top + y;
   }
 
-  function moveKnob(clientX, clientY) {
+  function moveKnob(px, py) {
     const r = baseRadius() * 0.62;
-    let dx = clientX - stick.ox;
-    let dy = clientY - stick.oy;
+    let dx = px - stick.ox;
+    let dy = py - stick.oy;
     const d = Math.hypot(dx, dy);
     if (d > r) { dx = (dx / d) * r; dy = (dy / d) * r; }
     stickKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
@@ -129,12 +141,15 @@ export function createInput({
     stick.id = e.pointerId;
     stickZone.setPointerCapture(e.pointerId);
     stickBase.classList.add('is-active');
-    placeBase(e.clientX, e.clientY);
-    moveKnob(e.clientX, e.clientY);
+    const p = frame.point(e);
+    placeBase(p.x, p.y);
+    moveKnob(p.x, p.y);
     e.preventDefault();
   });
   stickZone.addEventListener('pointermove', (e) => {
-    if (e.pointerId === stick.id) moveKnob(e.clientX, e.clientY);
+    if (e.pointerId !== stick.id) return;
+    const p = frame.point(e);
+    moveKnob(p.x, p.y);
   });
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
     stickZone.addEventListener(type, (e) => { if (e.pointerId === stick.id) releaseStick(); });
@@ -145,19 +160,19 @@ export function createInput({
   function kTravel() { return kRadius() * 0.5; }
 
   /** The K button comes to the thumb; dragging is measured from where it landed. */
-  function placeK(clientX, clientY) {
-    const zone = throwZone.getBoundingClientRect();
+  function placeK(px, py) {
+    const zone = frame.rect(throwZone);
     const r = kRadius();
-    kStick.style.left = `${clamp(clientX - zone.left, r, zone.width - r)}px`;
-    kStick.style.top = `${clamp(clientY - zone.top, r, zone.height - r)}px`;
-    k.ox = clientX;
-    k.oy = clientY;
+    kStick.style.left = `${clamp(px - zone.left, r, zone.width - r)}px`;
+    kStick.style.top = `${clamp(py - zone.top, r, zone.height - r)}px`;
+    k.ox = px;
+    k.oy = py;
   }
 
-  function steerK(clientX, clientY) {
+  function steerK(px, py) {
     const travel = kTravel();
-    let dx = clientX - k.ox;
-    let dy = clientY - k.oy;
+    let dx = px - k.ox;
+    let dy = py - k.oy;
     const d = Math.hypot(dx, dy);
     k.steer = d < travel * K_DEAD_ZONE ? null : { x: dx / d, y: dy / d };
     if (d > travel) { dx = (dx / d) * travel; dy = (dy / d) * travel; }
@@ -182,12 +197,15 @@ export function createInput({
     k.steer = null;
     throwZone.setPointerCapture(e.pointerId);
     throwButton.classList.add('is-down');
-    placeK(e.clientX, e.clientY);
+    const p = frame.point(e);
+    placeK(p.x, p.y);
     pressed = true;
     e.preventDefault();
   });
   throwZone.addEventListener('pointermove', (e) => {
-    if (e.pointerId === k.id) steerK(e.clientX, e.clientY);
+    if (e.pointerId !== k.id) return;
+    const p = frame.point(e);
+    steerK(p.x, p.y);
   });
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
     throwZone.addEventListener(type, (e) => { if (e.pointerId === k.id) releaseK(); });
