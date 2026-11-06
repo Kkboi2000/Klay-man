@@ -391,7 +391,7 @@ export class Renderer {
     const bg = this.sprites.bg;
     ctx.drawImage(bg, 0, 0, bg.width * POT_SCALE, bg.height * POT_SCALE);
     ctx.imageSmoothingEnabled = false;
-    this.weather.ground(ctx, game.season);
+    this.weather.ground(ctx, game.seasons);
 
     if (game.fertilized) this.drawFeed(game);
     this.drawPatches(dt);
@@ -402,11 +402,11 @@ export class Renderer {
     const slowAll = game.fertilized;
     const things = [];
     things.push({ y: TREE_SPOT.y, draw: () => this.drawTree(game) });
-    if (game.season === 'spring' && !game.over) this.stars(game, things);
+    if (game.inSeason('spring') && !game.over) this.stars(game, things);
     if (game.boss) things.push({ y: game.boss.y, draw: () => this.drawBoss(game.boss, game) });
     for (const b of game.bacteria) things.push({ y: b.y, draw: () => this.drawBacteria(b, game.frozen, slowAll) });
     for (const c of game.coins) things.push({ y: c.y, draw: () => this.drawCoin(c) });
-    for (const d of game.dirtballs) things.push({ y: d.y, draw: () => this.drawDirtball(d, game.frozen, game.season === 'autumn') });
+    for (const d of game.dirtballs) things.push({ y: d.y, draw: () => this.drawDirtball(d, game.frozen, game.inSeason('autumn')) });
     for (const item of game.items) things.push({ y: item.y, draw: () => this.drawItem(item) });
     for (const shot of game.shots) things.push({ y: shot.y, draw: () => this.drawShot(shot) });
     things.push({ y: game.klay.y, draw: () => this.drawKlayman(game) });
@@ -430,7 +430,7 @@ export class Renderer {
     this.drawPopups(dt);
 
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    this.weather.screen(ctx, game.season, this.cssW, this.cssH, dt);
+    this.weather.screen(ctx, game.seasons, this.cssW, this.cssH, dt);
     if (this.markers) this.drawMarkers(game);
   }
 
@@ -538,7 +538,7 @@ export class Renderer {
     // Corn shudders as its leaves snap shut.
     const sx = this.kick > 0 && !this.calm ? Math.round(Math.sin(this.time * 60) * this.kick * 6) : 0;
     this.sprite(look.sheet, frame * 32, 0, 32, 48, x + sx, y, a.x, a.y, { scale });
-    if (game.season === 'summer') {
+    if (game.inSeason('summer')) {
       // Summer: tiny sunglasses, low on the stem (the bridge sits on the spot).
       const spot = SHADES_SPOTS[game.gear.sprout] ?? SHADES_SPOTS.sprout;
       const img = this.sprites.shades;

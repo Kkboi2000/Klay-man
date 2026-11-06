@@ -74,7 +74,7 @@
     </div>
 
     <section id="title" class="screen" aria-labelledby="title-name">
-      <canvas id="title-balls" class="title-balls" aria-hidden="true"></canvas>
+      <div class="title-art" aria-hidden="true"></div>
       <div class="screen-body">
         <canvas id="face" class="face" role="img" aria-label="Klayman’s face"></canvas>
         <h1 id="title-name" class="title-name">Klayman</h1>
@@ -92,6 +92,7 @@
     </section>
 
     <section id="setup" class="screen screen-setup" hidden aria-labelledby="setup-name">
+      <canvas id="setup-balls" class="setup-balls" aria-hidden="true"></canvas>
       <div class="setup">
         <!-- Over the notch, so the list never shows through it under the window. -->
         <div class="setup-cap" aria-hidden="true"></div>
@@ -203,7 +204,7 @@
               <li>From level 7, dirt thrown at a dirtball from afar breaks it.</li>
               <li>Levels 5, 10, 15 and on end with a boss bacteria. Wear it down with dirt, and push dirtballs into it, for a 10K coin. While it’s out, thrown dirt doesn’t break dirtballs.</li>
               <li>A gadget’s button, top right, fills up as it recharges. Tap it (G on a computer) when it’s full.</li>
-              <li>A season (under Plant) changes the weather over the pot, and what bacteria, dirtballs and the sprout do. Never the boss.</li>
+              <li>A season (under Plant) changes the weather over the pot, and what bacteria, dirtballs and the sprout do. Never the boss. With the 2nd season slot, mix two.</li>
             </ul>
             <p class="keys">WASD or arrow keys to move, the mouse to aim. Click or Space to throw, or to push a dirtball you’re touching. G and H use your gadgets. P to pause.</p>
           </details>
@@ -234,7 +235,7 @@
             <div id="sprouts" class="shelf-list"></div>
           </div>
           <div id="panel-seasons" class="panel" role="tabpanel" aria-labelledby="tab-seasons" hidden>
-            <p class="panel-note">one per game, 1% stronger every level</p>
+            <p id="seasons-note" class="panel-note">one per game; 1% stronger every level</p>
             <div id="seasons" class="shelf-list"></div>
           </div>
         </section>

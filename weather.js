@@ -7,6 +7,8 @@
 //   screen()  over the whole view: summer brighter, winter a little blue,
 //             a spring breeze now and then, autumn leaves drifting down,
 //             light rain, a lightning flash.
+// Each takes the game's seasons, a list: two mixed (the 2nd season slot)
+// are simply both drawn, one over the other.
 // With reduced motion: no falling rain or breeze, a softer flash.
 import { SOIL, WORLD } from './world.js';
 
@@ -110,8 +112,8 @@ export class Weather {
   }
 
   /** On the soil, under everything standing on it. */
-  ground(ctx, season) {
-    if (season !== 'autumn') return;
+  ground(ctx, seasons) {
+    if (!seasons.includes('autumn')) return;
     this.shade ??= treeShade();
     const sway = this.calm ? 0 : Math.sin(this.t * 0.7) * 4;
     ctx.save();
@@ -169,29 +171,33 @@ export class Weather {
     this.bolts = this.bolts.filter((b) => b.t < BOLT_TIME);
   }
 
-  /** Over the whole view (CSS pixels): the season's light, rain, breeze, flash. */
-  screen(ctx, season, w, h, dt) {
+  /** Over the whole view (CSS pixels): the seasons' light, rain, breeze, flash. */
+  screen(ctx, seasons, w, h, dt) {
     this.t += dt;
+    const has = (id) => seasons.includes(id);
     ctx.save();
-    if (season === 'summer') {
-      ctx.globalCompositeOperation = 'screen';
-      ctx.fillStyle = 'rgba(255, 226, 150, 0.16)';
-      ctx.fillRect(0, 0, w, h);
-    } else if (season === 'winter') {
+    if (has('winter')) {
       ctx.globalCompositeOperation = 'multiply';
       ctx.fillStyle = 'rgb(200, 224, 255)';
       ctx.fillRect(0, 0, w, h);
       ctx.globalCompositeOperation = 'source-over';
       ctx.fillStyle = 'rgba(150, 200, 255, 0.13)';
       ctx.fillRect(0, 0, w, h);
-    } else if (season === 'rainy') {
+    }
+    if (has('rainy')) {
+      ctx.globalCompositeOperation = 'source-over';
       ctx.fillStyle = 'rgba(24, 36, 58, 0.14)';
       ctx.fillRect(0, 0, w, h);
     }
+    if (has('summer')) {           // last: the sun breaks through whatever else is about
+      ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = 'rgba(255, 226, 150, 0.16)';
+      ctx.fillRect(0, 0, w, h);
+    }
     ctx.restore();
-    if (season === 'rainy' && !this.calm) this.rain(ctx, w, h, dt);
-    if (season === 'spring' && !this.calm) this.breeze(ctx, w, h, dt);
-    if (season === 'autumn' && !this.calm) this.fall(ctx, w, h, dt);
+    if (has('rainy') && !this.calm) this.rain(ctx, w, h, dt);
+    if (has('spring') && !this.calm) this.breeze(ctx, w, h, dt);
+    if (has('autumn') && !this.calm) this.fall(ctx, w, h, dt);
     if (this.flash > 0) {
       ctx.save();
       ctx.fillStyle = `rgba(235, 245, 255, ${this.flash})`;

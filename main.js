@@ -1,6 +1,7 @@
 // Boots Klayman: loads assets, lays out the screen for the device, runs the loop.
-// Three pages: the title (Klayman's face over rolling dirtballs), setup
-// (tools, sprouts, gadgets, the shop, auto throw), and the game itself, which ends
+// Three pages: the title (Klayman's face over the title art), setup (tools,
+// sprouts, gadgets, seasons, the shop, settings, over rolling dirtballs),
+// and the game itself, which ends
 // with a score summary: a revive or the backup sprout can carry it on, or
 // play again, or go back to setup.
 import { Game } from './game.js';
@@ -12,7 +13,7 @@ import { createUI } from './ui.js';
 import { Wallet, SAVE, ADMIN_SAVE, CATALOG } from './gear.js';
 import { ONCE } from './config.js';
 import { createSetup, createFace } from './setup.js';
-import { createTitleBalls } from './titleballs.js';
+import { createSetupBalls } from './setupballs.js';
 import { createOrientation, wayFor } from './orientation.js';
 
 const STEP = 1 / 60;
@@ -26,7 +27,7 @@ const isPreview = Boolean(globalThis.KLAYMAN_ASSETS);
 
 let mode = 'loading';            // loading | title | setup | playing | paused | over
 let touch = matchMedia('(pointer: coarse)').matches;
-let game, renderer, input, sound, ui, best, wallet, setup, face, titleBalls, sprites;
+let game, renderer, input, sound, ui, best, wallet, setup, face, setupBalls, sprites;
 // A phone or tablet: the only place a page is ever turned (orientation.js).
 const handheld = touch && matchMedia('(hover: none)').matches;
 const orientation = createOrientation({ handheld, onChange: () => layout() });
@@ -100,6 +101,7 @@ function layout() {
   app.style.setProperty('--cw', `${view.w}px`);
   app.style.setProperty('--ch', `${view.h}px`);
   app.classList.toggle('is-short', view.h <= 520);
+  app.dataset.shape = view.w > view.h ? 'wide' : 'tall';   // which title art fits the page
   app.dataset.layout = !touch ? 'desk' : view.h >= view.w ? 'portrait' : 'landscape';
   const stage = $('stage');
   const w = stage.clientWidth;
@@ -389,11 +391,11 @@ function loop(now) {
   }
   renderer.draw(game, dt);
   ui.update(game, dt);
-  if (mode === 'title') {
-    titleBalls.draw(dt, calm);
-    face.draw(dt, calm);
+  if (mode === 'title') face.draw(dt, calm);
+  if (mode === 'setup') {
+    setupBalls.draw(dt, calm);
+    setup.update(dt);
   }
-  if (mode === 'setup') setup.update(dt);
   requestAnimationFrame(loop);
 }
 
@@ -484,6 +486,7 @@ function registerServiceWorker() {
 
 async function boot() {
   setUpInstall();                // first: the install offer can arrive before assets load
+  layout();                      // the page's shape, so the title art that fits comes in while assets load
   ui = createUI();
   if (new URLSearchParams(location.search).has('admin')) {
     try { localStorage.setItem(ADMIN_KEY, '1'); } catch { /* private mode */ }
@@ -512,7 +515,7 @@ async function boot() {
   game.drainEvents();
   dressButtons(sprites.bac);
   face = createFace($('face'), sprites.klay);
-  titleBalls = createTitleBalls($('title-balls'), sprites.bac);
+  setupBalls = createSetupBalls($('setup-balls'), sprites.bac);
 
   ui.setGadgetIcons(sprites.gadgetIcons);
   input = createInput({

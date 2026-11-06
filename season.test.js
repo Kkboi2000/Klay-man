@@ -1,10 +1,11 @@
 // Seasons (v22; v24: stronger every level, autumn's crack, lightning near
-// Klayman), dirtballs pushed any way, and the round pot. Run with:  npm test
+// Klayman; v25: two mixed, with the 2nd season slot), dirtballs pushed any
+// way, and the round pot. Run with:  npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game, NO_INPUT } from './game.js';
-import { BACTERIA, BOSS, DIRTBALL, GADGETS, KLAYMAN, SCORE, SEASONS, SEASON_LEVEL_UP, SPROUTS, TREE } from './config.js';
-import { CATALOG, SAVE, SEASON_IDS, Wallet, gearFor, seasonAt } from './gear.js';
+import { BACTERIA, BOSS, DIRTBALL, GADGETS, KLAYMAN, SCORE, SEASONS, SEASON_LEVEL_UP, SLOTS, SPROUTS, TREE } from './config.js';
+import { CATALOG, SAVE, SEASON_IDS, SLOT_IDS, Wallet, gearFor, seasonAt, weatherOf } from './gear.js';
 import { SOIL, dist, insideRing, insideSoil, keepOnSoil, rimPoint } from './world.js';
 import { Dirtball } from './dirtball.js';
 import { bossSpawnEvery } from './boss.js';
@@ -14,9 +15,11 @@ const run = (game, seconds, input = NO_INPUT) => {
   for (let t = 0; t < seconds; t += STEP) game.update(STEP, input);
 };
 
-/** An empty pot in `season`: no spawning, no coins, Klayman parked away from the sprout. */
+/** An empty pot in `season` (one, a list of two to mix, or null): no
+ *  spawning, no coins, Klayman parked away from the sprout. */
 function quietGame(season = null, more = {}) {
-  const game = new Game({ rng: () => 0.5, loadout: { season, ...more } });
+  const seasons = season === null ? [] : [season].flat();
+  const game = new Game({ rng: () => 0.5, loadout: { seasons, ...more } });
   game.phase = 'test';
   game.toSpawn = 0;
   game.klay.x = SOIL.cx - 120;
@@ -81,24 +84,89 @@ test('five seasons at 169K each, one per game, and a save remembers it', () => {
   const storage = memory();
   const w = new Wallet(storage);
   w.add(400);
-  assert.equal(w.loadout.season, null, 'no season to start with');
+  assert.deepEqual(w.loadout.seasons, [], 'no season to start with');
   assert.equal(w.buy('winter'), true);
-  assert.equal(w.loadout.season, 'winter', 'bought straight into use');
+  assert.deepEqual(w.loadout.seasons, ['winter'], 'bought straight into use');
   assert.equal(w.equip('summer'), false, 'only what you own');
   w.buy('summer');
-  assert.equal(w.loadout.season, 'summer', 'one at a time: the new one swaps in');
+  assert.deepEqual(w.loadout.seasons, ['summer'], 'one at a time: the new one swaps in');
   assert.equal(w.isOn('winter'), false);
+  w.equip('summer');
+  assert.deepEqual(w.loadout.seasons, ['summer'], 'with one slot, tapping it again keeps it');
   const again = new Wallet(storage);
-  assert.equal(again.loadout.season, 'summer', 'remembered');
+  assert.deepEqual(again.loadout.seasons, ['summer'], 'remembered');
   again.equip('noSeason');
-  assert.equal(again.loadout.season, null);
-  assert.equal(new Wallet(storage).loadout.season, null);
+  assert.deepEqual(again.loadout.seasons, []);
+  assert.deepEqual(new Wallet(storage).loadout.seasons, []);
 });
 
-test('a save from before seasons loads with none', () => {
+test('a save from before seasons loads with none; one from v22-v24 keeps its one season', () => {
   const storage = memory();
   storage.setItem(SAVE, JSON.stringify({ coins: 5, owned: ['sprout'] }));
-  assert.equal(new Wallet(storage).loadout.season, null);
+  assert.deepEqual(new Wallet(storage).loadout.seasons, []);
+  storage.setItem(SAVE, JSON.stringify({ coins: 5, owned: ['sprout', 'rainy'], season: 'rainy' }));
+  assert.deepEqual(new Wallet(storage).loadout.seasons, ['rainy']);
+});
+
+// ------------------------------------------------------- two, mixed (v25)
+
+test('the 2nd season slot (299K): tap two seasons to mix them; a third swaps out the oldest', () => {
+  assert.equal(SLOTS.seasonSlot.price, 299);
+  assert.ok(SLOT_IDS.includes('seasonSlot'));
+  assert.ok(CATALOG.seasonSlot.name && CATALOG.seasonSlot.says);
+  const storage = memory();
+  const w = new Wallet(storage);
+  w.add(169 * 3 + 299);
+  w.buy('winter');
+  w.buy('rainy');
+  assert.deepEqual(w.loadout.seasons, ['rainy'], 'one slot: one season');
+  assert.equal(w.buy('seasonSlot'), true);
+  w.equip('winter');
+  assert.deepEqual(w.loadout.seasons, ['rainy', 'winter'], 'two, mixed');
+  assert.equal(w.isOn('rainy') && w.isOn('winter'), true);
+  w.buy('summer');
+  assert.deepEqual(w.loadout.seasons, ['winter', 'summer'], 'a third swaps out the oldest');
+  w.equip('winter');
+  assert.deepEqual(w.loadout.seasons, ['summer'], 'with two slots, tapping one that’s on takes it off');
+  w.equip('rainy');
+  assert.deepEqual(new Wallet(storage).loadout.seasons, ['summer', 'rainy'], 'remembered, both');
+  w.equip('noSeason');
+  assert.deepEqual(w.loadout.seasons, []);
+});
+
+test('no two seasons turn the same knob, so a mix is simply both', () => {
+  const knobs = (id) => Object.keys(SEASONS[id]).filter((k) => k !== 'price');
+  for (const a of SEASON_IDS) {
+    for (const b of SEASON_IDS) {
+      if (a < b) assert.deepEqual(knobs(a).filter((k) => knobs(b).includes(k)), [], `${a} and ${b}`);
+    }
+  }
+  const mix = weatherOf(['winter', 'rainy'], 4);
+  assert.equal(mix.bacteriaPace, seasonAt('winter', 4).bacteriaPace);
+  assert.deepEqual(mix.storm, seasonAt('rainy', 4).storm);
+  assert.deepEqual(weatherOf([], 4), {}, 'none: nothing');
+});
+
+test('a mixed game does both: winter and rainy slow bacteria and strike them; spring and summer bring the sun sooner too', () => {
+  const crawled = (season) => {
+    const game = quietGame(season);
+    const b = game.addBacteria(game.tree.x + 300, game.tree.y);
+    const d0 = dist(b, game.tree);
+    run(game, 2);
+    return d0 - dist(b, game.tree);
+  };
+  assert.ok(Math.abs(crawled(['winter', 'rainy']) / crawled(null) - 0.85) < 0.02, 'winter’s slow crawl');
+  const game = quietGame(['winter', 'rainy']);
+  assert.deepEqual(game.seasons, ['winter', 'rainy']);
+  assert.equal(game.inSeason('rainy') && game.inSeason('winter') && !game.inSeason('summer'), true);
+  const b = game.addBacteria(game.tree.x + 250, game.tree.y);
+  b.speed = 0;
+  run(game, 60.1);
+  assert.equal(b.alive, false, 'and rainy’s lightning');
+  const bright = quietGame(['spring', 'summer'], { sprouts: ['rose'] });
+  assert.ok(Math.abs(bright.gear.heal.every - 20 * 0.85) < 1e-9, 'spring still speeds the sprout');
+  assert.equal(bright.sunTimer, 50, 'the sun is summer’s, on its own clock');
+  assert.deepEqual(quietGame(['winter', 'winter', 'nope']).seasons, ['winter'], 'a game keeps only real, different seasons');
 });
 
 // ------------------------------------------------------------------ summer
@@ -160,13 +228,13 @@ test('winter and the fertilizer slow bacteria together', () => {
 
 test('spring (v23): every sprout power comes round 15% sooner (its wait is 85% as long)', () => {
   const plain = gearFor({ sprout: 'mushroom' });
-  const spring = gearFor({ sprout: 'mushroom', season: 'spring' });
+  const spring = gearFor({ sprout: 'mushroom', seasons: ['spring'] });
   assert.ok(Math.abs(spring.spores.every - SPROUTS.mushroom.spores.every * 0.85) < 1e-9);
   assert.ok(Math.abs(spring.heal.every - plain.heal.every * 0.85) < 1e-9);
   assert.ok(Math.abs(spring.growEvery - plain.growEvery * 0.85) < 1e-9);
   assert.equal(spring.spores.reach, plain.spores.reach, 'only sooner, no bigger');
-  assert.ok(Math.abs(gearFor({ sprout: 'daisy', season: 'spring' }).coinEvery - 30 * 0.85) < 1e-9);
-  const corn = gearFor({ sprout: 'corn', season: 'spring' });
+  assert.ok(Math.abs(gearFor({ sprout: 'daisy', seasons: ['spring'] }).coinEvery - 30 * 0.85) < 1e-9);
+  const corn = gearFor({ sprout: 'corn', seasons: ['spring'] });
   assert.ok(Math.abs(corn.shield.every - 40 * 0.85) < 1e-9);
   assert.equal(corn.shield.time, 15, 'and closed just as long');
   const game = quietGame('spring', { sprouts: ['rose'] });

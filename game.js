@@ -13,7 +13,7 @@ import { DirtShot } from './dirtshot.js';
 import { Boss, bossHp, bossSpawnEvery, isBossLevel } from './boss.js';
 import { Gadget } from './gadgets.js';
 import { Coin, Item, pickItem } from './items.js';
-import { gearFor, seasonAt } from './gear.js';
+import { gearFor, weatherOf } from './gear.js';
 
 /** x, y: which way to walk. pressed/held: the action button (the K button on
  *  a phone, Space or a click on a computer): it pushes a dirtball Klayman is
@@ -69,8 +69,9 @@ function itemSource(kind, every) {
 }
 
 export class Game {
-  /** `loadout` is { tools, sprouts, gadgets, season }: what the player picked
-   *  on the setup page. sprouts[1], if there is one, is the backup. */
+  /** `loadout` is { tools, sprouts, gadgets, seasons }: what the player
+   *  picked on the setup page. sprouts[1], if there is one, is the backup;
+   *  seasons holds none, one, or two to mix (the 2nd season slot). */
   constructor({ rng = Math.random, loadout } = {}) {
     this.rng = rng;
     this.events = [];
@@ -83,10 +84,10 @@ export class Game {
       tools: [...(loadout?.tools ?? [])],
       sprouts: loadout?.sprouts?.length ? [...loadout.sprouts] : ['sprout'],
       gadgets: [...new Set(loadout?.gadgets ?? [])].filter((id) => GADGETS[id]),
-      season: SEASONS[loadout?.season] ? loadout.season : null,
+      seasons: [...new Set(loadout?.seasons ?? [])].filter((id) => SEASONS[id]),
     };
-    this.season = this.loadout.season;
-    this.level = level;            // set early: the season and the sprout's powers depend on it
+    this.seasons = this.loadout.seasons;
+    this.level = level;            // set early: the seasons and the sprout's powers depend on it
     this.stormTimer = this.weather.storm?.every;
     this.stormTargets = [];        // rainy: what the next lightning will strike, once picked
     this.items = [];               // special items out on the soil (or flying)
@@ -118,7 +119,7 @@ export class Game {
   /** Puts a sprout in the pot: its hearts and its powers' clocks (spring
    *  brings them round sooner), and summer's sun on it. */
   plant(sprout) {
-    this.gear = gearFor({ tools: this.loadout.tools, sprout, season: this.season, level: this.level });
+    this.gear = gearFor({ tools: this.loadout.tools, sprout, seasons: this.seasons, level: this.level });
     const g = this.gear;
     this.lives = g.lives;
     this.maxLives = g.lives;
@@ -138,22 +139,25 @@ export class Game {
 
   // ---------------------------------------------------------------- state
 
-  /** What this game's season does at this level (nothing, with no season):
-   *  every level it gets 1% better (seasonAt in gear.js). */
+  /** What this game's seasons do at this level (nothing, with none; both,
+   *  mixed): every level they get 1% better (seasonAt in gear.js). */
   get weather() {
-    const key = `${this.season}@${this.level}`;
+    const key = `${this.seasons}@${this.level}`;
     if (this.weatherKey !== key) {
       this.weatherKey = key;
-      this.weatherNow = seasonAt(this.season, this.level);
+      this.weatherNow = weatherOf(this.seasons, this.level);
     }
     return this.weatherNow;
   }
+
+  /** This game is played in season `id` (alone, or mixed with another). */
+  inSeason(id) { return this.seasons.includes(id); }
 
   /** The sprout's powers at this level: spring brings them round a little
    *  sooner every level. A power already counting down keeps its count; the
    *  next one waits the new, shorter time. */
   regear() {
-    this.gear = gearFor({ tools: this.loadout.tools, sprout: this.gear.sprout, season: this.season, level: this.level });
+    this.gear = gearFor({ tools: this.loadout.tools, sprout: this.gear.sprout, seasons: this.seasons, level: this.level });
     if (this.flowerItems) this.flowerItems.every = this.gear.itemEvery;
     if (this.flowerCoins) this.flowerCoins.every = this.gear.coinEvery;
   }

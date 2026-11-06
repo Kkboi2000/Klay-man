@@ -260,8 +260,9 @@ export const GADGETS = {
   },
 };
 
-// Seasons: the weather over the pot. Bought once (169K each); one per game,
-// picked on the setup page under Plant > Seasons. None of them touches a boss
+// Seasons: the weather over the pot. Bought once (169K each); one per game
+// (two, mixed, with the 2nd season slot), picked on the setup page under
+// Plant > Seasons. None of them touches a boss
 // (the bacteria it sends out are ordinary bacteria, so they do feel it).
 // These are level 1's numbers: every level after, each one moves 1% further
 // the player's way (v24), compounding (SEASON_LEVEL_UP, and seasonAt() in gear.js).
@@ -291,11 +292,13 @@ export const SEASONS = {
 // How much better every season gets each level: 1%, compounding.
 export const SEASON_LEVEL_UP = 0.01;
 
-// Slots: bought once. A second tool to wear, a backup sprout, a second gadget.
+// Slots: bought once. A second tool to wear, a backup sprout, a second
+// gadget, and a second season to mix with the first (v25).
 export const SLOTS = {
   toolSlot: { price: 199 },
   sproutSlot: { price: 399 },
   gadgetSlot: { price: 99 },
+  seasonSlot: { price: 299 },
 };
 
 // Used once: bought, then spent the first time they're used. You hold one

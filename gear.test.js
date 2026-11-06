@@ -492,7 +492,7 @@ test('one tool slot: picking a tool swaps it; you can only use what you own', ()
   w.equip(null);
   assert.deepEqual(w.tools, [], 'bare hands');
   w.buy('rose');
-  assert.deepEqual(w.loadout, { tools: [], sprouts: ['rose'], gadgets: [], season: null });
+  assert.deepEqual(w.loadout, { tools: [], sprouts: ['rose'], gadgets: [], seasons: [] });
 });
 
 test('2nd tool slot: wear two; a third swaps out the oldest; tap one to take it off', () => {
@@ -549,7 +549,7 @@ test('a v13 save (one tool, one sprout) still loads', () => {
   storage.setItem(SAVE, JSON.stringify({ coins: 80, owned: ['sprout', 'gun', 'corn'], tool: 'gun', sprout: 'corn' }));
   const w = new Wallet(storage);
   assert.equal(w.coins, 80);
-  assert.deepEqual(w.loadout, { tools: ['gun'], sprouts: ['corn'], gadgets: [], season: null });
+  assert.deepEqual(w.loadout, { tools: ['gun'], sprouts: ['corn'], gadgets: [], seasons: [] });
 });
 
 test('a broken or tampered save falls back safely', () => {
@@ -572,7 +572,7 @@ test('prices match the brief', () => {
       sprout: 0, daisy: 99, sunflower: 149, rose: 199, corn: 249, lilies: 249, mushroom: 299,
       leaf: 39, spray: 39, fertilizer: 39, shovel: 39, booster: 39,
       summer: 169, winter: 169, spring: 169, autumn: 169, rainy: 169,
-      toolSlot: 199, sproutSlot: 399, gadgetSlot: 99,
+      toolSlot: 199, sproutSlot: 399, gadgetSlot: 99, seasonSlot: 299,
       skip3: 29, skip7: 74, skip10: 99, revive: 49,
     },
   );
@@ -611,7 +611,7 @@ test('admin: lock all to try buying, unlock all to try everything', () => {
   w.equip('rose');
   w.lockAll();
   assert.equal(w.owns('coat'), false);
-  assert.deepEqual(w.loadout, { tools: [], sprouts: ['sprout'], gadgets: [], season: null });
+  assert.deepEqual(w.loadout, { tools: [], sprouts: ['sprout'], gadgets: [], seasons: [] });
   assert.equal(w.buy('mushroom'), true, 'buying works again');
   w.unlockAll();
   assert.equal(w.owns('gun'), true);

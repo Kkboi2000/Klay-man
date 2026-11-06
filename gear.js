@@ -7,7 +7,7 @@ export const TOOL_IDS = ['backpack', 'shoes', 'gloves', 'coat', 'glasses', 'gun'
 export const SPROUT_IDS = ['sprout', 'daisy', 'sunflower', 'rose', 'corn', 'lilies', 'mushroom'];
 export const GADGET_IDS = ['leaf', 'spray', 'fertilizer', 'shovel', 'booster'];
 export const SEASON_IDS = ['summer', 'winter', 'spring', 'autumn', 'rainy'];
-export const SLOT_IDS = ['toolSlot', 'sproutSlot', 'gadgetSlot'];
+export const SLOT_IDS = ['toolSlot', 'sproutSlot', 'gadgetSlot', 'seasonSlot'];
 export const ONCE_IDS = ['skip3', 'skip7', 'skip10', 'revive'];
 // Sold on the setup page. Revive isn't: it's offered on the summary when the sprout is lost.
 export const SKIP_IDS = ['skip3', 'skip7', 'skip10'];
@@ -39,6 +39,7 @@ export const CATALOG = {
   toolSlot: { name: '2nd tool slot', says: 'Wear two tools at once.' },
   sproutSlot: { name: '2nd sprout slot', says: 'Pick a backup sprout. When the first is lost, carry on with it.' },
   gadgetSlot: { name: '2nd gadget slot', says: 'Take two gadgets into a game.' },
+  seasonSlot: { name: '2nd season slot', says: 'Mix two seasons in one game: both weathers, both effects.' },
   skip3: { name: 'Skip to level 3', says: 'Start a game at level 3. Used once.' },
   skip7: { name: 'Skip to level 7', says: 'Start a game at level 7. Used once.' },
   skip10: { name: 'Skip to level 10', says: 'Start a game at level 10. Used once.' },
@@ -90,14 +91,21 @@ export function seasonAt(id, level = 1) {
   return Object.freeze(out);
 }
 
-/** What the worn tools, a sprout and the season change in the rules. No
+/** The weather of a game played in `ids` (none, one season, or two mixed)
+ *  at `level`. No two seasons turn the same knob (season.test.js checks),
+ *  so a mix is simply both: winter and rainy is slow bacteria and lightning. */
+export function weatherOf(ids = [], level = 1) {
+  return Object.freeze(Object.assign({}, ...ids.map((id) => seasonAt(id, level))));
+}
+
+/** What the worn tools, a sprout and the seasons change in the rules. No
  *  tool is plain Klayman. Spring brings every sprout power round sooner,
  *  and a little sooner still at every level. */
-export function gearFor({ tools = [], sprout = 'sprout', season = null, level = 1 } = {}) {
+export function gearFor({ tools = [], sprout = 'sprout', seasons = [], level = 1 } = {}) {
   const worn = [...new Set(tools)].filter((id) => TOOLS[id]);
   const s = SPROUTS[sprout] ? sprout : 'sprout';
   const ss = SPROUTS[s];
-  const wait = seasonAt(season, level).sproutWait ?? 1;
+  const wait = weatherOf(seasons, level).sproutWait ?? 1;
   const times = (key) => worn.reduce((k, id) => k * (TOOLS[id][key] ?? 1), 1);
   const lives = ss.lives ?? TREE.lives;
   return Object.freeze({
@@ -152,7 +160,7 @@ export class Wallet {
     this.tools = [];               // worn, oldest first
     this.gadgets = [];             // taken along, oldest first
     this.sprouts = ['sprout', 'sprout']; // first, and the backup
-    this.season = null;            // the weather over the pot next game, or none
+    this.seasons = [];             // the weather over the pot next game: none, one, or two mixed
     this.skip = null;              // a level skip to spend on the next game
     const found = this.load();
     // A first visit to admin starts with everything and plenty of coins.
@@ -165,6 +173,7 @@ export class Wallet {
   get isAdmin() { return this.key === ADMIN_SAVE; }
   get toolSlots() { return this.owns('toolSlot') ? 2 : 1; }
   get gadgetSlots() { return this.owns('gadgetSlot') ? 2 : 1; }
+  get seasonSlots() { return this.owns('seasonSlot') ? 2 : 1; }
   get hasBackup() { return this.owns('sproutSlot'); }
 
   /** Admin: own everything (to try it), or nothing but the free sprout (to try buying). */
@@ -178,7 +187,7 @@ export class Wallet {
     this.tools = [];
     this.gadgets = [];
     this.sprouts = ['sprout', 'sprout'];
-    this.season = null;
+    this.seasons = [];
     this.skip = null;
     this.save();
   }
@@ -189,7 +198,7 @@ export class Wallet {
       tools: this.tools.slice(0, this.toolSlots),
       sprouts: this.hasBackup ? [...this.sprouts] : [this.sprouts[0]],
       gadgets: this.gadgets.slice(0, this.gadgetSlots),
-      season: this.season,
+      seasons: this.seasons.slice(0, this.seasonSlots),
     };
   }
 
@@ -210,7 +219,7 @@ export class Wallet {
     if (kind === 'tool') return this.tools.includes(id);
     if (kind === 'gadget') return this.gadgets.includes(id);
     if (kind === 'sprout') return this.sproutSlotsOf(id).length > 0;
-    if (kind === 'season') return this.season === id;
+    if (kind === 'season') return this.seasons.includes(id);
     return id === this.skip;
   }
 
@@ -240,15 +249,15 @@ export class Wallet {
   /**
    * Puts on what you own. A tool goes on (and with two slots full, the one
    * put on first comes off; tapping a worn one there takes it off); a gadget
-   * the same. A sprout fills slot 0 (first) or 1 (backup). A level skip is
-   * picked for the next game, or unpicked. A season is the one for the next
-   * game. `null` takes every tool off, `'noGadget'` leaves every gadget at
-   * home, and `'noSeason'` plays without one.
+   * the same, and a season too (with the 2nd season slot, two are mixed). A
+   * sprout fills slot 0 (first) or 1 (backup). A level skip is picked for
+   * the next game, or unpicked. `null` takes every tool off, `'noGadget'`
+   * leaves every gadget at home, and `'noSeason'` plays without one.
    */
   equip(id, slot = 0) {
     if (id === null) { this.tools = []; this.save(); return true; }
     if (id === 'noGadget') { this.gadgets = []; this.save(); return true; }
-    if (id === 'noSeason') { this.season = null; this.save(); return true; }
+    if (id === 'noSeason') { this.seasons = []; this.save(); return true; }
     if (!this.owns(id)) return false;
     const kind = kindOf(id);
     if (kind === 'tool') {
@@ -258,7 +267,7 @@ export class Wallet {
     } else if (kind === 'sprout') {
       this.sprouts[slot === 1 ? 1 : 0] = id;
     } else if (kind === 'season') {
-      this.season = id;
+      this.seasons = this.toggle(this.seasons, id, this.seasonSlots);
     } else if (kind === 'once' && ONCE[id].level) {
       this.skip = this.skip === id ? null : id;
     } else {
@@ -268,8 +277,8 @@ export class Wallet {
     return true;
   }
 
-  /** Tapping a tool or gadget: on, swapping out the oldest when the slots
-   *  are full; with two slots, tapping one that's on takes it off. */
+  /** Tapping a tool, gadget or season: on, swapping out the oldest when the
+   *  slots are full; with two slots, tapping one that's on takes it off. */
   toggle(list, id, slots) {
     if (list.includes(id)) return slots > 1 ? list.filter((t) => t !== id) : list;
     return [...list, id].slice(-slots);
@@ -299,7 +308,9 @@ export class Wallet {
       const sprouts = Array.isArray(saved.sprouts) ? saved.sprouts : [saved.sprout];
       this.sprouts = [0, 1].map((i) => (kindOf(sprouts[i]) === 'sprout' && this.owns(sprouts[i]) ? sprouts[i] : 'sprout'));
       if (kindOf(saved.skip) === 'once' && this.owns(saved.skip)) this.skip = saved.skip;
-      if (kindOf(saved.season) === 'season' && this.owns(saved.season)) this.season = saved.season;
+      // Saves from before the 2nd season slot (v25) kept one `season`.
+      const seasons = Array.isArray(saved.seasons) ? saved.seasons : [saved.season];
+      this.seasons = [...new Set(seasons)].filter((id) => kindOf(id) === 'season' && this.owns(id)).slice(-this.seasonSlots);
       return true;
     } catch { return false; /* nothing saved, or a broken save */ }
   }
@@ -307,7 +318,7 @@ export class Wallet {
   save() {
     try {
       this.storage?.setItem(this.key, JSON.stringify({
-        coins: this.coins, owned: [...this.owned], tools: this.tools, gadgets: this.gadgets, sprouts: this.sprouts, season: this.season, skip: this.skip,
+        coins: this.coins, owned: [...this.owned], tools: this.tools, gadgets: this.gadgets, sprouts: this.sprouts, seasons: this.seasons, skip: this.skip,
       }));
     } catch { /* private mode: it lasts until the page closes */ }
   }

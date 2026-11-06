@@ -24,14 +24,22 @@ Every file sits in one folder, with no subfolders, so uploading is simple.
 ### Updating
 
 Upload the changed files the same way. Also open `sw.js` and bump `VERSION`
-(`klayman-v24` → `klayman-v25`): phones keep an offline copy, and this is how
+(`klayman-v25` → `klayman-v26`): phones keep an offline copy, and this is how
 they know to fetch the new one.
+
+v25 renamed `titleballs.js` to `setupballs.js`. Uploading never deletes, so
+delete `titleballs.js` from the repository by hand (nothing uses it now).
 
 ## Pages
 
-1. **Title:** Klayman’s face, over faded dirtballs rolling in from every side
-   (two that meet break). Tap **Play**.
-2. **Setup:** two doors, **Klayman** and **Plant**, each saying what's picked
+1. **Title:** Klayman’s face over the title art, faded so the buttons stay
+   clear: the wide picture (`title-wide.webp`) when the page is wider than
+   tall, as on a computer, and the tall one (`title-tall.webp`) when it's
+   taller, as on a phone. Only the one that fits is downloaded. Tap **Play**.
+2. **Setup:** over faded dirtballs rolling straight across from any angle
+   (two that meet break; until v24 they were behind the title, and half as
+   fast). Always about four on the page: a new one sets off when one rolls
+   off or breaks (`setupballs.js`). Two doors, **Klayman** and **Plant**, each saying what's picked
    behind it, then **Slots**, **Level skips**, **Orientation** and **Auto
    throw**. Klayman's page has two tabs, **Tools** and **Gadgets**; the
    plant's has **Sprouts** and **Seasons**. **‹ Setup** (or the phone's back
@@ -59,7 +67,8 @@ they know to fetch the new one.
 
 **Sound** and **Music** each have their own switch, on the title page, the
 setup page and the pause screen. Music is off until you switch it on, and
-both are remembered between visits.
+both are remembered between visits. Since v25 the music rests for a second
+after it ends before it starts again.
 
 **Orientation** (v24): the title and setup pages are always upright. A game
 is sideways (**Landscape**) unless you pick **Portrait**, on the setup page
@@ -129,7 +138,12 @@ waits 1% shorter, and autumn's dirtballs and dirt hold on 1% longer. At level
 25 that's about 21% sooner or slower, or 27% longer, than at level 1.
 
 Seasons are bought once and kept. Pick one on the setup page (Plant, then
-Seasons), or **No season**; the pick is remembered. The numbers are in
+Seasons), or **No season**; the pick is remembered. With the **2nd season
+slot** (v25), tap two to mix them: the game has both weathers and both
+effects (winter and rainy: slow bacteria, and lightning). A third swaps out
+the one picked first, tapping one that's on takes it off, and **No season**
+clears both. No two seasons change the same thing, so a mix is simply both
+(`weatherOf` in `gear.js`). The numbers are in
 `config.js` (`SEASONS`, level 1's, and `SEASON_LEVEL_UP`); `storm.strikes` is
 how many things lightning hits each minute (1), and `storm.warn` how early it
 picks them (2 s).
@@ -139,6 +153,7 @@ picks them (2 s).
 | 2nd tool slot | 199K | Wear two tools. Tap a tool to put it on or take it off; a third swaps out the oldest |
 | 2nd sprout slot | 399K | Pick a 1st and a 2nd sprout (the **1st / 2nd** buttons). When the 1st is lost, carry on with the 2nd |
 | 2nd gadget slot | 99K | Take two gadgets into a game, the same way as tools |
+| 2nd season slot | 299K | Mix two seasons in one game, picked the same way (v25) |
 
 | Level skip | Price | What it does |
 | --- | --- | --- |
@@ -256,7 +271,9 @@ coins off-screen. (Since v24 there's no arrow to the sprout: it never moves.)
 | `gadgets.js` | A gadget’s clock: ready, working, recharging (what each does is in `game.js`) |
 | `gear.js` | Tools, sprouts, gadgets, seasons, slots and used-once items: names, what they change, and the saved wallet |
 | `setup.js` | The setup page (its tabs, and the window that tries things on) and the title face |
-| `titleballs.js` | The dirtballs rolling behind the title |
+| `setupballs.js` | The dirtballs rolling behind setup (until v24, `titleballs.js`, behind the title) |
+| `title-wide.webp`, `title-tall.webp` | The title art: wide for a computer, tall for a phone |
+| `icon.png`, `make-icon.py` | The app icon's own 18 × 18 pixels, and the script that builds every icon size from them, crisp (`pip install pillow`) |
 | `orientation.js` | Which way round each page is shown: the lock, or the page's own quarter turn, and touches turned to match |
 | `art.js` | Pixel art drawn in code: sprouts (open and closed), tool, gadget, season and shop icons, coin, dirt guns, the backpack as worn, a gadget leaf, the mist bottle, summer's sunglasses, autumn's dirtball leaf, the glasses' lightning bolt |
 | `game.js` | Rules: levels, spawning, collisions, score |
@@ -266,16 +283,20 @@ coins off-screen. (Since v24 there's no arrow to the sprout: it never moves.)
 | `sw.js`, `manifest.webmanifest` | Offline play and home-screen install |
 | `klay-digits.woff2`, `klay-digits-bold.woff2` | The numbers 0–9, drawn for this game so 2 and 5 never read as 8 and S |
 | `make-digits.py` | Builds those two files: edit a digit’s pixels there and run it (`pip install fonttools brotli`) |
-| `game.test.js`, `gear.test.js`, `boss.test.js`, `season.test.js`, `orientation.test.js` | Rule checks: run `npm test` (needs Node 18+) |
+| `game.test.js`, `gear.test.js`, `boss.test.js`, `season.test.js`, `orientation.test.js`, `sound.test.js` | Rule checks: run `npm test` (needs Node 18+) |
 
 The sound effects were trimmed to remove the silence at the start of each
 file, so they play the moment something happens, and every effect plays at
 half volume (`EFFECTS_VOLUME` in `sound.js`). The gun, coin, shop and
 sunflower sounds are made in code (`sound.js`). The music is `music.mp3` (v22's new
-track), a 9-second loop; `sound.js` finds where it really starts and ends, so it
-loops without a click.
+track), a 9-second loop; `sound.js` finds where it really starts and ends, then
+adds a second of quiet after it (`MUSIC_GAP`, v25), eased in and out over a few
+milliseconds so it never clicks.
 
-The app icon is Klayman’s head, cut from the same frame as the title face.
+The app icon (v25) is Krit's own drawing of Klayman's head on a brown square
+(`icon.png`). `make-icon.py` draws it at a whole number of screen pixels per
+art pixel for every size, so it stays crisp; on Android's round-cropped icon
+the face sits a little smaller, inside the circle.
 
 Font: Pixelify Sans, SIL Open Font License (`OFL.txt`). The digits are the
 game’s own (Klay Digits), on Pixelify’s pixel grid.

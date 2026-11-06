@@ -66,7 +66,7 @@ function iconFor(id, sprites) {
 //   klayman  square: just Klayman, far from the sprout, in his tools, throwing
 //            now and then, with the gadget (if any) at work.
 //   spray    square: the sprout and the mist bottle, Klayman just in at the edge.
-//   plant    square: just the sprout, its power, and the season over it.
+//   plant    square: just the sprout, its power, and the seasons over it.
 
 const LOOP = 5.5;                  // seconds before the little game starts again
 const SOON = 1;                    // a sprout's power comes this soon after a start
@@ -88,7 +88,7 @@ class Showcase {
     this.key = '';
   }
 
-  /** Shows `scene` ({ view, tools, gadgets, sprouts, season }). The same
+  /** Shows `scene` ({ view, tools, gadgets, sprouts, seasons }). The same
    *  scene again only starts over when `replay` (a tap on it). */
   show(scene, replay = false) {
     const key = keyOf(scene);
@@ -111,8 +111,8 @@ class Showcase {
 
   /** Starts the little game again, the same scene, with what's in flight left to finish. */
   build() {
-    const { view, tools, gadgets, sprouts, season } = this.scene;
-    const game = new Game({ rng: () => 0.5, loadout: { tools, sprouts, gadgets, season } });
+    const { view, tools, gadgets, sprouts, seasons } = this.scene;
+    const game = new Game({ rng: () => 0.5, loadout: { tools, sprouts, gadgets, seasons } });
     for (const gadget of game.gadgets) {
       if (gadget.spec.preview) gadget.spec = { ...gadget.spec, ...gadget.spec.preview };
     }
@@ -232,6 +232,7 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     gadgets: $('gadgets'),
     gadgetsNote: $('gadgets-note'),
     seasons: $('seasons'),
+    seasonsNote: $('seasons-note'),
     sproutSlots: $('sprout-slots'),
     slots: $('slots'),
     once: $('once'),
@@ -307,9 +308,14 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     if (id === 'toolSlot') return `Bought the ${name}. Tap two tools to wear both.`;
     if (id === 'sproutSlot') return `Bought the ${name}. Pick a 2nd sprout to take over if the 1st is lost.`;
     if (id === 'gadgetSlot') return `Bought the ${name}. Tap two gadgets to take both.`;
+    if (id === 'seasonSlot') return `Bought the ${name}. Tap two seasons to mix them.`;
     if (kindOf(id) === 'gadget') return `Bought ${name}. In a game, tap its button (G on a computer).`;
     if (kindOf(id) === 'once') return `Bought ${name}. Your next game starts there.`;
-    if (kindOf(id) === 'season') return `Bought ${name}. Your games are played in it until you pick another.`;
+    if (kindOf(id) === 'season') {
+      return wallet.seasonSlots > 1 && wallet.seasons.length > 1
+        ? `Bought ${name}. Your games mix it with ${CATALOG[wallet.seasons[0]].name}.`
+        : `Bought ${name}. Your games are played in it until you pick another.`;
+    }
     return `Bought ${name}. It’s yours to keep.`;
   }
 
@@ -362,27 +368,30 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     const lo = wallet.loadout;
     const sprout = lo.sprouts[0];
     if (page === null) {
-      return { view: 'home', tools: lo.tools, gadgets: lo.gadgets.slice(0, 1), sprouts: [sprout], season: lo.season };
+      return { view: 'home', tools: lo.tools, gadgets: lo.gadgets.slice(0, 1), sprouts: [sprout], seasons: lo.seasons };
     }
     const tried = look && !NONE[look] && !wallet.owns(look) ? look : null;
     const tab = tabOf[page];
     if (tab === 'tools') {
       const tools = tried ? [...lo.tools, tried].slice(-wallet.toolSlots) : lo.tools;
-      return { view: 'klayman', tools, gadgets: [], sprouts: [sprout], season: null };
+      return { view: 'klayman', tools, gadgets: [], sprouts: [sprout], seasons: [] };
     }
     if (tab === 'gadgets') {
       let gadget = lo.gadgets.at(-1) ?? null;           // the one put on last
       if (tried) gadget = tried;
       else if (look === 'noGadget') gadget = null;
       else if (lo.gadgets.includes(look)) gadget = look;
-      return { view: gadget === 'spray' ? 'spray' : 'klayman', tools: lo.tools, gadgets: gadget ? [gadget] : [], sprouts: [sprout], season: null };
+      return { view: gadget === 'spray' ? 'spray' : 'klayman', tools: lo.tools, gadgets: gadget ? [gadget] : [], sprouts: [sprout], seasons: [] };
     }
     if (tab === 'sprouts') {
       const shown = kindOf(look) === 'sprout' ? look : lo.sprouts[sproutSlot] ?? sprout;
-      return { view: 'plant', tools: [], gadgets: [], sprouts: [shown], season: lo.season };
+      return { view: 'plant', tools: [], gadgets: [], sprouts: [shown], seasons: lo.seasons };
     }
-    const season = look === 'noSeason' ? null : kindOf(look) === 'season' ? look : lo.season;
-    return { view: 'plant', tools: [], gadgets: [], sprouts: [sprout], season };
+    // Seasons: what's picked; one being tried joins it, as buying it would.
+    let seasons = lo.seasons;
+    if (look === 'noSeason') seasons = [];
+    else if (tried) seasons = [...lo.seasons, tried].slice(-wallet.seasonSlots);
+    return { view: 'plant', tools: [], gadgets: [], sprouts: [sprout], seasons };
   }
 
   /** `replay`: a row was tapped, so the window starts its little show again. */
@@ -392,7 +401,7 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
       let state;
       let text;
       if (NONE[id]) {
-        const off = id === 'noSeason' ? !wallet.season : (id === 'none' ? wallet.tools : wallet.gadgets).length === 0;
+        const off = { none: wallet.tools, noGadget: wallet.gadgets, noSeason: wallet.seasons }[id].length === 0;
         state = off ? 'on' : 'owned';
         text = state === 'on' ? 'On' : 'Use';
       } else if (wallet.owns(id)) {
@@ -410,6 +419,7 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     }
     el.toolsNote.textContent = wallet.toolSlots > 1 ? 'two per game' : 'one per game';
     el.gadgetsNote.textContent = wallet.gadgetSlots > 1 ? 'two per game' : 'one per game';
+    el.seasonsNote.textContent = `${wallet.seasonSlots > 1 ? 'two per game, mixed' : 'one per game'}; 1% stronger every level`;
     el.sproutSlots.hidden = !wallet.hasBackup;
     el.sproutsNote.textContent = wallet.hasBackup ? 'the 2nd takes over if the 1st is lost' : 'one per game';
     if (!wallet.hasBackup) sproutSlot = 0;
@@ -449,11 +459,11 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
       b.tabIndex = open ? 0 : -1;
       $(b.getAttribute('aria-controls')).hidden = !open;
     }
-    const { tools, gadgets, sprouts, season } = wallet.loadout;
+    const { tools, gadgets, sprouts, seasons } = wallet.loadout;
     el.doors.klayman.replaceChildren(`Tool: ${listOf(tools)}`, document.createElement('br'), `Gadget: ${listOf(gadgets)}`);
     const backup = sprouts.length > 1 ? ` (2nd: ${nameOf(sprouts[1])})` : '';
     el.doors.plant.replaceChildren(`Sprout: ${nameOf(sprouts[0])}${backup}`, document.createElement('br'),
-      `Season: ${season ? nameOf(season) : 'none'}`);
+      seasons.length > 1 ? `Seasons: ${seasons.map(nameOf).join(' + ')}` : `Season: ${listOf(seasons)}`);
     if (el.doorPics.plant.dataset.id !== sprouts[0]) {
       el.doorPics.plant.dataset.id = sprouts[0];
       el.doorPics.plant.replaceChildren(iconFor(sprouts[0], sprites));

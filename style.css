@@ -565,15 +565,38 @@ body {
 }
 .screen-body p { margin: 0; }
 
-/* Behind the title: faded dirtballs rolling in from every side. */
-.title-balls {
+/* Behind the title: the art, faded so the face and the buttons stay clear.
+   The wide picture on a wide page (a computer), the tall one on a tall page
+   (a phone); main.js says which (data-shape), from the page's own shape, so
+   only that one is fetched. A soft shadow pools behind the middle. */
+.title-art {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: var(--title-art, none) center / cover no-repeat;
+  opacity: 0.42;
+}
+[data-shape="tall"] .title-art { --title-art: url('title-tall.webp'); }
+[data-shape="wide"] .title-art { --title-art: url('title-wide.webp'); }
+#title::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(ellipse 34rem 30rem at 50% 50%, rgba(30, 21, 11, 0.55), rgba(30, 21, 11, 0) 70%);
+}
+#title .screen-body { position: relative; z-index: 2; }
+
+/* Behind setup: faded dirtballs rolling across from every angle (setupballs.js). */
+.setup-balls {
   position: fixed;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
 }
-#title .screen-body { position: relative; }
+.setup { position: relative; }
 
 /* Title: just Klayman's face, big. */
 .face {

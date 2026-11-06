@@ -5,7 +5,8 @@
 //
 // Music is off until switched on, and has its own switch: Sound off silences
 // the effects, Music off the music. It loops sample-exact from a decoded
-// buffer, so there's no click each time round (an <audio loop> would have one).
+// buffer (an <audio loop> would click each time round), and since v25 it
+// rests for a second after it ends before it comes round again.
 import { assetUrl } from './sprites.js';
 
 const MUTE_KEY = 'klayman.muted';
@@ -13,6 +14,8 @@ const MUSIC_KEY = 'klayman.music';
 const MUSIC_FILE = 'music.mp3';
 const EFFECTS_VOLUME = 0.5;        // every sound effect, at half what each asks for
 const MUSIC_VOLUME = 0.3;
+const MUSIC_GAP = 1;               // seconds of quiet after the music ends, before it starts again
+const DECLICK = 0.02;              // seconds eased in and out at its edges, so the cut never clicks
 
 /** Where the music really starts and ends: an MP3 can carry a few silent
  *  samples at either end, and looping those would click. */
@@ -22,6 +25,29 @@ export function loopPoints(samples, rate) {
   let last = samples.length - 1;
   while (last > first && Math.abs(samples[last]) < 1e-5) last--;
   return { start: first / rate, end: (last + 1) / rate };
+}
+
+/** The loop as played: the music from where it really starts to where it
+ *  really ends (loopPoints), then `gap` seconds of quiet. Its edges are eased
+ *  over DECLICK, so stopping into the quiet never clicks. Built once and
+ *  looped whole: sample-exact, with no timer to drift or to stall in the
+ *  background. */
+export function withGap(ctx, buffer, { start, end }, gap) {
+  const rate = buffer.sampleRate;
+  const from = Math.round(start * rate);
+  const length = Math.max(1, Math.round(end * rate) - from);
+  const ease = Math.min(Math.round(DECLICK * rate), Math.floor(length / 2));
+  const out = ctx.createBuffer(buffer.numberOfChannels, length + Math.round(gap * rate), rate);
+  for (let c = 0; c < buffer.numberOfChannels; c++) {
+    const music = buffer.getChannelData(c);
+    const played = out.getChannelData(c);      // a new buffer is silent: the gap is already there
+    for (let i = 0; i < length; i++) played[i] = music[from + i] ?? 0;
+    for (let i = 0; i < ease; i++) {
+      played[i] *= i / ease;
+      played[length - 1 - i] *= i / ease;
+    }
+  }
+  return out;
 }
 
 function base64ToBuffer(dataUrl) {
@@ -85,7 +111,7 @@ export class Sound {
     this.ctx = Ctx ? new Ctx() : null;
     try { this.muted = localStorage.getItem(MUTE_KEY) === '1'; } catch { this.muted = false; }
     try { this.musicOn = localStorage.getItem(MUSIC_KEY) === '1'; } catch { this.musicOn = false; }
-    this.music = null;             // the decoded loop, once wanted
+    this.music = null;             // the loop as played (music, then the gap), once wanted
     this.musicNode = null;         // the loop while it plays
     this.loadingMusic = null;
     // Respect the phone's silent switch and let the player's music keep going.
@@ -124,9 +150,9 @@ export class Sound {
     this.loadingMusic ??= fetchBytes(MUSIC_FILE)
       .then((bytes) => new Promise((ok, fail) => this.ctx.decodeAudioData(bytes, ok, fail)))
       .then((buffer) => {
-        this.music = buffer;
-        this.musicLoop = loopPoints(buffer.getChannelData(0), buffer.sampleRate);
-        return buffer;
+        const span = loopPoints(buffer.getChannelData(0), buffer.sampleRate);
+        this.music = withGap(this.ctx, buffer, span, MUSIC_GAP);
+        return this.music;
       })
       .catch(() => null);          // no music is never a reason to stop the game
     return this.loadingMusic;
@@ -146,13 +172,11 @@ export class Sound {
     if (this.ctx.state !== 'running') return;
     const src = this.ctx.createBufferSource();
     src.buffer = this.music;
-    src.loop = true;
-    src.loopStart = this.musicLoop.start;
-    src.loopEnd = this.musicLoop.end;
+    src.loop = true;               // the whole buffer: the music, then its second of quiet
     const gain = this.ctx.createGain();
     gain.gain.value = MUSIC_VOLUME;
     src.connect(gain).connect(this.ctx.destination);
-    src.start(0, this.musicLoop.start);
+    src.start();
     this.musicNode = src;
   }
 
