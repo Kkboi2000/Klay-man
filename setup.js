@@ -1,7 +1,10 @@
 // The setup page, with two pages of its own: Klayman's (tools and gadgets)
 // and the plant's (sprouts and seasons), each opened from a door on setup's
-// first page and split into two tabs. Setup's first page also has slots,
-// level skips and the settings (orientation, auto throw, sound, music).
+// first page and split into two tabs. Setup's first page starts with the
+// mode (v26): Survival, with its level skips dropping down under it, or
+// Timer, with its three runs. Nothing is picked till the player picks, and
+// Start asks for one. Then slots and the settings (orientation, auto throw,
+// sound, music).
 // Every page keeps a window into the pot, and Start. (Revive isn't sold
 // here: the summary offers it when the sprout is lost.)
 //
@@ -12,8 +15,9 @@
 // own goes on, something you don't is tried on, so you can see it at work
 // before you buy it. Tap it again to buy it.
 import {
-  CATALOG, TOOL_IDS, SPROUT_IDS, GADGET_IDS, SEASON_IDS, SLOT_IDS, SKIP_IDS, priceOf, kindOf, formatK,
+  CATALOG, TOOL_IDS, SPROUT_IDS, GADGET_IDS, SEASON_IDS, SLOT_IDS, SKIP_IDS, RUN_IDS, priceOf, kindOf, formatK, runName,
 } from './gear.js';
+import { TIMER } from './config.js';
 import { Game, NO_INPUT } from './game.js';
 import { Renderer } from './render.js';
 import { KLAY } from './sprites.js';
@@ -220,8 +224,10 @@ class Showcase {
 
 // --------------------------------------------------------------- the page
 
-/** `startLevel()` says where the next game starts (a level skip, or admin's pick). */
-export function createSetup({ wallet, sprites, input, sound, admin, startLevel }) {
+/** `startLevel()` says where the next game starts (a level skip, or admin's
+ *  pick). `pick` is { mode, run }: the mode picked here ('survival', 'timer',
+ *  or null till one is), and timer mode's run. */
+export function createSetup({ wallet, sprites, input, sound, admin, startLevel, pick }) {
   const el = {
     purse: $('purse'),
     news: $('shop-news'),
@@ -236,6 +242,11 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     sproutSlots: $('sprout-slots'),
     slots: $('slots'),
     once: $('once'),
+    modes: $('modes'),
+    modeNote: $('mode-note'),
+    modeButtons: [...document.querySelectorAll('[data-game-mode]')],
+    drops: [...document.querySelectorAll('[data-drop]')],
+    runs: $('runs'),
     auto: $('setup-auto'),
     admin: $('admin'),
     start: $('start'),
@@ -257,6 +268,8 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
   const tabOf = { klayman: 'tools', plant: 'sprouts' };   // each page's open tab, kept while you're on setup
   let look = null;                 // what was tapped last on this tab: the window shows it
   el.doorPics.klayman.append(pixelCanvas(sprites.klay, 16, 19, 16, 25));
+  document.querySelector('[data-pic="survival"]').append(pixelCanvas(sprites.bac, 6, 8, 20, 18));
+  document.querySelector('[data-pic="timer"]').append(pixelCanvas(sprites.shopIcons.stopwatch, 0, 0, 16, 16));
 
   function makeRow(id) {
     const info = NONE[id] ?? CATALOG[id];
@@ -288,7 +301,81 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
   el.slots.append(...SLOT_IDS.map(makeRow));
   el.once.append(...SKIP_IDS.map(makeRow));
 
+  // ------------------------------------------------------- the mode
+
+  /** Timer mode's runs: a row each, picked like a radio button. */
+  const runRows = new Map();
+  for (const id of RUN_IDS) {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'gear';
+    row.setAttribute('role', 'radio');
+    const text = document.createElement('span');
+    text.className = 'gear-text';
+    const name = Object.assign(document.createElement('span'), { className: 'gear-name', textContent: runName(id) });
+    const says = Object.assign(document.createElement('span'), { className: 'gear-says' });
+    text.append(name, says);
+    const tag = Object.assign(document.createElement('span'), { className: 'gear-tag' });
+    row.append(pixelCanvas(sprites.shopIcons.stopwatch, 0, 0, 16, 16), text, tag);
+    row.addEventListener('click', () => chooseRun(id));
+    el.runs.append(row);
+    runRows.set(id, { row, says, tag });
+  }
+
+  /** The run before `id`, which opens it. */
+  const before = (id) => RUN_IDS[RUN_IDS.indexOf(id) - 1];
+
+  function chooseMode(mode) {
+    pick.mode = mode;
+    armed = null;
+    say('');
+    el.modes.classList.remove('is-asking');
+    render();
+  }
+
+  function chooseRun(id) {
+    armed = null;
+    if (!wallet.runOpen(id)) {
+      say(`Win ${runName(before(id))} to open ${runName(id)}.`);
+      nudge(runRows.get(id).row);
+    } else {
+      pick.run = id;
+      say('');
+    }
+    render();
+  }
+
+  for (const b of el.modeButtons) b.addEventListener('click', () => chooseMode(b.dataset.gameMode));
+
+  /** The mode tiles, what drops down under the one picked, and the runs. */
+  function renderMode() {
+    for (const b of el.modeButtons) b.setAttribute('aria-checked', String(b.dataset.gameMode === pick.mode));
+    for (const drop of el.drops) {
+      const open = drop.dataset.drop === pick.mode;
+      drop.classList.toggle('is-open', open);
+      drop.toggleAttribute('inert', !open);           // closed: nothing in it can be reached
+    }
+    el.modeNote.textContent = pick.mode ? '' : 'pick one to start';
+    if (!wallet.runOpen(pick.run)) pick.run = RUN_IDS[0];   // Lock all, in admin mode
+    for (const [id, { row, says, tag }] of runRows) {
+      const open = wallet.runOpen(id);
+      const on = open && pick.run === id;
+      const prize = formatK(TIMER.runs[id].prize);
+      row.dataset.state = on ? 'on' : open ? 'open' : 'locked';
+      row.setAttribute('aria-checked', String(on));
+      tag.textContent = on ? 'On' : open ? prize : 'Locked';
+      says.textContent = open ? `Pays ${prize} every time you win it.` : `Opens when you win ${runName(before(id))}. Pays ${prize}.`;
+    }
+  }
+
   function say(text) { el.news.textContent = text; }
+
+  /** A short shake: that can't be had yet. */
+  function nudge(row) {
+    row.classList.remove('is-short');
+    void row.offsetWidth;
+    row.classList.add('is-short');
+  }
 
   /** What a tap on something you own does, and what to tell you about it. */
   function use(id) {
@@ -330,10 +417,7 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
       armed = null;
       const short = formatK(priceOf(id) - wallet.coins);
       say(tries ? `Trying ${name}. You need ${short} more to buy it.` : `You need ${short} more for ${name}.`);
-      const { row } = rows.get(id);
-      row.classList.remove('is-short');
-      void row.offsetWidth;
-      row.classList.add('is-short');
+      nudge(rows.get(id).row);
     } else if (armed !== id) {
       armed = id;
       say(tries ? `Trying ${name}. Tap again to buy it for ${formatK(priceOf(id))}.` : `Tap ${name} again to buy it for ${formatK(priceOf(id))}.`);
@@ -433,7 +517,10 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
       b.setAttribute('aria-pressed', String(Number(b.dataset.level) === admin?.level));
     }
     const level = startLevel();
-    el.start.textContent = level > 1 ? `Start at level ${level}` : 'Start';
+    if (!pick.mode) el.start.textContent = 'Pick a mode';
+    else if (pick.mode === 'timer') el.start.textContent = `Start: ${runName(pick.run)}`;
+    else el.start.textContent = level > 1 ? `Start at level ${level}` : 'Start';
+    renderMode();
     renderPages();
     showcase.show(scene(), replay);
   }
@@ -578,6 +665,17 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel }
     },
     /** Leaving setup (a game starts): back to its own page for next time. */
     leave() { close(); },
+    /** Start with no mode picked: back to setup's own page, where the mode
+     *  tiles nudge and say so. */
+    askForMode() {
+      close();
+      say('Pick a mode first: Survival or Timer.');
+      el.modes.classList.remove('is-asking');
+      void el.modes.offsetWidth;
+      el.modes.classList.add('is-asking');
+      el.modes.scrollIntoView({ block: 'nearest' });
+      if (document.getElementById('app').dataset.layout === 'desk') el.modeButtons[0].focus({ preventScroll: true });
+    },
     resize: () => showcase.resize(),
     update: (dt) => showcase.update(dt),
   };

@@ -24,7 +24,7 @@ Every file sits in one folder, with no subfolders, so uploading is simple.
 ### Updating
 
 Upload the changed files the same way. Also open `sw.js` and bump `VERSION`
-(`klayman-v25` → `klayman-v26`): phones keep an offline copy, and this is how
+(`klayman-v26` → `klayman-v27`): phones keep an offline copy, and this is how
 they know to fetch the new one.
 
 v25 renamed `titleballs.js` to `setupballs.js`. Uploading never deletes, so
@@ -39,9 +39,12 @@ delete `titleballs.js` from the repository by hand (nothing uses it now).
 2. **Setup:** over faded dirtballs rolling straight across from any angle
    (two that meet break; until v24 they were behind the title, and half as
    fast). Always about four on the page: a new one sets off when one rolls
-   off or breaks (`setupballs.js`). Two doors, **Klayman** and **Plant**, each saying what's picked
-   behind it, then **Slots**, **Level skips**, **Orientation** and **Auto
-   throw**. Klayman's page has two tabs, **Tools** and **Gadgets**; the
+   off or breaks (`setupballs.js`). First the **Mode** (v26): **Survival** or
+   **Timer**. Nothing is picked each time the app opens, and Start reads
+   **Pick a mode** (tapped, it nudges the two tiles) until one is; then it's
+   kept until the app closes. Picking Survival drops its **Level skips** down
+   under it; picking Timer drops down its three runs. Then two doors, **Klayman** and **Plant**, each saying what's picked
+   behind it, then **Slots**, **Orientation** and **Auto throw**. Klayman's page has two tabs, **Tools** and **Gadgets**; the
    plant's has **Sprouts** and **Seasons**. **‹ Setup** (or the phone's back
    gesture, or Esc) comes back. Pick, buy, then **Start**, from any of the
    three.
@@ -79,6 +82,33 @@ screen the wrong way round the page turns itself a quarter turn instead: a
 sideways game on an upright phone is turned so you turn the phone to the
 left to play, and the joystick, K button and every tap follow the turn. On a
 computer nothing turns, and there's no orientation to pick.
+
+## Timer mode (v26)
+
+Keep the sprout until the clock runs out. There are no levels and no boss:
+bacteria keep coming out of the pot's four corners (never the one Klayman
+stands in), one every 3.125 s to start with, the pace a level-5 boss sends
+them out. Every 20 seconds a **Faster!** banner shows: they come 25% more
+often and every bacteria in the pot crawls 25% faster. That's 25% of the
+starting pace more each time, added, not compounded: x1.25 at 20 s, x1.5 at
+40 s, up to x4.5 in a 5-minute run's last 20 s (compounded, that would be
+x23). The rest plays like level 1, except that special items appear from the
+start. The clock (top right, where the level would be) starts once the
+banner is gone, turns gold for the last 10 seconds, and keeps running
+through a sandclock (which still holds the bacteria back).
+
+| Run | Prize | Opens |
+| --- | --- | --- |
+| 1 minute | 49K | from the start |
+| 3 minutes | 179K | once 1 minute is won |
+| 5 minutes | 289K | once 3 minutes is won |
+
+When time's up with the sprout still there, every bacteria left pops, the
+sprout lights up, and the summary pays the prize. A run pays every time it's
+won, not just the first. Lose the sprout and the summary says how long it
+lasted; a revive or the backup sprout carries the same clock on. Timer mode
+has no best score (that's survival's). Admin mode opens every run, and Lock
+all closes them again. The numbers are in `config.js` (`TIMER`).
 
 ## Coins and the shop
 
@@ -159,7 +189,7 @@ picks them (2 s).
 | --- | --- | --- |
 | Skip to level 3 / 7 / 10 | 29K / 74K / 99K | The next game starts there. Tap it to pick or unpick it; it’s spent when the game starts |
 
-You hold one of each level skip at a time, and can buy it again after using
+Level skips drop down under **Survival** on the setup page (v26). You hold one of each level skip at a time, and can buy it again after using
 it. Tools, sprouts, gadgets, seasons and slots are yours for good.
 
 **Revive** isn’t on the setup page. When the sprout is lost and there’s no
@@ -270,20 +300,20 @@ coins off-screen. (Since v24 there's no arrow to the sprout: it never moves.)
 | `weather.js` | How each season looks: summer's light and sun, winter's blue, spring's breeze, autumn's tree shade and leaves, rain and lightning (what they do is in `game.js`) |
 | `gadgets.js` | A gadget’s clock: ready, working, recharging (what each does is in `game.js`) |
 | `gear.js` | Tools, sprouts, gadgets, seasons, slots and used-once items: names, what they change, and the saved wallet |
-| `setup.js` | The setup page (its tabs, and the window that tries things on) and the title face |
+| `setup.js` | The setup page (the mode and what drops down under it, its tabs, and the window that tries things on) and the title face |
 | `setupballs.js` | The dirtballs rolling behind setup (until v24, `titleballs.js`, behind the title) |
 | `title-wide.webp`, `title-tall.webp` | The title art: wide for a computer, tall for a phone |
 | `icon.png`, `make-icon.py` | The app icon's own 18 × 18 pixels, and the script that builds every icon size from them, crisp (`pip install pillow`) |
 | `orientation.js` | Which way round each page is shown: the lock, or the page's own quarter turn, and touches turned to match |
 | `art.js` | Pixel art drawn in code: sprouts (open and closed), tool, gadget, season and shop icons, coin, dirt guns, the backpack as worn, a gadget leaf, the mist bottle, summer's sunglasses, autumn's dirtball leaf, the glasses' lightning bolt |
-| `game.js` | Rules: levels, spawning, collisions, score |
+| `game.js` | Rules: levels (or a timer run), spawning, collisions, score |
 | `world.js` | The pot: soil edge, sprout spot, where items appear |
 | `render.js`, `sprites.js` | Drawing and sprite-sheet frames; shoes, gloves, coat and glasses are painted onto Klayman’s frames the first time they’re worn; the gun and backpack are drawn on him |
 | `input.js`, `sound.js`, `ui.js`, `main.js` | Controls, sound, screens, start-up |
 | `sw.js`, `manifest.webmanifest` | Offline play and home-screen install |
 | `klay-digits.woff2`, `klay-digits-bold.woff2` | The numbers 0–9, drawn for this game so 2 and 5 never read as 8 and S |
 | `make-digits.py` | Builds those two files: edit a digit’s pixels there and run it (`pip install fonttools brotli`) |
-| `game.test.js`, `gear.test.js`, `boss.test.js`, `season.test.js`, `orientation.test.js`, `sound.test.js` | Rule checks: run `npm test` (needs Node 18+) |
+| `game.test.js`, `gear.test.js`, `boss.test.js`, `season.test.js`, `timer.test.js`, `orientation.test.js`, `sound.test.js` | Rule checks: run `npm test` (needs Node 18+) |
 
 The sound effects were trimmed to remove the silence at the start of each
 file, so they play the moment something happens, and every effect plays at

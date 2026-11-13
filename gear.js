@@ -1,7 +1,7 @@
 // Tools, sprouts, gadgets, seasons, slots and one-use items: what they're
 // called, what they do to the rules, and the wallet that remembers your coins
 // and everything you own between games.
-import { GADGETS, ONCE, SEASONS, SEASON_LEVEL_UP, SLOTS, SPROUTS, TOOLS, TREE } from './config.js';
+import { GADGETS, ONCE, SEASONS, SEASON_LEVEL_UP, SLOTS, SPROUTS, TIMER, TOOLS, TREE } from './config.js';
 
 export const TOOL_IDS = ['backpack', 'shoes', 'gloves', 'coat', 'glasses', 'gun'];
 export const SPROUT_IDS = ['sprout', 'daisy', 'sunflower', 'rose', 'corn', 'lilies', 'mushroom'];
@@ -11,6 +11,14 @@ export const SLOT_IDS = ['toolSlot', 'sproutSlot', 'gadgetSlot', 'seasonSlot'];
 export const ONCE_IDS = ['skip3', 'skip7', 'skip10', 'revive'];
 // Sold on the setup page. Revive isn't: it's offered on the summary when the sprout is lost.
 export const SKIP_IDS = ['skip3', 'skip7', 'skip10'];
+// Timer mode's runs (v26), shortest first: each opens once the one before is won.
+export const RUN_IDS = ['t1', 't3', 't5'];
+
+/** "1 minute", "3 minutes". */
+export const runName = (id) => {
+  const mins = TIMER.runs[id].secs / 60;
+  return `${mins} ${mins === 1 ? 'minute' : 'minutes'}`;
+};
 
 export const CATALOG = {
   backpack: { name: 'Backpack', says: 'A coin magnet: coins close by fly to Klayman.' },
@@ -162,6 +170,7 @@ export class Wallet {
     this.sprouts = ['sprout', 'sprout']; // first, and the backup
     this.seasons = [];             // the weather over the pot next game: none, one, or two mixed
     this.skip = null;              // a level skip to spend on the next game
+    this.won = new Set();          // timer runs won at least once
     const found = this.load();
     // A first visit to admin starts with everything and plenty of coins.
     if (!found && key === ADMIN_SAVE) {
@@ -179,6 +188,7 @@ export class Wallet {
   /** Admin: own everything (to try it), or nothing but the free sprout (to try buying). */
   unlockAll() {
     for (const id of ALL_IDS) this.owned.add(id);
+    for (const id of RUN_IDS) this.won.add(id);
     this.save();
   }
 
@@ -189,6 +199,7 @@ export class Wallet {
     this.sprouts = ['sprout', 'sprout'];
     this.seasons = [];
     this.skip = null;
+    this.won = new Set();
     this.save();
   }
 
@@ -284,6 +295,27 @@ export class Wallet {
     return [...list, id].slice(-slots);
   }
 
+  // ------------------------------------------------------ timer runs (v26)
+
+  /** A run can be played: the first always, the others once the one before is won. */
+  runOpen(id) {
+    const i = RUN_IDS.indexOf(id);
+    return i === 0 || (i > 0 && this.won.has(RUN_IDS[i - 1]));
+  }
+
+  /** A run is won: its prize, every time, and the first time, the next run
+   *  opens. Returns { prize, opened } (opened: the run it opened, or null). */
+  winRun(id) {
+    const run = TIMER.runs[id];
+    if (!run) return null;
+    const next = RUN_IDS[RUN_IDS.indexOf(id) + 1] ?? null;
+    const opened = next && !this.runOpen(next) ? next : null;
+    this.won.add(id);
+    this.coins += run.prize;
+    this.save();
+    return { prize: run.prize, opened };
+  }
+
   /** Spends a one-use item. Returns false if you don't have it. */
   use(id) {
     if (kindOf(id) !== 'once' || !this.owns(id)) return false;
@@ -308,6 +340,7 @@ export class Wallet {
       const sprouts = Array.isArray(saved.sprouts) ? saved.sprouts : [saved.sprout];
       this.sprouts = [0, 1].map((i) => (kindOf(sprouts[i]) === 'sprout' && this.owns(sprouts[i]) ? sprouts[i] : 'sprout'));
       if (kindOf(saved.skip) === 'once' && this.owns(saved.skip)) this.skip = saved.skip;
+      this.won = new Set((saved.won ?? []).filter((id) => RUN_IDS.includes(id)));
       // Saves from before the 2nd season slot (v25) kept one `season`.
       const seasons = Array.isArray(saved.seasons) ? saved.seasons : [saved.season];
       this.seasons = [...new Set(seasons)].filter((id) => kindOf(id) === 'season' && this.owns(id)).slice(-this.seasonSlots);
@@ -318,7 +351,7 @@ export class Wallet {
   save() {
     try {
       this.storage?.setItem(this.key, JSON.stringify({
-        coins: this.coins, owned: [...this.owned], tools: this.tools, gadgets: this.gadgets, sprouts: this.sprouts, seasons: this.seasons, skip: this.skip,
+        coins: this.coins, owned: [...this.owned], tools: this.tools, gadgets: this.gadgets, sprouts: this.sprouts, seasons: this.seasons, skip: this.skip, won: [...this.won],
       }));
     } catch { /* private mode: it lasts until the page closes */ }
   }

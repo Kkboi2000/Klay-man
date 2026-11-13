@@ -1,7 +1,7 @@
 // Boots Klayman: loads assets, lays out the screen for the device, runs the loop.
-// Three pages: the title (Klayman's face over the title art), setup (tools,
-// sprouts, gadgets, seasons, the shop, settings, over rolling dirtballs),
-// and the game itself, which ends
+// Three pages: the title (Klayman's face over the title art), setup (the
+// mode, tools, sprouts, gadgets, seasons, the shop, settings, over rolling
+// dirtballs), and the game itself: survival, or a timer run. It ends
 // with a score summary: a revive or the backup sprout can carry it on, or
 // play again, or go back to setup.
 import { Game } from './game.js';
@@ -10,7 +10,7 @@ import { Renderer } from './render.js';
 import { createInput } from './input.js';
 import { Sound } from './sound.js';
 import { createUI } from './ui.js';
-import { Wallet, SAVE, ADMIN_SAVE, CATALOG } from './gear.js';
+import { Wallet, SAVE, ADMIN_SAVE, CATALOG, runName } from './gear.js';
 import { ONCE } from './config.js';
 import { createSetup, createFace } from './setup.js';
 import { createSetupBalls } from './setupballs.js';
@@ -34,6 +34,9 @@ const orientation = createOrientation({ handheld, onChange: () => layout() });
 const IN_GAME = new Set(['playing', 'paused', 'over']);
 let overDelay = 0;
 let adminLevel = 1;              // admin mode can start a game further in
+// The mode picked on the setup page: none each time the app opens, so it's
+// picked on purpose; then kept until the app closes. `run`: timer mode's run.
+const pick = { mode: null, run: 't1' };
 const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ------------------------------------------------------------- best score
@@ -161,13 +164,21 @@ function startLevel() {
 }
 
 function start() {
+  if (!pick.mode) {                 // a mode first: setup says so and shows where
+    setup.askForMode();
+    return;
+  }
   sound.unlock();
   setup.leave();                    // next time, setup opens on its own page
   document.activeElement?.blur();   // Space throws, rather than pressing a button
-  const level = startLevel();
-  // A level skip is spent when the game it starts begins (admin's levels are free).
-  if (level > 1 && level === wallet.startLevel && !(wallet.isAdmin && adminLevel > 1)) wallet.use(wallet.skip);
-  game.reset(wallet.loadout, level);
+  if (pick.mode === 'timer') {
+    game.reset(wallet.loadout, 1, pick.run);
+  } else {
+    const level = startLevel();
+    // A level skip is spent when the game it starts begins (admin's levels are free).
+    if (level > 1 && level === wallet.startLevel && !(wallet.isAdmin && adminLevel > 1)) wallet.use(wallet.skip);
+    game.reset(wallet.loadout, level);
+  }
   ui.setCoins(wallet.coins);
   renderer.clearEffects();
   ui.reset();
@@ -235,13 +246,17 @@ function sproutPicture(id) {
   return pictures.get(id);
 }
 
-function finish(score, level) {
-  const isNewBest = score > best.score;
+/** The game is over: the sprout is lost, or (`won`) a timer run is won, its
+ *  prize paid and the next run opened. A best score is survival's alone. */
+function finish({ score, level, run = null, lasted = null }, won = false) {
+  const isNewBest = !run && score > best.score;
   if (isNewBest) {
     best = { score, level };
     saveBest(best);
     ui.setBest(best);
   }
+  const prize = won ? wallet.winRun(run) : null;
+  if (won) ui.setCoins(wallet.coins);
   ui.hideBanner();                // a level banner shouldn't show through the summary
   const revive = game.canRevive ? {
     sprout: game.gear.sprout,
@@ -252,9 +267,9 @@ function finish(score, level) {
     picture: sproutPicture(game.gear.sprout),
   } : null;
   const backup = game.backupSprout ? { id: game.backupSprout, picture: sproutPicture(game.backupSprout) } : null;
-  ui.setFinal({ score, level, best, isNewBest, earned: game.earned, revive, backup });
+  ui.setFinal({ score, level, best, isNewBest, earned: game.earned, revive, backup, run: run && { id: run, won, lasted, prize } });
   setMode('over');
-  overDelay = 1.3;               // let the sprout wilt before the screen comes up
+  overDelay = won ? 0.2 : 1.3;   // let the sprout wilt before the screen comes up (a win has had its moment)
 }
 
 // ----------------------------------------------------------------- events
@@ -356,7 +371,20 @@ function handleEvents(events) {
         sound.play('break', { volume: 1, rate: 0.35 });
         sound.buzz(60);
         break;
-      case 'gameover': finish(e.score, e.level); break;
+      // Timer mode.
+      case 'runStarts': ui.banner(runName(e.run), 'Keep the sprout till the clock runs out.', 3); break;
+      case 'surge':
+        ui.banner('Faster!', '', 1);
+        sound.play('hit', { volume: 0.5, rate: 0.5 });
+        sound.buzz(40);
+        break;
+      case 'timeUp':
+        ui.banner('Time’s up!', 'The sprout made it.', 2);
+        sound.play('break', { volume: 0.8, rate: 1.1 });
+        sound.play('buy', { volume: 0.7, rate: 1 });
+        break;
+      case 'won': finish(e, true); break;
+      case 'gameover': finish(e); break;
     }
   }
 }
@@ -533,7 +561,7 @@ async function boot() {
   });
 
   setup = createSetup({
-    wallet, sprites, input, sound, startLevel,
+    wallet, sprites, input, sound, startLevel, pick,
     admin: {
       get level() { return adminLevel; },
       setLevel(n) { adminLevel = n; },

@@ -144,9 +144,40 @@
           <p id="shop-news" class="shop-news" aria-live="polite"></p>
         </div>
 
-        <!-- Setup's own page: a door into Klayman and one into the plant,
-             then slots, level skips and settings. -->
+        <!-- Setup's own page: the mode (with what goes with it dropping down
+             under it), a door into Klayman and one into the plant, then
+             slots and settings. -->
         <div id="setup-home" class="setup-view">
+          <section id="modes" class="group group-mode" aria-labelledby="mode-name">
+            <h3 id="mode-name" class="group-name">Mode <span id="mode-note" class="shelf-note">pick one to start</span></h3>
+            <div class="modes" role="radiogroup" aria-labelledby="mode-name">
+              <button class="mode" type="button" role="radio" aria-checked="false" data-game-mode="survival">
+                <span class="mode-pic" data-pic="survival" aria-hidden="true"></span>
+                <span class="mode-name">Survival</span>
+                <span class="mode-says">Level after level, a boss every 5th</span>
+              </button>
+              <button class="mode" type="button" role="radio" aria-checked="false" data-game-mode="timer">
+                <span class="mode-pic" data-pic="timer" aria-hidden="true"></span>
+                <span class="mode-name">Timer</span>
+                <span class="mode-says">Keep the sprout till the clock runs out</span>
+              </button>
+            </div>
+            <!-- Drops down under Survival: level skips. -->
+            <div class="drop" data-drop="survival" inert>
+              <div class="drop-body"><div class="drop-inner">
+                <h4 id="once-name" class="drop-name">Level skips <span class="shelf-note">used once; buy again after</span></h4>
+                <div id="once" class="shelf-list" role="group" aria-labelledby="once-name"></div>
+              </div></div>
+            </div>
+            <!-- Drops down under Timer: its three runs. -->
+            <div class="drop" data-drop="timer" inert>
+              <div class="drop-body"><div class="drop-inner">
+                <h4 id="runs-name" class="drop-name">Runs <span class="shelf-note">win one to open the next; every win pays</span></h4>
+                <div id="runs" class="shelf-list" role="radiogroup" aria-labelledby="runs-name"></div>
+              </div></div>
+            </div>
+          </section>
+
           <nav class="doors" aria-label="Pick and buy">
             <button class="door" type="button" data-open="klayman">
               <span class="door-pic" data-pic="klayman" aria-hidden="true"></span>
@@ -162,11 +193,6 @@
           <section class="group" aria-labelledby="slots-name">
             <h3 id="slots-name" class="group-name">Slots <span class="shelf-note">yours to keep</span></h3>
             <div id="slots" class="shelf-list" role="group" aria-labelledby="slots-name"></div>
-          </section>
-
-          <section class="group" aria-labelledby="once-name">
-            <h3 id="once-name" class="group-name">Level skips <span class="shelf-note">used once; buy again after</span></h3>
-            <div id="once" class="shelf-list" role="group" aria-labelledby="once-name"></div>
           </section>
 
           <div class="settings">
@@ -202,6 +228,7 @@
               <li>Walk over coins to pick them up. Spend them here.</li>
               <li>From level 3, special items appear near the sprout.</li>
               <li>From level 7, dirt thrown at a dirtball from afar breaks it.</li>
+              <li>Pick a mode first. Survival goes on level after level. Timer: keep the sprout till the clock runs out, as bacteria pour out of the pot’s corners, faster every 20 seconds. Win a run to open the next.</li>
               <li>Levels 5, 10, 15 and on end with a boss bacteria. Wear it down with dirt, and push dirtballs into it, for a 10K coin. While it’s out, thrown dirt doesn’t break dirtballs.</li>
               <li>A gadget’s button, top right, fills up as it recharges. Tap it (G on a computer) when it’s full.</li>
               <li>A season (under Plant) changes the weather over the pot, and what bacteria, dirtballs and the sprout do. Never the boss. With the 2nd season slot, mix two.</li>

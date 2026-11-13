@@ -310,6 +310,27 @@ export const ONCE = {
   revive: { price: 49 },     // bought on the summary when the sprout is lost
 };
 
+// Timer mode (v26): no levels and no boss. Bacteria keep coming out of the
+// pot's four corners, at the pace a level-5 boss sends them out (one every
+// 3.125 seconds: bossSpawnEvery(5) in boss.js), until the clock runs out.
+// Keep the sprout till then to win the run's prize, and to open the next run.
+// Every 20 seconds they come 25% more often and crawl 25% faster: 25% of the
+// starting pace more each time, added, not compounded (x1.25, x1.5, x1.75...;
+// x4.5 in a 5-minute run's last 20 seconds, where compounding would make it x23).
+// Special items appear from the start; the rest plays like level 1.
+export const TIMER = {
+  runs: {
+    t1: { secs: 60, prize: 49 },
+    t3: { secs: 180, prize: 179 },
+    t5: { secs: 300, prize: 289 },
+  },
+  surgeEvery: 20,            // every 20 seconds...
+  surge: 0.25,               // ...25% more often, and 25% faster
+  corner: 12,                // they come out this far in from the rim, at a corner...
+  spread: 0.12,              // ...give or take this much of a turn (radians)
+  lap: 1.6,                  // time's up: the pot pops clean for this long before the summary
+};
+
 // A revive brings a lost sprout back with half its hearts, once a game, and
 // only when there's no backup sprout left to carry on with. A revived sprout
 // (or a backup sprout taking over) clears a little room.

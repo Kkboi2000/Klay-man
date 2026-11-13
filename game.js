@@ -1,7 +1,7 @@
 // The rules of Klayman. No drawing, no sound, no DOM: the game only changes
 // numbers and announces what happened through events, so it can be tested.
 import {
-  BACTERIA, BOSS, COINS, DIRTBALL, GADGETS, ITEMS, KLAYMAN, LEVELS, LOOKAHEAD, REVIVE, SCORE, SEASONS, SHOT, TOOLS, TREE,
+  BACTERIA, BOSS, COINS, DIRTBALL, GADGETS, ITEMS, KLAYMAN, LEVELS, LOOKAHEAD, REVIVE, SCORE, SEASONS, SHOT, TIMER, TOOLS, TREE,
 } from './config.js';
 import {
   RING_SQUASH, SOIL, TREE_SPOT, dist, insideRing, insideSoil, keepOnSoil, randomSpotNear, randomSpotOnSoil, rimPoint,
@@ -33,8 +33,12 @@ const PLAIN = Object.freeze({});
 // Where a flower's head is, above the spot it's rooted in (unscaled).
 const FLOWER_TOP = { sunflower: 54, daisy: 50 };
 
-// A boss rises at one of the pot's four corners, BOSS.corner in from the rim.
+// A boss rises at one of the pot's four corners, BOSS.corner in from the rim
+// (and in timer mode, bacteria come out of them).
 const BOSS_CORNERS = [-3, -1, 1, 3].map((k) => (k * Math.PI) / 4);
+
+// Timer mode sends bacteria out as fast as a level-5 boss does.
+const TIMER_SPAWN = bossSpawnEvery(BOSS.firstLevel);
 
 /** Moves `a` out of `b` until they are at least `minD` apart. */
 function separate(a, b, minD, share = 1) {
@@ -78,8 +82,9 @@ export class Game {
     this.reset(loadout);
   }
 
-  /** A new game. `level` is where it starts (a level skip, or admin mode). */
-  reset(loadout = this.loadout, level = 1) {
+  /** A new game. Survival starts at `level` (a level skip, or admin mode);
+   *  with `run` ('t1', 't3' or 't5'), it's a timer-mode run instead. */
+  reset(loadout = this.loadout, level = 1, run = null) {
     this.loadout = {
       tools: [...(loadout?.tools ?? [])],
       sprouts: loadout?.sprouts?.length ? [...loadout.sprouts] : ['sprout'],
@@ -112,8 +117,10 @@ export class Game {
     this.over = false;
     this.resumeTo = null;
     this.revivesLeft = REVIVE.perGame;
+    this.run = null;               // timer mode: { id, secs, left, surges, won }
     this.events.length = 0;
-    this.startLevel(level);
+    if (TIMER.runs[run]) this.startRun(run);
+    else this.startLevel(level);
   }
 
   /** Puts a sprout in the pot: its hearts and its powers' clocks (spring
@@ -189,7 +196,7 @@ export class Game {
   /** How much dirt a throw puts on (1 is a plain throw). */
   get dirtPower() { return this.power('dirt'); }
   get frozen() { return this.freeze > 0; }
-  get itemsUnlocked() { return this.level >= ITEMS.unlockLevel; }
+  get itemsUnlocked() { return this.timed || this.level >= ITEMS.unlockLevel; }
   /** Level 7 skill: dirt thrown from a distance breaks a dirtball. */
   get skillUnlocked() { return this.level >= KLAYMAN.skillLevel; }
   /** How much bigger the sprout has grown (water drops, a mushroom growing). */
@@ -230,7 +237,8 @@ export class Game {
     const alive = this.bacteria.filter((b) => b.alive).length;
     const balls = this.dirtballs.filter((d) => d.state !== 'breaking').length;
     const boss = this.bossLevel && !this.bossBeaten && !(this.boss && !this.boss.alive) ? 1 : 0;
-    return this.toSpawn + alive + balls + boss;
+    const toCome = this.timed ? 0 : this.toSpawn;   // timer mode: no end to them, so what's in the pot
+    return toCome + alive + balls + boss;
   }
 
   /** Seconds until the next bacteria appears (the level banner counts too). */
@@ -268,9 +276,10 @@ export class Game {
   /** The fertilizer is working. */
   get fertilized() { return this.gadgets.some((g) => g.id === 'fertilizer' && g.active); }
 
-  /** Every bacteria's speed, now: slower while the fertilizer works, and in winter. */
+  /** Every bacteria's speed, now: slower while the fertilizer works, and in
+   *  winter; faster as a timer run goes on. */
   get pace() {
-    return (this.fertilized ? GADGETS.fertilizer.slowFactor : 1) * (this.weather.bacteriaPace ?? 1);
+    return (this.fertilized ? GADGETS.fertilizer.slowFactor : 1) * (this.weather.bacteriaPace ?? 1) * this.surge;
   }
 
   emit(type, data = {}) { this.events.push({ type, ...data }); }
@@ -302,8 +311,9 @@ export class Game {
     this.emit('level', { level: n, unlocksItems, unlocksSkill, boss: isBossLevel(n), firstBoss: n === BOSS.firstLevel });
   }
 
-  /** A spot on the rim, not right next to Klayman. */
+  /** A spot on the rim, not right next to Klayman (timer mode: at a corner). */
   planBacteria() {
+    if (this.timed) return this.planCorner();
     let p = rimPoint(this.rng() * Math.PI * 2, 12);
     for (let i = 0; i < 12 && dist(p, this.klay) < 90; i++) {
       p = rimPoint(this.rng() * Math.PI * 2, 12);
@@ -329,6 +339,87 @@ export class Game {
     d.hold *= this.weather.crackHold ?? 1;           // autumn: it takes far longer to crack open
     this.dirtballs.push(d);
     return d;
+  }
+
+  // ------------------------------------------------------- timer mode (v26)
+
+  /** A timer-mode run: level 1's rules (special items from the start), no
+   *  levels and no boss. Bacteria keep coming out of the pot's corners until
+   *  the clock runs out; the clock starts once the banner is gone. */
+  startRun(id) {
+    const { secs } = TIMER.runs[id];
+    this.level = 1;
+    this.regear();
+    this.run = { id, secs, left: secs, surges: 0, won: false };
+    this.toSpawn = Infinity;
+    this.spawnEvery = TIMER_SPAWN;
+    this.spawnTimer = 0.4;
+    this.upcoming = [];
+    this.boss = null;
+    this.bossPlan = null;
+    this.bossWarn = 0;
+    this.bossBeaten = false;
+    this.phase = 'banner';
+    this.phaseT = LEVELS.bannerTime;
+    this.potItems.timer = ITEMS.every;
+    this.emit('runStarts', { run: id, secs });
+  }
+
+  /** This game is a timer-mode run. */
+  get timed() { return Boolean(this.run); }
+
+  /** The run was won: the sprout was still there when time ran out. */
+  get won() { return Boolean(this.run?.won); }
+
+  /** How much more often bacteria come, and how much faster they crawl, than
+   *  at the start of the run: 1, then 1.25, 1.5... every 20 seconds (added,
+   *  not compounded). Survival: always 1. */
+  get surge() { return this.timed ? 1 + TIMER.surge * this.run.surges : 1; }
+
+  /** Timer mode: one of the pot's four corners, give or take a little, and not the one Klayman stands in. */
+  planCorner() {
+    const spots = BOSS_CORNERS.map((a) => rimPoint(a + (this.rng() * 2 - 1) * TIMER.spread, TIMER.corner));
+    const clear = spots.filter((p) => dist(p, this.klay) >= 90);
+    const pool = clear.length ? clear : spots;
+    return pool[Math.floor(this.rng() * pool.length) % pool.length];
+  }
+
+  /** The clock, the surges, and the bacteria it keeps sending. A sandclock
+   *  holds the bacteria back, never the clock. */
+  updateRun(dt) {
+    const run = this.run;
+    run.left = Math.max(0, run.left - dt);
+    if (run.left <= 0) {
+      this.timeUp();
+      return;
+    }
+    const surges = Math.floor((run.secs - run.left) / TIMER.surgeEvery);
+    if (surges > run.surges) {
+      run.surges = surges;
+      this.spawnEvery = TIMER_SPAWN / this.surge;    // the next one waits the new, shorter time
+      this.emit('surge', { surge: this.surge });
+    }
+    if (this.frozen) return;
+    this.spawnTimer -= dt;
+    if (this.spawnTimer <= 0) {
+      this.spawnOne();
+      this.spawnTimer = this.spawnEvery;
+    }
+  }
+
+  /** Time's up with the sprout still there: the run is won. Every bacteria
+   *  left pops, and a moment later (TIMER.lap) the game ends. */
+  timeUp() {
+    this.run.won = true;
+    this.phase = 'won';
+    this.phaseT = TIMER.lap;
+    this.upcoming = [];
+    for (const b of this.bacteria) {
+      if (!b.alive) continue;
+      b.breakApart();
+      this.emit('pop', { x: b.x, y: b.y });
+    }
+    this.emit('timeUp', { run: this.run.id });
   }
 
   // ------------------------------------------------------------- the boss
@@ -598,6 +689,7 @@ export class Game {
   }
 
   hurtTree() {
+    if (this.won) return;          // time's up: nothing gets at it now
     this.lives = Math.max(0, this.lives - 1);
     this.treeHurt = 0.5;
     this.emit('treeHurt', { lives: this.lives });
@@ -1022,6 +1114,14 @@ export class Game {
     if (this.phase === 'banner') {
       this.phaseT -= dt;
       if (this.phaseT <= 0) this.phase = 'play';
+    } else if (this.phase === 'play' && this.timed) {
+      this.updateRun(dt);
+    } else if (this.phase === 'won') {
+      this.phaseT -= dt;
+      if (this.phaseT <= 0) {
+        this.over = true;
+        this.emit('won', { run: this.run.id, score: this.score });
+      }
     } else if (this.phase === 'play') {
       if (this.toSpawn > 0 && !this.frozen) {
         this.spawnTimer -= dt;
@@ -1060,7 +1160,7 @@ export class Game {
     this.over = true;
     this.resumeTo = this.phase;
     this.phase = 'over';
-    this.emit('gameover', { score: this.score, level: this.level });
+    this.emit('gameover', { score: this.score, level: this.level, run: this.run?.id ?? null, lasted: this.run ? this.run.secs - this.run.left : null });
   }
 
   /** The backup sprout, if one was picked and it hasn't taken over yet. */
@@ -1071,7 +1171,7 @@ export class Game {
 
   /** A revive is on offer: the sprout is lost, there's no backup left to
    *  carry on with, and this game hasn't used one. */
-  get canRevive() { return this.over && this.revivesLeft > 0 && !this.backupSprout; }
+  get canRevive() { return this.over && !this.won && this.revivesLeft > 0 && !this.backupSprout; }
 
   /** Brings the lost sprout back with half its hearts (once a game). */
   revive() {
@@ -1084,7 +1184,7 @@ export class Game {
 
   /** The backup sprout takes over, fresh, and the game goes on. */
   useBackup() {
-    if (!this.over || !this.backupSprout) return false;
+    if (!this.over || this.won || !this.backupSprout) return false;
     this.sproutIndex += 1;
     this.plant(this.loadout.sprouts[this.sproutIndex]);
     this.carryOn('backup');

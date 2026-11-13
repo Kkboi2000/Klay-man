@@ -174,6 +174,12 @@ export class Renderer {
         case 'dirtball': this.burst(e.x, e.y - 10, 8, DIRT, 80); break;
         case 'break': this.burst(e.x, e.y - 8, 10, DIRT, 110); break;
         case 'smash': this.burst(e.x, e.y - 8, 10, GERM, 120); break;
+        // ---------------------------------------------------- timer mode
+        case 'pop': this.burst(e.x, e.y - 8, 8, GERM, 110); break;      // time's up: every bacteria left pops
+        case 'timeUp':
+          this.bling(top.x, top.y - 10);
+          this.burst(top.x, top.y - 10, 24, SPARK, 140, -70);
+          break;
         case 'crack': this.burst(e.x, e.y - 10, 6, DIRT, 70); break;
         case 'spawn': this.burst(e.x, e.y, 5, DIRT, 40); break;
         case 'poison': this.burst(e.x, e.y - 22, 8, GERM, 50, -60); break;
@@ -526,7 +532,7 @@ export class Renderer {
     let scale = S * game.treeScale;
     const { x, y } = TREE_SPOT;
     const a = TREE_ART.anchor;
-    if (game.over) {
+    if (game.over && !game.won) {
       this.sprite(sprout.wilted, frame * 32, 0, 32, 48, x, y, a.x, a.y, { scale: scale * 0.9 });
       return;
     }

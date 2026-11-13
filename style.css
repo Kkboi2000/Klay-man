@@ -228,6 +228,8 @@ body {
 .hearts.is-many { display: grid; grid-template-columns: repeat(var(--cols, 5), auto); gap: 0.1em 0.12em; }
 .hearts.is-many .heart { height: 0.85em; }
 .hud-level { white-space: nowrap; }
+/* A timer run's last seconds. */
+.hud-level.is-hurry { color: var(--gold); }
 .heart {
   height: 1.2em;
   width: auto;
@@ -917,6 +919,69 @@ body {
 }
 .group-name .shelf-note { text-shadow: none; }
 
+/* The mode (v26): Survival or Timer, nothing picked till the player picks.
+   What goes with each drops down under it: level skips, or the runs. */
+.group-mode { gap: 0; margin-top: 0; }
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; margin-top: 0.8rem; }
+.mode {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 0.25rem;
+  margin: 0 3px;
+  padding: 0.6rem 0.55rem 0.7rem;
+  border: 0;
+  font: inherit;
+  color: var(--chalk);
+  text-align: center;
+  background: rgba(255, 244, 227, 0.07);
+  box-shadow: 0 -3px var(--ink), 0 3px var(--ink), -3px 0 var(--ink), 3px 0 var(--ink),
+    inset 0 -0.25rem 0 rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.mode:active { transform: translateY(2px); }
+.mode:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+.mode-pic { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; }
+.mode-pic canvas { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.mode-name { font-size: 1.3rem; font-weight: 700; line-height: 1.1; color: var(--clay-light); }
+.mode-says { font-size: 0.85rem; line-height: 1.25; color: rgba(255, 244, 227, 0.72); }
+.mode[aria-checked="true"] {
+  background: rgba(255, 210, 90, 0.13);
+  box-shadow: 0 -3px var(--gold), 0 3px var(--gold), -3px 0 var(--gold), 3px 0 var(--gold),
+    0 -6px var(--ink), 0 6px var(--ink), -6px 0 var(--ink), 6px 0 var(--ink);
+}
+.mode[aria-checked="true"] .mode-name { color: var(--gold); }
+/* Asked to pick one (Start with no mode): a nudge, and a gold edge. */
+.group-mode.is-asking .modes { animation: nudge 280ms steps(6); }
+.group-mode.is-asking .mode { box-shadow: 0 -3px var(--gold), 0 3px var(--gold), -3px 0 var(--gold), 3px 0 var(--gold); }
+
+/* A drop-down: closed, it takes no room; open, it slides down to its full height. */
+.drop {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 260ms ease-out, opacity 200ms ease-out;
+}
+.drop.is-open { grid-template-rows: 1fr; opacity: 1; }
+.drop-body { min-height: 0; overflow: hidden; margin: 0 -8px; }
+/* Room inside for the rows' edges and focus rings, which the drop would clip. */
+.drop-inner { display: grid; gap: 0.6rem; padding: 1rem 8px 8px; }
+.drop-name { margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--clay-light); }
+
+/* A timer run: open (its prize), or not yet. */
+.gear[data-state="open"] .gear-tag { color: var(--gold); }
+.gear[data-state="open"] .gear-tag::before {
+  content: '';
+  width: 1em;
+  height: 1em;
+  background: var(--coin) center / contain no-repeat;
+  image-rendering: pixelated;
+}
+.gear[data-state="locked"] .gear-pic,
+.gear[data-state="locked"] .gear-text { opacity: 0.5; }
+.gear[data-state="locked"] .gear-tag { opacity: 0.7; }
+
 /* With the 2nd sprout slot: which sprout a tap picks. */
 .slot-tabs { display: flex; flex: none; gap: 0.4rem; }
 .slot-tabs[hidden] { display: none; }
@@ -1153,6 +1218,8 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .banner.is-in { animation: none; }
+  .drop { transition: none; }
+  .group-mode.is-asking .modes { animation: none; }
   .gear.is-short { animation: none; }
   .gadget.is-fresh, .gadget[data-state="active"] .gadget-pic { animation: none; }
 }

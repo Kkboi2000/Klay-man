@@ -1,13 +1,20 @@
 // The DOM parts: score bar, coins, hearts, what the glasses count, the
 // gadget buttons, the level banner and the screens laid over the game: title,
 // setup, paused and the summary when the sprout is lost (with a revive or the
-// backup sprout, if any).
+// backup sprout, if any) or a timer run is won.
 import { heartArt, coinArt } from './sprites.js';
-import { CATALOG, formatK } from './gear.js';
+import { CATALOG, formatK, runName } from './gear.js';
+import { TIMER } from './config.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => n.toLocaleString('en-US');
 const hearts = (n) => `${n} ${n === 1 ? 'heart' : 'hearts'}`;
+/** Seconds as a clock, rounded up (59.2 left reads 1:00): "2:05". */
+export const clock = (secs) => {
+  const s = Math.max(0, Math.ceil(secs - 1e-9));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+const HURRY = 10;                  // a run's last seconds: the clock turns gold
 
 /** The same setting shown in several places: a switch on the setup page
  *  ("On"), a button on the title and pause screens ("Sound on"). */
@@ -37,6 +44,7 @@ export function createUI() {
     coins: $('coins'),
     finalCoins: $('final-coins'),
     best: $('best'),
+    overName: $('over-name'),
     finalScore: $('final-score'),
     finalBest: $('final-best'),
     finalLevel: $('final-level'),
@@ -63,7 +71,7 @@ export function createUI() {
 
   // What's on screen now, so it's only rebuilt when it changes. `left` starts
   // unknown, so a new game always shows or hides the glasses' count afresh.
-  let shown = { score: -1, level: -1, hearts: '', left: null, gadgets: null };
+  let shown = { score: -1, level: '', hearts: '', left: null, gadgets: null };
   let bannerTimer = 0;
   let gadgetPics = {};             // each gadget's icon, as a CSS image
 
@@ -153,9 +161,12 @@ export function createUI() {
         shown.score = game.score;
         el.score.textContent = fmt(game.score);
       }
-      if (game.level !== shown.level) {
-        shown.level = game.level;
-        el.level.textContent = `Level ${game.level}`;
+      // The level, or in a timer run, the clock counting down.
+      const level = game.timed ? clock(game.run.left) : `Level ${game.level}`;
+      if (level !== shown.level) {
+        shown.level = level;
+        el.level.textContent = level;
+        el.level.classList.toggle('is-hurry', game.timed && game.run.left <= HURRY && !game.won);
       }
       renderHearts(game.lives, game.maxLives);
       renderVisor(game);
@@ -202,13 +213,21 @@ export function createUI() {
 
     /** `revive`: { sprout, hearts, price, coins, have, picture } when a revive is on
      *  offer (`have`: one bought before, so it's free), else null.
-     *  `backup`: { id, picture } for the backup sprout that can take over, else null. */
-    setFinal({ score, level, best, isNewBest, earned, revive = null, backup = null }) {
+     *  `backup`: { id, picture } for the backup sprout that can take over, else null.
+     *  `run`: a timer run, { id, won, lasted, prize: { prize, opened } } (null in survival). */
+    setFinal({ score, level, best, isNewBest, earned, revive = null, backup = null, run = null }) {
+      const won = Boolean(run?.won);
+      el.overName.textContent = won ? 'You held out!' : 'The sprout is gone';
       el.finalScore.textContent = fmt(score);
-      el.finalBest.textContent = isNewBest ? 'New best score!' : `Best ${fmt(best.score)}`;
-      el.finalBest.classList.toggle('is-new', isNewBest);
-      el.finalLevel.textContent = `You reached level ${level}.`;
-      el.finalCoins.textContent = `+${formatK(earned)} coins`;
+      // Survival keeps a best score; a run is won or not.
+      el.finalBest.textContent = run ? '' : isNewBest ? 'New best score!' : `Best ${fmt(best.score)}`;
+      el.finalBest.classList.toggle('is-new', !run && isNewBest);
+      if (!run) el.finalLevel.textContent = `You reached level ${level}.`;
+      else if (won) {
+        const opened = run.prize.opened ? ` ${runName(run.prize.opened)} is open now.` : '';
+        el.finalLevel.textContent = `${runName(run.id)} won: +${formatK(run.prize.prize)}.${opened}`;
+      } else el.finalLevel.textContent = `Lasted ${clock(run.lasted)} of ${clock(TIMER.runs[run.id].secs)}.`;
+      el.finalCoins.textContent = `+${formatK(earned + (won ? run.prize.prize : 0))} coins`;
 
       const short = Boolean(revive) && !revive.have && revive.coins < revive.price;
       el.revive.hidden = !revive;
@@ -218,7 +237,7 @@ export function createUI() {
         // from where it stopped: the button says both.
         el.revivePic.src = revive.picture;
         el.reviveName.textContent = `Revive the ${CATALOG[revive.sprout].name.toLowerCase()}`;
-        const back = `Same level and score, ${hearts(revive.hearts)} back`;
+        const back = run ? `The clock goes on, ${hearts(revive.hearts)} back` : `Same level and score, ${hearts(revive.hearts)} back`;
         if (revive.have) el.reviveNote.textContent = back;
         else if (short) el.reviveNote.textContent = `Needs ${formatK(revive.price)}. You have ${formatK(revive.coins)}.`;
         else {
@@ -250,7 +269,7 @@ export function createUI() {
     setMusic(on) { showSwitch(el.musicButtons, 'Music', on); },
 
     reset() {
-      shown = { score: -1, level: -1, hearts: '', left: null, gadgets: null };
+      shown = { score: -1, level: '', hearts: '', left: null, gadgets: null };
       for (const b of el.gadgetButtons) delete b.dataset.id;
     },
   };
