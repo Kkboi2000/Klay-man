@@ -107,33 +107,36 @@ export const SCORE = {
 export const UNIT = 6;
 
 // Two more kinds of bacteria (v27). The green ones crawl to the sprout.
-// Yellow ones (one eye, no legs) bounce after Klayman instead, never into the
-// sprout, and spit a yellow germ at him. Blue ones (two long legs, glasses)
-// never go near the sprout either: they look for bacteria in dirt and for
-// dirtballs, and stamp the dirt off them. Each kind is its `share` of a
+// Orange ones (one eye, no legs) bounce after Klayman instead, never into the
+// sprout, and spit an orange germ at him (orange since v28; yellow before).
+// Blue ones (v28: a rounded box with boar's fangs, no legs; it was long legs
+// and glasses) never go near the sprout either: they look for bacteria in
+// dirt and for dirtballs, and jump to stamp the dirt off them. Each kind is its `share` of a
 // level's bacteria from level `from`, of what a boss sends out from
 // `bossFrom`, and of what comes in the timer runs listed. Dirt them like any
 // other: a dirtball keeps its kind, and what climbs out of it is that kind.
 export const KINDS = {
-  yellow: {
+  orange: {
     share: 0.10, from: 20, bossFrom: 25, runs: ['t3', 't5'],
-    reach: 10 * UNIT,          // spits at Klayman from this close
+    reach: 10 * UNIT * 2,      // spits at Klayman from this close (v28: twice v27's 10 units)
     every: 5,                  // a germ every 5 seconds...
     charge: 1,                 // ...the last of them spent charging it up, standing still
     hop: 0.55,                 // seconds a bounce takes
-    germ: { speed: 150, range: 10 * UNIT * 1.6, radius: 5 },
+    // Its germ (v28): twice as far as v27's, and 50% faster.
+    germ: { speed: 150 * 1.5, range: 10 * UNIT * 1.6 * 2, radius: 5 },
     // A germ on Klayman does what a bacteria inside him does (POISON), but
-    // yellow, and 20% worse: 20% slower still, and 20% longer.
+    // orange, and 20% worse: 20% slower still, and 20% longer.
     poison: { stun: 0.2 * 1.2, slow: 2 * 1.2, slowFactor: 0.5 * 0.8 },
   },
   blue: {
     share: 0.15, from: 10, bossFrom: 35, runs: [],
-    reach: 10 * UNIT,          // stamps on dirt this close...
-    every: 5,                  // ...every 5 seconds...
+    reach: 10 * UNIT * 4,      // stamps on dirt this far off (v28: 4 times v27's 10 units)...
+    every: 5 / 3,              // ...every 1.67 seconds (v28: 3 times as often as v27's 5)...
     dirt: 1,                   // ...a layer of dirt off every dirty bacteria in reach...
     hold: 2.5,                 // ...and a layer's worth (decayTime) off every dirtball's hold
     keepOff: 90,               // it never comes closer to the sprout than this
-    stamp: 0.35,               // how long the stamp takes to show
+    jump: 0.7,                 // the stamp: it jumps up, lands (the stamp itself)...
+    land: 0.42,                // ...this far in, and bounces once
   },
 };
 
@@ -191,10 +194,11 @@ export const TOOLS = {
   glasses: { price: 69 },                              // arrows, timers, counts, what's coming next
   gun: { price: 99, fireRate: 1.05, range: 1.05, speed: 1.05 }, // shots lock on to a bacteria
   // Bazoo-klay (v27): a dirt bazooka on his shoulder. Every shot is a wave of
-  // dirt fanning out `cone` degrees, 10% shorter (range) and 15% slower
-  // (waveSpeed) than a throw. Three hits make a dirtball; a clean bacteria it
-  // hits is knocked back 3 units, one already in dirt isn't, nor a dirtball.
-  bazoo: { price: 299, range: 0.9, waveSpeed: 0.85, cone: 40, hits: 3, knock: 3 * UNIT },
+  // dirt fanning out `cone` degrees, 15% slower (waveSpeed) than a throw. v28:
+  // it shoots half as often (fireRate) and reaches 70% as far as v27's (90%
+  // of a throw: range 0.9 x 0.7). Three hits make a dirtball; a clean bacteria
+  // it hits is knocked back 3 units, one already in dirt isn't, nor a dirtball.
+  bazoo: { price: 299, fireRate: 0.5, range: 0.9 * 0.7, waveSpeed: 0.85, cone: 40, hits: 3, knock: 3 * UNIT },
 };
 
 // The dirt gun locks on to whatever is closest to Klayman within reach of a
@@ -285,13 +289,14 @@ export const GADGETS = {
   booster: {
     price: 39,
     // A shot of something: red, a little bigger and glowing. For 4 seconds
-    // he throws 2.5 times as fast and as far, walks 2.5 times as fast, and
-    // his dirt counts 2.5 times. (The setup page still says twice, on
-    // purpose: the real thing is a little stronger than it promises.)...
-    boost: { time: 4, fireRate: 2.5, range: 2.5, speed: 2.5, dirt: 2.5 },
-    // ...then it wears off: grey, and for 2 seconds all four drop to half.
-    crash: { time: 2, fireRate: 0.5, range: 0.5, speed: 0.5, dirt: 0.5 },
-    time: 4 + 2,
+    // he throws 1.875 times as fast (v28: 25% slower than v27's 2.5) and 2.5
+    // times as far, walks 2.5 times as fast, and his dirt counts 2.5 times.
+    // (The setup page still says twice, on purpose.)...
+    boost: { time: 4, fireRate: 2.5 * 0.75, range: 2.5, speed: 2.5, dirt: 2.5 },
+    // ...then it wears off: grey, and for 3 seconds (v28: 50% longer than
+    // v27's 2) all four drop to half.
+    crash: { time: 2 * 1.5, fireRate: 0.5, range: 0.5, speed: 0.5, dirt: 0.5 },
+    time: 4 + 2 * 1.5,
     cooldown: COOLDOWN,      // counted from when he's himself again
   },
   fertilizer: {

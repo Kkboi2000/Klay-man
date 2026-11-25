@@ -315,7 +315,7 @@ function handleEvents(events) {
       case 'dirtball': sound.play('hit', { volume: 0.75, rate: 0.8 }); break;
       case 'break': sound.play('break', { volume: 0.7, rate: jitter(1, 0.05) }); break;
       case 'smash': sound.play('break', { volume: 0.9, rate: 1.2 }); break;
-      // Yellow and blue bacteria, and the bazoo-klay (v27).
+      // Orange and blue bacteria, and the bazoo-klay (v27).
       case 'blast':
         sound.play('throw', { volume: 0.55, rate: jitter(0.55, 0.04) });
         sound.play('hit', { volume: 0.3, rate: 0.5 });

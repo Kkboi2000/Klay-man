@@ -99,13 +99,13 @@ export const BAC = {
   ballBreakY: 219,
 };
 
-// --- Yellow and blue bacteria (v27) ----------------------------------------------
+// --- Orange and blue bacteria (v27) ----------------------------------------------
 // Sheets laid out like bacteiras.png: their own frames across (KIND_FRAMES),
 // with 0-3 layers of dirt down; then the green sheet's dirtball and break,
 // and its splat recoloured.
 export const KIND_FRAMES = {
-  yellow: ['round', 'squash', 'stretch', 'charge'],
-  blue: ['stand', 'stepL', 'stepR', 'lift', 'stamp'],
+  orange: ['round', 'squash', 'stretch', 'charge'],
+  blue: ['stand', 'waddleL', 'waddleR', 'crouch', 'air'],
 };
 const DIRT = { dark: [66, 37, 14], mid: [112, 73, 43], main: [131, 95, 67] };
 // How much of a bacteria (from its feet up) each layer of dirt covers.
@@ -550,7 +550,7 @@ export async function loadSprites() {
       looks.set(key, {
         sheet,
         green: tinted(sheet, 'rgba(96, 196, 72, 0.55)'),
-        yellow: tinted(sheet, 'rgba(236, 204, 52, 0.6)'),    // a yellow germ (v27)
+        orange: tinted(sheet, 'rgba(242, 138, 42, 0.6)'),    // an orange germ (v27)
         red: tinted(sheet, 'rgba(236, 52, 40, 0.62)'),
         grey: greyed(sheet),
       });
@@ -601,8 +601,8 @@ export async function loadSprites() {
     bacSlow: tinted(bac, 'rgba(176, 110, 214, 0.5)'),
     bac,
     bacFrozen: tinted(bac, 'rgba(150, 215, 255, 0.55)'),
-    // Each kind's sheet (v27), slowed and frozen too; a yellow one charging, lit up.
-    kinds: Object.fromEntries(['green', 'yellow', 'blue'].map((kind) => {
+    // Each kind's sheet (v27), slowed and frozen too; an orange one charging, lit up.
+    kinds: Object.fromEntries(['green', 'orange', 'blue'].map((kind) => {
       const sheet = kind === 'green' ? bac : kindSheet(bac, KIND_ART[kind], KIND_FRAMES[kind]);
       return [kind, {
         sheet,

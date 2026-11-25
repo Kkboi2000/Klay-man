@@ -4,7 +4,7 @@
 // Dirt is counted in throws: BACTERIA.maxDirt of it makes a dirtball.
 //
 // Since v27 there are three kinds (KINDS in config.js). Green: the bacteria
-// above. Yellow (Spitter): bounces after Klayman and spits germs at him (the
+// above. Orange (Spitter): bounces after Klayman and spits germs at him (the
 // game fires them). Blue (Stomper): walks to dirt and stamps it off (the
 // game does the stamping). Neither goes into the sprout or into Klayman.
 import { BACTERIA, KINDS, KNOCK_TIME } from './config.js';
@@ -216,14 +216,14 @@ function approach(b, dt, speed, goal, near, avoid, clear) {
   return true;
 }
 
-/** Yellow (v27): one eye, no legs. It bounces after Klayman (`target`), never
+/** Orange (v27): one eye, no legs. It bounces after Klayman (`target`), never
  *  into the sprout (`avoid`), and stops once he's in reach. The game charges
  *  and fires its germs: `cooldown` till it can charge again, `charging` the
  *  second it spends charging one up, standing still. */
 export class Spitter extends Bacteria {
   constructor(x, y, speed) {
     super(x, y, speed);
-    this.kind = 'yellow';
+    this.kind = 'orange';
     this.hopT = Math.random();     // where in a bounce it is (0 to 1)
     this.cooldown = 0;
     this.charging = 0;
@@ -241,47 +241,64 @@ export class Spitter extends Bacteria {
 
   move(dt, speed, target, avoid) {
     if (this.charging > 0) return;
-    this.hopT = (this.hopT + dt / KINDS.yellow.hop) % 1;
+    this.hopT = (this.hopT + dt / KINDS.orange.hop) % 1;
     // It only gets anywhere in the air: twice as fast then, so it keeps up on the whole.
     const air = 2 * Math.sin(this.hopT * Math.PI);
     if (!target) this.wander(dt, speed * air, avoid, KINDS.blue.keepOff);
-    else approach(this, dt, speed * air, target, KINDS.yellow.reach * 0.8, avoid, KINDS.blue.keepOff);
+    else approach(this, dt, speed * air, target, KINDS.orange.reach * 0.8, avoid, KINDS.blue.keepOff);
   }
 }
 
-/** Blue (v27): two long legs and glasses. It walks to the nearest dirt
- *  (`target`: a dirty bacteria or a dirtball, or null: it wanders), never
- *  near the sprout (`avoid`), and stops in reach. The game does the stamping:
- *  `cooldown` till the next, `stamping` while one shows. */
+/** Blue (v27; v28: a rounded box with boar's fangs, no legs). It waddles to
+ *  the nearest dirt (`target`: a dirty bacteria or a dirtball, or null: it
+ *  wanders), never near the sprout (`avoid`), and stops in reach. The game
+ *  does the stamping: `cooldown` till the next; `jump`, the seconds into a
+ *  jump (0 on the ground): up, down (the stamp), and one small bounce. */
 export class Stomper extends Bacteria {
   constructor(x, y, speed) {
     super(x, y, speed);
     this.kind = 'blue';
     this.cooldown = 2;             // a moment after it's out before the first stamp
-    this.stamping = 0;
-    this.walking = false;
+    this.jump = 0;
+    this.waddling = false;
   }
 
   get invades() { return false; }
 
+  get jumping() { return this.jump > 0; }
+
+  /** How high it is, 0 (on the soil) to 1: the jump, then a bounce a third as high. */
+  get lift() {
+    if (!this.jumping || !this.crawling) return 0;
+    const { jump, land } = KINDS.blue;
+    const t = this.jump;
+    if (t < land) return Math.sin((Math.PI * t) / land);
+    return 0.3 * Math.sin((Math.PI * (t - land)) / (jump - land));
+  }
+
+  addDirt(amount = 1) {
+    this.jump = 0;                 // dirt on it: down it comes
+    return super.addDirt(amount);
+  }
+
   move(dt, speed, target, avoid) {
     const { keepOff, reach } = KINDS.blue;
-    if (this.stamping > 0) {
-      this.walking = false;
+    if (this.jumping) {
+      this.waddling = false;
       return;
     }
     if (!target) {
-      this.walking = true;
+      this.waddling = true;
       this.wander(dt, speed, avoid, keepOff);
       return;
     }
-    this.walking = approach(this, dt, speed, target, reach * 0.7, avoid, keepOff);
+    this.waddling = approach(this, dt, speed, target, reach * 0.7, avoid, keepOff);
   }
 }
 
-/** A bacteria of `kind` ('green', 'yellow' or 'blue'). */
+/** A bacteria of `kind` ('green', 'orange' or 'blue'). */
 export function makeBacteria(kind, x, y, speed) {
-  if (kind === 'yellow') return new Spitter(x, y, speed);
+  if (kind === 'orange') return new Spitter(x, y, speed);
   if (kind === 'blue') return new Stomper(x, y, speed);
   return new Bacteria(x, y, speed);
 }

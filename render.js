@@ -15,10 +15,10 @@ import { Weather } from './weather.js';
 const FONT = '"Klay Digits", "Pixelify Sans", ui-rounded, system-ui, sans-serif';
 const DIRT = ['#4a2f17', '#6b4423', '#8a5a2b'];
 const GERM = ['#3e7a4a', '#5aa266', '#2c5a35'];
-const YELLOW = ['#ecc934', '#fcee8c', '#b0d628'];   // a yellow bacteria, and its germs (v27)
+const ORANGE = ['#f28a2a', '#ffc47e', '#ff9a3c'];   // an orange bacteria, and its germs (v27; yellow till v28)
 const BLUE = ['#4888dc', '#8cc4fa', '#2c60b0'];
 const STEAM = ['#ffffff', '#e4eef2', '#c9d6dc'];  // a blue one's stamp, rising off the dirt
-const GERM_HEIGHT = 18;           // a germ flies at the height of a yellow one's eye
+const GERM_HEIGHT = 18;           // a germ flies at the height of an orange one's eye
 const SPARK = ['#ffe9a8', '#ffd25a', '#ffffff'];
 const SPORE = ['#b06ed6', '#d9a6f0', '#7a3fa0'];
 const PETAL = ['#ff8593', '#d8263d', '#ffffff'];
@@ -187,14 +187,16 @@ export class Renderer {
           break;
         case 'crack': this.burst(e.x, e.y - 10, 6, DIRT, 70); break;
         case 'spawn': this.burst(e.x, e.y, 5, DIRT, 40); break;
-        case 'poison': this.burst(e.x, e.y - 22, 8, e.kind === 'yellow' ? YELLOW : GERM, 50, -60); break;
-        // ------------------------------------------- yellow and blue (v27)
-        case 'spit': this.burst(e.x, e.y - GERM_HEIGHT, 5, YELLOW, 50); break;
-        case 'germBlown': this.burst(e.x, e.y - GERM_HEIGHT, 6, ['#ffffff', ...YELLOW], 70); break;
-        case 'germBlocked': this.burst(e.x, e.y - GERM_HEIGHT, 8, [...YELLOW, ...COAT], 70); break;
+        case 'poison': this.burst(e.x, e.y - 22, 8, e.kind === 'orange' ? ORANGE : GERM, 50, -60); break;
+        // ------------------------------------------- orange and blue (v27)
+        case 'spit': this.burst(e.x, e.y - GERM_HEIGHT, 5, ORANGE, 50); break;
+        case 'germBlown': this.burst(e.x, e.y - GERM_HEIGHT, 6, ['#ffffff', ...ORANGE], 70); break;
+        case 'germBlocked': this.burst(e.x, e.y - GERM_HEIGHT, 8, [...ORANGE, ...COAT], 70); break;
+        case 'jump': this.burst(e.x, e.y, 4, DIRT, 40, -15); break;
         case 'stomp':
-          this.burst(e.x - 8, e.y, 4, DIRT, 50, -20);
-          this.burst(e.x + 8, e.y, 4, DIRT, 50, -20);
+          this.burst(e.x - 10, e.y, 5, DIRT, 60, -20);
+          this.burst(e.x + 10, e.y, 5, DIRT, 60, -20);
+          this.shake = Math.max(this.shake, 0.08);
           for (const at of e.steam) this.steams.push({ x: at.x, y: at.y, t: 0, high: at.ball ? 34 : 28, seed: Math.random() * 10 });
           break;
         case 'blast': {
@@ -612,19 +614,20 @@ export class Renderer {
       this.sprite(look.sheet, 0, 0, 32, 32, b.x, b.y, a.x, a.y, { scale: S * k, alpha: k });
       return;
     }
-    // Off the ground: flung by the whirlwind (an arc, up and down), or a yellow one's bounce.
+    // Off the ground: flung by the whirlwind (an arc, up and down), an
+    // orange one's bounce, or a blue one's jump.
     const flight = b.flung && b.knock > 0 ? Math.sin(Math.PI * (1 - b.knock / KNOCK_TIME)) * 22 : 0;
-    const hop = b.kind === 'yellow' && !frozen ? b.lift * 10 : 0;
+    const hop = frozen || !b.lift ? 0 : b.lift * (b.kind === 'blue' ? 20 : 10);
     const up = Math.round(flight + hop);
     this.shadow(b.x, b.y, Math.max(6, 11 - up / 4));
     const rise = Math.min(1, b.t / 0.35);
     const frame = this.bacteriaFrame(b, frozen);
     const at = { scale: S * (0.5 + rise * 0.5), alpha: rise };
     this.sprite(sheet, frame * 32, BAC.crawlY(b.look), 32, 32, b.x, b.y - up, a.x, a.y, at);
-    // A yellow one charging a germ: it lights up, flickering faster, and the
+    // An orange one charging a germ: it lights up, flickering faster, and the
     // germ swells above its eye.
-    if (b.kind === 'yellow' && b.charging > 0 && b.crawling) {
-      const p = 1 - b.charging / KINDS.yellow.charge;
+    if (b.kind === 'orange' && b.charging > 0 && b.crawling) {
+      const p = 1 - b.charging / KINDS.orange.charge;
       const flicker = this.calm ? 0.6 : 0.5 + 0.5 * Math.sin(this.time * (14 + 26 * p));
       this.sprite(look.lit, frame * 32, BAC.crawlY(b.look), 32, 32, b.x, b.y - up, a.x, a.y, { ...at, alpha: 0.15 + 0.45 * p * flicker });
       const germ = this.sprites.germ;
@@ -632,11 +635,11 @@ export class Renderer {
     }
   }
 
-  /** Which frame of its sheet a bacteria shows. Green: crawling. Yellow:
+  /** Which frame of its sheet a bacteria shows. Green: crawling. Orange:
    *  squashed on the soil, stretched going up, round at the top, puffed up
-   *  charging. Blue: its legs walking, or one foot up and stamping down. */
+   *  charging. Blue: waddling side to side, or its jump. */
   bacteriaFrame(b, frozen) {
-    if (b.kind === 'yellow') {
+    if (b.kind === 'orange') {
       if (!b.crawling || frozen) return 0;
       if (b.charging > 0) return 3;
       if (b.lift < 0.2) return 1;
@@ -644,13 +647,18 @@ export class Renderer {
     }
     if (b.kind === 'blue') {
       if (!b.crawling || frozen) return 0;
-      if (b.stamping > 0) return b.stamping > KINDS.blue.stamp / 2 ? 3 : 4;
-      return b.walking ? [0, 1, 0, 2][Math.floor(b.t * 7) % 4] : 0;
+      if (b.jumping) {
+        // Squashed as it springs, lands and lands again; stretched in the air.
+        const { jump, land } = KINDS.blue;
+        const t = b.jump;
+        return t < 0.07 || Math.abs(t - land) < 0.06 || t > jump - 0.06 ? 3 : 4;
+      }
+      return b.waddling ? [0, 1, 0, 2][Math.floor(b.t * 6) % 4] : 0;
     }
     return Math.floor(b.t * 6) % 4;
   }
 
-  /** A yellow germ in flight, with a short trail. */
+  /** An orange germ in flight, with a short trail. */
   drawGerm(g) {
     const img = this.sprites.germ;
     const { ctx } = this;
@@ -980,7 +988,7 @@ export class Renderer {
     if (pack) this.drawPack(k, row, col, flip, jitter, 'over');
     const green = k.greenness;
     if (green > 0) {
-      const tint = k.poisonKind === 'yellow' ? look.yellow : look.green;   // a yellow germ: yellow
+      const tint = k.poisonKind === 'orange' ? look.orange : look.green;   // an orange germ: orange
       this.sprite(tint, col * size, row * size, size, size, k.x + jitter, k.y, a.x, a.y, {
         flip,
         alpha: green * 0.55, // "turn green a bit"

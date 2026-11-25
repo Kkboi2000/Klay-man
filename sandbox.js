@@ -8,7 +8,7 @@ import { CATALOG, TOOL_IDS, SPROUT_IDS, GADGET_IDS, SEASON_IDS, formatK } from '
 import { ITEM_INFO } from './items.js';
 import { clock } from './ui.js';
 
-const KIND_NAMES = { green: 'Green', yellow: 'Yellow', blue: 'Blue' };
+const KIND_NAMES = { green: 'Green', orange: 'Orange', blue: 'Blue' };
 
 /** `getGame()` is the game in play; `onCoins()` shows the wallet's coins after a change. */
 export function createSandbox({ root, getGame, wallet, onCoins }) {
@@ -73,7 +73,7 @@ export function createSandbox({ root, getGame, wallet, onCoins }) {
 
   const bacteria = row('Bacteria');
   for (const kind of Object.keys(KIND_NAMES)) button(bacteria.wrap, `+1 ${KIND_NAMES[kind]}`, (g) => g.spawnKind(kind));
-  button(bacteria.wrap, '+5 mixed', (g) => { for (const kind of ['green', 'green', 'yellow', 'blue', 'green']) g.spawnKind(kind); });
+  button(bacteria.wrap, '+5 mixed', (g) => { for (const kind of ['green', 'green', 'orange', 'blue', 'green']) g.spawnKind(kind); });
   button(bacteria.wrap, 'Clear the pot', (g) => g.clearPot());
 
   const hearts = row('Sprout hearts');

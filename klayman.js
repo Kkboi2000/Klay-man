@@ -26,8 +26,8 @@ export class Klayman {
     this.action = null;          // { kind: 'attack' | 'push', t }
     this.stun = 0;
     this.slow = 0;
-    this.slowFactor = POISON.slowFactor; // how slow poisoned: a yellow germ's is slower (v27)
-    this.poisonKind = 'green';    // what poisoned him: a bacteria inside (green), or a yellow germ
+    this.slowFactor = POISON.slowFactor; // how slow poisoned: an orange germ's is slower (v27)
+    this.poisonKind = 'green';    // what poisoned him: a bacteria inside (green), or an orange germ
     this.t = 0;
     this.tapBuffer = 0;          // a press during the cooldown still counts
     this.heading = { x: 0, y: 1 }; // the way he last walked, any angle
@@ -43,11 +43,11 @@ export class Klayman {
     return Math.min(1, this.slow / 0.4);
   }
 
-  /** A bacteria got inside him (or, `kind` 'yellow', a yellow germ hit him:
+  /** A bacteria got inside him (or, `kind` 'orange', an orange germ hit him:
    *  20% slower still, and 20% longer). Returns false if he is already poisoned. */
   poison(kind = 'green') {
     if (this.poisoned) return false;
-    const p = kind === 'yellow' ? KINDS.yellow.poison : POISON;
+    const p = kind === 'orange' ? KINDS.orange.poison : POISON;
     this.stun = p.stun;
     this.slow = p.slow;
     this.slowFactor = p.slowFactor;

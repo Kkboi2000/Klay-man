@@ -897,18 +897,18 @@ test('the booster was the hypodermic syringe: same price, new name', () => {
   assert.equal(GADGETS.syringe, undefined);
 });
 
-test('booster (v23): 4 seconds red, throwing 2.5 times as fast and as far (the setup page says twice)', () => {
+test('booster (v28): 4 seconds red, throwing 1.875 times as fast (25% slower than v27) and 2.5 times as far', () => {
   assert.equal(GADGETS.booster.boost.time, 4);
-  assert.match(CATALOG.booster.says, /twice as fast/, 'the shop still promises twice');
+  assert.match(CATALOG.booster.says, /twice as fast/, 'the shop still promises twice (walking)');
   const plain = throwsIn(quietGame(), 3.8);
   const game = quietGame(withGadgets('booster'));
   game.update(STEP, press(0));
   assert.equal(game.booster, 'boost');
   assert.equal(game.shotRange, SHOT.range * 2.5);
-  assert.equal(game.fireRate, 2.5);
+  assert.equal(game.fireRate, 2.5 * 0.75);
   const boosted = throwsIn(game, 3.8);
-  // Throws land on whole 1/60s steps, so the ratio is close to 2.5, not exactly (as with the gloves).
-  assert.ok(boosted / plain > 2.2 && boosted / plain < 2.6, `${boosted} throws against ${plain}`);
+  // Throws land on whole 1/60s steps, so the ratio is close to 1.875, not exactly (as with the gloves).
+  assert.ok(boosted / plain > 1.65 && boosted / plain < 2, `${boosted} throws against ${plain}`);
 });
 
 test('booster: he walks 2.5 times as fast while it works', () => {
@@ -930,7 +930,7 @@ test('booster: while it works, his dirt counts 2.5 times', () => {
   assert.equal(throwsToBall(game), 2, 'with medicine too, still two (3.75 + 3.75)');
 });
 
-test('booster: then 2 seconds grey, at half of everything; then himself, and 15 seconds to recharge', () => {
+test('booster (v28): then 3 seconds grey (50% longer than v27), at half of everything; then himself, and 15 seconds to recharge', () => {
   const plainThrows = throwsIn(quietGame(), 1.9);
   const plainWalk = walked(quietGame(), 0.5);
   const game = quietGame(withGadgets('booster'));
@@ -948,8 +948,10 @@ test('booster: then 2 seconds grey, at half of everything; then himself, and 15 
   const crashed = throwsIn(game, 1.4);
   const plainIn14 = plainThrows * (1.4 / 1.9);
   assert.ok(crashed <= Math.ceil(plainIn14 / 2) + 1 && crashed >= Math.floor(plainIn14 / 2) - 1, `${crashed} throws against ${plainIn14}`);
-  run(game, 0.2);
-  assert.equal(game.booster, null, 'after 6 seconds in all');
+  run(game, 0.5);
+  assert.equal(game.booster, 'crash', 'still grey at 6 seconds in');
+  run(game, 0.7);
+  assert.equal(game.booster, null, 'after 7 seconds in all');
   assert.equal(game.shotRange, SHOT.range);
   assert.equal(game.walkSpeed, 1);
   const g = game.gadgets[0];
@@ -961,7 +963,7 @@ test('booster: then 2 seconds grey, at half of everything; then himself, and 15 
 test('booster: with gloves, both count', () => {
   const game = quietGame({ tools: ['gloves'], gadgets: ['booster'] });
   game.update(STEP, press(0));
-  assert.ok(Math.abs(game.fireRate - 1.15 * 2.5) < 1e-9);
+  assert.ok(Math.abs(game.fireRate - 1.15 * 2.5 * 0.75) < 1e-9);
   assert.ok(Math.abs(game.shotRange - SHOT.range * 1.15 * 2.5) < 1e-9);
 });
 

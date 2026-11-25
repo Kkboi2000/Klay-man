@@ -29,7 +29,7 @@ test('sandbox: hearts, kinds on demand, spawning held, the pot cleared', () => {
   assert.deepEqual([game.lives, game.maxLives], [2, 9]);
   game.setHearts(-3);
   assert.equal(game.lives, 0.5, 'never below half a heart');
-  for (const kind of ['green', 'yellow', 'blue']) assert.equal(game.spawnKind(kind).kind, kind);
+  for (const kind of ['green', 'orange', 'blue']) assert.equal(game.spawnKind(kind).kind, kind);
   game.held = true;
   const before = game.bacteria.length;
   run(game, LEVELS.bannerTime + 6);

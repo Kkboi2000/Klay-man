@@ -1,11 +1,11 @@
-// A yellow bacteria's germ (v27): spat from its eye at where Klayman stood,
+// An orange bacteria's germ (v27): spat from its eye at where Klayman stood,
 // it flies straight, and is gone once it's out of range or off the soil.
 import { KINDS } from './config.js';
 import { insideSoil } from './world.js';
 
 export class Germ {
   constructor(x, y, dir) {
-    const { speed, range } = KINDS.yellow.germ;
+    const { speed, range } = KINDS.orange.germ;
     const d = Math.hypot(dir.x, dir.y) || 1;
     this.x = x;
     this.y = y;

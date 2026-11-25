@@ -39,7 +39,7 @@ export const CATALOG = {
   spray: { name: 'Mist spray', says: 'Sprays the sprout twice: half a heart back.' },
   fertilizer: { name: 'Fertilizer', says: 'Every bacteria crawls 70% slower for 5 seconds.' },
   shovel: { name: 'Shovel', says: 'Klayman digs and throws dirt all round him: every bacteria near him gets two layers of dirt.' },
-  booster: { name: 'Booster', says: 'For 4 seconds Klayman throws twice as fast and as far, walks twice as fast, and his dirt counts double. Then 2 seconds at half of all four.' },
+  booster: { name: 'Booster', says: 'For 4 seconds Klayman throws faster and twice as far, walks twice as fast, and his dirt counts double. Then 3 seconds at half of all four.' },
   summer: { name: 'Summer', says: 'Brighter, and the sprout wears shades. Every 50 seconds the sun shines on it: it grows half a heart, up to 2 more.' },
   winter: { name: 'Winter', says: 'A little blue. Every bacteria crawls 15% slower.' },
   spring: { name: 'Spring', says: 'A breeze now and then, and stars twinkle round the sprout. Its powers come round 15% sooner.' },

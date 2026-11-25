@@ -129,7 +129,7 @@ export class Game {
     this.bacteria = [];
     this.dirtballs = [];
     this.shots = [];
-    this.germs = [];               // yellow bacteria's germs, flying at Klayman
+    this.germs = [];               // orange bacteria's germs, flying at Klayman
     this.waves = [];               // the bazoo-klay's waves of dirt
     this.coins = [];
     this.gadgets = this.loadout.gadgets.map((id) => new Gadget(id));
@@ -355,14 +355,14 @@ export class Game {
   // ------------------------------------------------- kinds (v27)
 
   /** The share of each kind among this game's own bacteria: from level 10
-   *  blue, from 20 yellow; in a timer run, the kinds that come in it. */
+   *  blue, from 20 orange; in a timer run, the kinds that come in it. */
   kindShares() {
     return this.timed
       ? sharesWhere((k) => k.runs.includes(this.run.id))
       : sharesWhere((k) => this.level >= k.from);
   }
 
-  /** ...and among what a boss sends out: yellow from level 25, blue from 35. */
+  /** ...and among what a boss sends out: orange from level 25, blue from 35. */
   bossShares() { return sharesWhere((k) => this.level >= k.bossFrom); }
 
   /** The kind of the next bacteria to come: a level's are dealt when it
@@ -398,9 +398,9 @@ export class Game {
     return best;
   }
 
-  /** Yellow ones charge up a germ once Klayman's in reach, and spit it. */
+  /** Orange ones charge up a germ once Klayman's in reach, and spit it. */
   spit(b, dt) {
-    const { reach, every, charge } = KINDS.yellow;
+    const { reach, every, charge } = KINDS.orange;
     if (b.charging > 0) {
       b.charging -= dt;
       if (b.charging <= 0) {
@@ -417,31 +417,53 @@ export class Game {
     }
   }
 
-  /** A germ flies from the yellow bacteria's eye at where Klayman stands now. */
+  /** A germ flies from the orange bacteria's eye at where Klayman stands now. */
   fireGerm(b) {
     const k = this.klay;
     this.germs.push(new Germ(b.x, b.y, { x: k.x - b.x, y: k.y - b.y }));
     this.emit('spit', { x: b.x, y: b.y });
   }
 
-  /** Blue ones stamp the dirt off whatever's dirty in reach, every few seconds. */
+  /** Blue ones jump to stamp the dirt off whatever's dirty in reach, every
+   *  so often: up, and when they land, the stamp; then one small bounce. */
   stomp(b, dt) {
-    const { reach, every, dirt, hold, stamp } = KINDS.blue;
-    b.stamping = Math.max(0, b.stamping - dt);
-    b.cooldown = Math.max(0, b.cooldown - dt);
-    if (b.cooldown > 0) return;
-    const hitBacteria = this.bacteria.filter((o) => o !== b && o.state === 'dirty' && dist(o, b) <= reach);
-    const hitBalls = this.dirtballs.filter((d) => d.solid && dist(d, b) <= reach);
-    if (!hitBacteria.length && !hitBalls.length) return;
-    for (const o of hitBacteria) o.shed(dirt);
-    for (const d of hitBalls) d.wear(hold);
+    const { reach, every, jump, land } = KINDS.blue;
+    b.cooldown = Math.max(0, b.cooldown - dt);       // counts from one jump to the next
+    if (b.jumping) {
+      const before = b.jump;
+      b.jump += dt;
+      if (before < land && b.jump >= land) this.stampDown(b);
+      if (b.jump >= jump) b.jump = 0;
+      return;
+    }
+    if (b.cooldown > 0 || !this.dirtAround(b, reach).length) return;
     b.cooldown = every;
-    b.stamping = stamp;
-    const steam = [...hitBacteria.map((o) => ({ x: o.x, y: o.y, ball: false })), ...hitBalls.map((d) => ({ x: d.x, y: d.y, ball: true }))];
+    b.jump = 1e-6;
+    this.emit('jump', { x: b.x, y: b.y });
+  }
+
+  /** Dirty bacteria and dirtballs within `reach` of `b`. */
+  dirtAround(b, reach) {
+    return [
+      ...this.bacteria.filter((o) => o !== b && o.state === 'dirty' && dist(o, b) <= reach),
+      ...this.dirtballs.filter((d) => d.solid && dist(d, b) <= reach),
+    ];
+  }
+
+  /** A blue one lands: a layer of dirt off every dirty bacteria in reach,
+   *  and a layer's worth off every dirtball's hold. Steam rises off each. */
+  stampDown(b) {
+    const { reach, dirt, hold } = KINDS.blue;
+    const hit = this.dirtAround(b, reach);
+    for (const t of hit) {
+      if (t instanceof Dirtball) t.wear(hold);
+      else t.shed(dirt);
+    }
+    const steam = hit.map((t) => ({ x: t.x, y: t.y, ball: t instanceof Dirtball }));
     this.emit('stomp', { x: b.x, y: b.y, steam });
   }
 
-  /** The germs fly; one that reaches Klayman poisons him, yellow (the lab
+  /** The germs fly; one that reaches Klayman poisons him, orange (the lab
    *  coat keeps it out, and so does the whirlwind's wind). */
   updateGerms(dt) {
     if (this.frozen) return;
@@ -453,10 +475,10 @@ export class Game {
       if (wind > 0 && insideRing(g, k, wind)) {
         g.dead = true;
         this.emit('germBlown', { x: g.x, y: g.y });
-      } else if (dist(g, k) <= KLAYMAN.radius + KINDS.yellow.germ.radius) {
+      } else if (dist(g, k) <= KLAYMAN.radius + KINDS.orange.germ.radius) {
         g.dead = true;
         if (this.gear.immune) this.emit('germBlocked', { x: g.x, y: g.y });
-        else if (k.poison('yellow')) this.emit('poison', { x: k.x, y: k.y, kind: 'yellow' });
+        else if (k.poison('orange')) this.emit('poison', { x: k.x, y: k.y, kind: 'orange' });
         else this.emit('germBlocked', { x: g.x, y: g.y });
       }
     }
@@ -872,13 +894,13 @@ export class Game {
     // A closed lily can't be seen: bacteria wander instead of heading for it.
     const target = this.hidden > 0 ? null : this.tree;
     for (const b of this.bacteria) {
-      // Green ones head for the sprout; yellow ones for Klayman; blue ones for dirt.
-      const goal = b.kind === 'yellow' ? this.klay : b.kind === 'blue' ? this.dirtNear(b) : target;
+      // Green ones head for the sprout; orange ones for Klayman; blue ones for dirt.
+      const goal = b.kind === 'orange' ? this.klay : b.kind === 'blue' ? this.dirtNear(b) : target;
       b.update(dt, goal, frozen, this.tree, pace);
       // The whirlwind's wind: nothing gets through to Klayman.
       if (wind > 0 && b.alive) this.blowAway(b, wind);
       if (!b.crawling || frozen) continue;
-      if (b.kind === 'yellow') this.spit(b, dt);
+      if (b.kind === 'orange') this.spit(b, dt);
       else if (b.kind === 'blue') this.stomp(b, dt);
       if (!b.invades) {
         // The lab coat still slows them at a touch.
