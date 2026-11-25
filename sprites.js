@@ -5,6 +5,7 @@ import {
   SPROUT_PALETTE, SPROUT_ROWS, CLOSING_ROWS, SPROUT_SWAY, ART_PALETTE, TOOL_ICON_ROWS, SHOP_ICON_ROWS,
   GADGET_ICON_ROWS, SEASON_ICON_ROWS, COIN_ROWS, GUN_ART, GUN_ART_SMALL, PACK_ART, LEAF_ROWS, BOTTLE_ROWS, SHOVEL_ROWS, SHOVEL_GRIP,
   SHADES_ROWS, SHADES_PALETTE, DIRT_LEAF_ROWS, DIRT_LEAF_PALETTES, BOLT_ROWS, BOLT_PALETTE,
+  KIND_ART, GERM_ROWS, GERM_PALETTE, BAZOO_ART,
 } from './art.js';
 
 /** In the single-file preview build, assets arrive inline as data URLs. */
@@ -97,6 +98,71 @@ export const BAC = {
   splatY: 183,
   ballBreakY: 219,
 };
+
+// --- Yellow and blue bacteria (v27) ----------------------------------------------
+// Sheets laid out like bacteiras.png: their own frames across (KIND_FRAMES),
+// with 0-3 layers of dirt down; then the green sheet's dirtball and break,
+// and its splat recoloured.
+export const KIND_FRAMES = {
+  yellow: ['round', 'squash', 'stretch', 'charge'],
+  blue: ['stand', 'stepL', 'stepR', 'lift', 'stamp'],
+};
+const DIRT = { dark: [66, 37, 14], mid: [112, 73, 43], main: [131, 95, 67] };
+// How much of a bacteria (from its feet up) each layer of dirt covers.
+const DIRT_COVER = [0, 0.38, 0.62, 0.86];
+
+/** A 20 x 24 frame with `look` layers of dirt over it from the feet up,
+ *  to row `top` (the body's top). The dirt's edge is a little ragged. */
+function dirtied(frame, look, top) {
+  const c = makeCanvas(frame.width, frame.height);
+  const g = c.getContext('2d');
+  g.drawImage(frame, 0, 0);
+  if (!look) return c;
+  const img = g.getImageData(0, 0, c.width, c.height);
+  const d = img.data;
+  const w = c.width;
+  const bottom = c.height - 1;
+  const cut = bottom - (bottom - top) * DIRT_COVER[look];
+  const solid = (x, y) => x >= 0 && y >= 0 && x < w && y < c.height && d[(y * w + x) * 4 + 3] > 0;
+  for (let y = 0; y < c.height; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!solid(x, y) || y < cut + ((x * 5 + 3) % 3) - 1) continue;
+      const edge = !solid(x - 1, y) || !solid(x + 1, y) || !solid(x, y + 1) || !solid(x, y - 1);
+      const [r, gg, b] = edge ? DIRT.dark : (x * 7 + y * 3) % 5 === 0 ? DIRT.mid : DIRT.main;
+      const i = (y * w + x) * 4;
+      d[i] = r; d[i + 1] = gg; d[i + 2] = b;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  return c;
+}
+
+/** The green splat's colours, swapped for a kind's own (by palette letter). */
+const SPLAT_SWAP = { '24,71,28': 'k', '52,106,74': 'D', '60,127,91': 'M', '76,145,95': 'L', '10,40,2': 'k' };
+
+function kindSheet(green, art, names) {
+  const c = makeCanvas(green.width, green.height);
+  const g = c.getContext('2d');
+  // The dirtball, the splat and the break: the green sheet's, then the splat recoloured.
+  g.drawImage(green, 0, BAC.ballY, green.width, green.height - BAC.ballY, 0, BAC.ballY, green.width, green.height - BAC.ballY);
+  const splat = g.getImageData(0, BAC.splatY, c.width, BAC.ballBreakY - BAC.splatY);
+  const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  for (let i = 0; i < splat.data.length; i += 4) {
+    const letter = SPLAT_SWAP[`${splat.data[i]},${splat.data[i + 1]},${splat.data[i + 2]}`];
+    if (!letter || !splat.data[i + 3]) continue;
+    [splat.data[i], splat.data[i + 1], splat.data[i + 2]] = hex(art.palette[letter]);
+  }
+  g.putImageData(splat, 0, BAC.splatY);
+  // Its own frames, with 0-3 layers of dirt.
+  const pad = (rows) => [...Array(24 - rows.length).fill('.'.repeat(20)), ...rows];
+  const frames = names.map((n) => pixelArt(pad(art.frames[n]), art.palette));
+  const first = pad(art.frames[names[0]]);
+  const top = first.findIndex((row) => /[^.]/.test(row));
+  for (let look = 0; look < 4; look++) {
+    frames.forEach((f, i) => g.drawImage(dirtied(f, look, top), i * BAC.size + 6, look * BAC.size));
+  }
+  return c;
+}
 
 // --- Boss: 96x72 frames from make-boss.py --------------------------------------
 // Frames 0-3 fighting (legs waving, breathing), 4-5 worn out. Feet at (48, 64).
@@ -484,6 +550,7 @@ export async function loadSprites() {
       looks.set(key, {
         sheet,
         green: tinted(sheet, 'rgba(96, 196, 72, 0.55)'),
+        yellow: tinted(sheet, 'rgba(236, 204, 52, 0.6)'),    // a yellow germ (v27)
         red: tinted(sheet, 'rgba(236, 52, 40, 0.62)'),
         grey: greyed(sheet),
       });
@@ -534,9 +601,22 @@ export async function loadSprites() {
     bacSlow: tinted(bac, 'rgba(176, 110, 214, 0.5)'),
     bac,
     bacFrozen: tinted(bac, 'rgba(150, 215, 255, 0.55)'),
+    // Each kind's sheet (v27), slowed and frozen too; a yellow one charging, lit up.
+    kinds: Object.fromEntries(['green', 'yellow', 'blue'].map((kind) => {
+      const sheet = kind === 'green' ? bac : kindSheet(bac, KIND_ART[kind], KIND_FRAMES[kind]);
+      return [kind, {
+        sheet,
+        slow: tinted(sheet, 'rgba(176, 110, 214, 0.5)'),
+        frozen: tinted(sheet, 'rgba(150, 215, 255, 0.55)'),
+        lit: tinted(sheet, 'rgba(255, 252, 214, 0.8)'),
+      }];
+    })),
+    germ: pixelArt(GERM_ROWS, GERM_PALETTE),
+    bazoo: Object.fromEntries(Object.entries(BAZOO_ART).map(([facing, art]) => [facing, { ...art, img: pixelArt(art.rows, ART_PALETTE) }])),
     boss: {
       sheet: boss,
       hit: tinted(boss, 'rgba(255, 255, 255, 0.8)'),       // the flash when dirt lands on it
+      red: tinted(boss, 'rgba(214, 36, 28, 0.82)'),        // its level's red, drawn over it (bossRed)
       frozen: tinted(boss, 'rgba(150, 215, 255, 0.55)'),   // a sandclock
     },
     shovel: { img: pixelArt(SHOVEL_ROWS, ART_PALETTE), grip: SHOVEL_GRIP },

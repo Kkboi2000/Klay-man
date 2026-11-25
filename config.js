@@ -19,7 +19,8 @@ export const KLAYMAN = {
   pushGap: 6,                // a dirtball this close to touching him can be pushed...
   pushCone: 0.64,            // ...if it's in front of him (within about 50 degrees)
   actionTime: 0.2,           // how long the throw / push pose is shown
-  skillLevel: 7,             // from here, dirt thrown from afar breaks a dirtball
+  // (Until v26, dirt thrown from level 7 broke a dirtball. Since v27 a
+  // dirtball is only ever pushed.)
 };
 
 export const SHOT = {
@@ -105,10 +106,42 @@ export const SCORE = {
 // leaf's and the backpack's 25 units are 150, the shovel's 30 are 180.
 export const UNIT = 6;
 
+// Two more kinds of bacteria (v27). The green ones crawl to the sprout.
+// Yellow ones (one eye, no legs) bounce after Klayman instead, never into the
+// sprout, and spit a yellow germ at him. Blue ones (two long legs, glasses)
+// never go near the sprout either: they look for bacteria in dirt and for
+// dirtballs, and stamp the dirt off them. Each kind is its `share` of a
+// level's bacteria from level `from`, of what a boss sends out from
+// `bossFrom`, and of what comes in the timer runs listed. Dirt them like any
+// other: a dirtball keeps its kind, and what climbs out of it is that kind.
+export const KINDS = {
+  yellow: {
+    share: 0.10, from: 20, bossFrom: 25, runs: ['t3', 't5'],
+    reach: 10 * UNIT,          // spits at Klayman from this close
+    every: 5,                  // a germ every 5 seconds...
+    charge: 1,                 // ...the last of them spent charging it up, standing still
+    hop: 0.55,                 // seconds a bounce takes
+    germ: { speed: 150, range: 10 * UNIT * 1.6, radius: 5 },
+    // A germ on Klayman does what a bacteria inside him does (POISON), but
+    // yellow, and 20% worse: 20% slower still, and 20% longer.
+    poison: { stun: 0.2 * 1.2, slow: 2 * 1.2, slowFactor: 0.5 * 0.8 },
+  },
+  blue: {
+    share: 0.15, from: 10, bossFrom: 35, runs: [],
+    reach: 10 * UNIT,          // stamps on dirt this close...
+    every: 5,                  // ...every 5 seconds...
+    dirt: 1,                   // ...a layer of dirt off every dirty bacteria in reach...
+    hold: 2.5,                 // ...and a layer's worth (decayTime) off every dirtball's hold
+    keepOff: 90,               // it never comes closer to the sprout than this
+    stamp: 0.35,               // how long the stamp takes to show
+  },
+};
+
 // A boss bacteria closes every fifth level from 5 (5, 10, 15, ...). Once
 // the level's own bacteria are gone it rises out of a corner, stays put and
-// sends out bacteria until dirt wears its HP (level x 10) down. Then it's
-// worn out, burrows back down, and a 10K coin pops out where it was.
+// sends out bacteria until dirt wears its HP (level x 10, up to level 30's
+// 300: v27) down. Then it's worn out, burrows back down, and a 10K coin pops
+// out where it was. It's a little redder every level, fully red at 40 (v27).
 export const BOSS = {
   firstLevel: 5,
   every: 5,
@@ -118,8 +151,10 @@ export const BOSS = {
   foot: { rx: 80, ry: 44, lift: 16 },
   corner: 70,                // how far in from the rim, at a corner of the pot
   hpPerLevel: 10,
+  hpUntil: 30,               // its HP grows no further after this level
+  redAt: 40,                 // fully red from this level: level/40 red before
   shotDamage: 1,             // a throw (medicine makes it 1.5, the booster 2.5)
-  ballDamage: 5,             // a rolling dirtball (thrown dirt doesn't break dirtballs while a boss is out)
+  ballDamage: 5,             // a rolling dirtball
   // Seconds between the bacteria it sends out: 2.5 at level 10, and 0.625
   // less every boss level after (1.875 at 15, 1.25 at 20), never under 1
   // (from 25). Level 5 carries the steps back: 3.125.
@@ -155,11 +190,16 @@ export const TOOLS = {
   coat: { price: 49, slowTime: 5, slowFactor: 0.7 },   // bacteria can't get in; a touch slows them 30%
   glasses: { price: 69 },                              // arrows, timers, counts, what's coming next
   gun: { price: 99, fireRate: 1.05, range: 1.05, speed: 1.05 }, // shots lock on to a bacteria
+  // Bazoo-klay (v27): a dirt bazooka on his shoulder. Every shot is a wave of
+  // dirt fanning out `cone` degrees, 10% shorter (range) and 15% slower
+  // (waveSpeed) than a throw. Three hits make a dirtball; a clean bacteria it
+  // hits is knocked back 3 units, one already in dirt isn't, nor a dirtball.
+  bazoo: { price: 299, range: 0.9, waveSpeed: 0.85, cone: 40, hits: 3, knock: 3 * UNIT },
 };
 
 // The dirt gun locks on to whatever is closest to Klayman within reach of a
-// shot (a bacteria, a boss, or from level 7 a dirtball, which dirt breaks),
-// marks it, and keeps him facing it, walking or standing.
+// shot (a bacteria or a boss), marks it, and keeps him facing it, walking or
+// standing.
 export const GUN = {
   lockTurn: 30,              // radians/second: a locked shot never misses
 };
@@ -216,8 +256,10 @@ export const SPROUTS = {
 const COOLDOWN = 15;
 
 export const GADGETS = {
+  // The whirlwind (v27; it was "the leaf", and keeps that id so saves still own it).
   leaf: {
     price: 39,
+    fling: 7 * UNIT,         // its first gust flings every bacteria inside it this much further out, and sets dirtballs rolling...
     reach: 25 * UNIT,        // three leaves spin out this far round Klayman...
     grow: 0.5,               // ...taking this long to spread
     time: 5,                 // their wind keeps bacteria out for 5 seconds (v23: was 7)
@@ -282,11 +324,12 @@ export const SEASONS = {
   // page says twice, on purpose, like the booster), and dirt takes 50% longer
   // to wear off a bacteria. (Each level: both 1% longer.)
   autumn: { price: 169, crackHold: 2.5, decay: 1.5 },
-  // A light rain. Every minute lightning strikes whatever is nearest Klayman
-  // (v24; it was anything, anywhere): a bacteria dies, a dirtball rolls at the
-  // closest bacteria (or into the pot's rim). The target is picked `warn`
-  // seconds early, so the glasses can mark it. (Each level: 1% sooner.)
-  rainy: { price: 169, storm: { every: 60, strikes: 1, warn: 2 } },
+  // A light rain. Every 36 seconds (v27: 40% sooner than the minute it was)
+  // lightning strikes whatever is nearest Klayman (v24; it was anything,
+  // anywhere): a bacteria dies, a dirtball rolls at the closest bacteria (or
+  // into the pot's rim). The target is picked `warn` seconds early, so the
+  // glasses can mark it. (Each level: 1% sooner.)
+  rainy: { price: 169, storm: { every: 60 * 0.6, strikes: 1, warn: 2 } },
 };
 
 // How much better every season gets each level: 1%, compounding.

@@ -188,7 +188,7 @@ test('a push needs Klayman right up against the dirtball', () => {
   assert.equal(tryPush(-touching), false, 'behind him');
 });
 
-test('level 7 skill: dirt from afar breaks a dirtball; up close it still pushes', () => {
+test('dirt never breaks a dirtball (v27): from afar it flies past, at any level; up close it pushes', () => {
   const tap = { x: 0, y: 0, pressed: true, held: false, auto: false };
   const setUp = (level, gap) => {
     const game = quietGame();
@@ -197,19 +197,14 @@ test('level 7 skill: dirt from afar breaks a dirtball; up close it still pushes'
     k.lookAlong({ x: 1, y: 0 });
     return { game, ball: game.addDirtball(k.x + gap, k.y) };
   };
-
-  let { game, ball } = setUp(6, 120);
-  game.update(STEP, tap);
-  run(game, 0.5);
-  assert.equal(ball.state, 'idle', 'before level 7, dirt flies past');
-
-  ({ game, ball } = setUp(7, 120));
-  game.update(STEP, tap);
-  run(game, 0.5);
-  assert.equal(ball.state === 'breaking' || ball.dead, true, 'from afar, it breaks');
-  assert.equal(game.score, SCORE.dirtball);
-
-  ({ game, ball } = setUp(7, 28));
+  for (const level of [1, 7, 30]) {
+    const { game, ball } = setUp(level, 120);
+    game.update(STEP, tap);
+    run(game, 0.5);
+    assert.equal(ball.state, 'idle', `level ${level}: dirt flies past`);
+    assert.equal(game.score, 0);
+  }
+  const { game, ball } = setUp(7, 28);
   game.update(STEP, tap);
   assert.equal(ball.state, 'rolling', 'up close, it is pushed');
 });
@@ -396,36 +391,29 @@ test('a mouse-aimed push still works on a dirtball he walks into', () => {
 
 // ------------------------------------------------- the dirt gun's targets
 
-test('dirt gun: from level 7 it locks on to a dirtball too, and breaks it', () => {
-  const lockOn = (level) => {
-    const game = new Game({ rng: () => 0.5, loadout: { tools: ['gun'] } });
-    game.reset(undefined, level);
-    game.phase = 'test';
-    game.toSpawn = 0;
-    const k = game.klay;
-    k.x = SOIL.cx - 120; k.y = SOIL.cy + 80;
-    const ball = game.addDirtball(k.x - 90, k.y);
-    game.addBacteria(k.x + 160, k.y);                        // farther away
-    game.update(STEP, { ...NO_INPUT, pressed: true });
-    return { game, ball };
-  };
-  const early = lockOn(6);
-  assert.notEqual(early.game.lock, early.ball, 'before level 7 dirt can’t break it, so no lock');
-  const { game, ball } = lockOn(7);
-  assert.equal(game.lock, ball, 'the closest thing it can hit');
-  assert.equal(game.klay.flip, true, 'he turns to it');
+test('dirt gun: it never locks on to a dirtball (v27), only what dirt can hit beyond it', () => {
+  const game = new Game({ rng: () => 0.5, loadout: { tools: ['gun'] } });
+  game.reset(undefined, 12);
+  game.phase = 'test';
+  game.toSpawn = 0;
+  const k = game.klay;
+  k.x = SOIL.cx - 120; k.y = SOIL.cy + 80;
+  const ball = game.addDirtball(k.x - 90, k.y);              // closer
+  const germ = game.addBacteria(k.x + 160, k.y);             // farther away
+  game.update(STEP, { ...NO_INPUT, pressed: true });
+  assert.equal(game.lock, germ, 'the bacteria, not the dirtball');
   run(game, 0.5);
-  assert.ok(ball.dead || ball.state === 'breaking');
-  assert.equal(game.score, SCORE.dirtball);
+  assert.equal(ball.state, 'idle');
 });
 
-test('dirt gun: a dirtball he is touching is pushed, not shot', () => {
+test('dirt gun: a dirtball he is touching and facing is pushed, not shot', () => {
   const game = new Game({ rng: () => 0.5, loadout: { tools: ['gun'] } });
   game.reset(undefined, 8);
   game.phase = 'test';
   game.toSpawn = 0;
   const k = game.klay;
   k.x = SOIL.cx; k.y = SOIL.cy;
+  k.lookAlong({ x: 1, y: 0 });
   const ball = game.addDirtball(k.x + 27, k.y);
   game.update(STEP, { ...NO_INPUT, pressed: true });
   assert.equal(ball.state, 'rolling');

@@ -14,6 +14,7 @@ import { Wallet, SAVE, ADMIN_SAVE, CATALOG, runName } from './gear.js';
 import { ONCE } from './config.js';
 import { createSetup, createFace } from './setup.js';
 import { createSetupBalls } from './setupballs.js';
+import { createSandbox } from './sandbox.js';
 import { createOrientation, wayFor } from './orientation.js';
 
 const STEP = 1 / 60;
@@ -27,7 +28,7 @@ const isPreview = Boolean(globalThis.KLAYMAN_ASSETS);
 
 let mode = 'loading';            // loading | title | setup | playing | paused | over
 let touch = matchMedia('(pointer: coarse)').matches;
-let game, renderer, input, sound, ui, best, wallet, setup, face, setupBalls, sprites;
+let game, renderer, input, sound, ui, best, wallet, setup, face, setupBalls, sprites, sandbox;
 // A phone or tablet: the only place a page is ever turned (orientation.js).
 const handheld = touch && matchMedia('(hover: none)').matches;
 const orientation = createOrientation({ handheld, onChange: () => layout() });
@@ -216,6 +217,9 @@ function pause() {
   if (mode !== 'playing') return;
   setMode('paused');
   input.clear();
+  // Admin mode: the sandbox, to change the game in play.
+  sandbox.show(wallet.isAdmin);
+  $('paused').classList.toggle('has-sandbox', wallet.isAdmin);
   ui.show('paused');
 }
 
@@ -311,6 +315,15 @@ function handleEvents(events) {
       case 'dirtball': sound.play('hit', { volume: 0.75, rate: 0.8 }); break;
       case 'break': sound.play('break', { volume: 0.7, rate: jitter(1, 0.05) }); break;
       case 'smash': sound.play('break', { volume: 0.9, rate: 1.2 }); break;
+      // Yellow and blue bacteria, and the bazoo-klay (v27).
+      case 'blast':
+        sound.play('throw', { volume: 0.55, rate: jitter(0.55, 0.04) });
+        sound.play('hit', { volume: 0.3, rate: 0.5 });
+        break;
+      case 'spit': sound.play('throw', { volume: 0.3, rate: jitter(1.7, 0.06) }); break;
+      case 'germBlocked':
+      case 'germBlown': sound.play('hit', { volume: 0.25, rate: 1.6 }); break;
+      case 'stomp': sound.play('hit', { volume: 0.4, rate: 0.45 }); break;
       case 'crack': sound.play('hit', { volume: 0.45, rate: 0.6 }); break;
       case 'poison':
         sound.play('hit', { volume: 0.6, rate: 0.55 });
@@ -329,7 +342,6 @@ function handleEvents(events) {
       case 'level': {
         let news = '';
         if (e.unlocksItems) news = 'From now on, special items will appear near the sprout.';
-        if (e.unlocksSkill) news = 'New skill: throw dirt at a dirtball from afar to break it. Up close, you still push it.';
         if (e.boss) news = e.firstBoss
           ? 'A boss bacteria waits at the end of this level. Wear it down with dirt, and push dirtballs into it.'
           : 'A boss bacteria waits at the end of this level.';
@@ -544,6 +556,7 @@ async function boot() {
   dressButtons(sprites.bac);
   face = createFace($('face'), sprites.klay);
   setupBalls = createSetupBalls($('setup-balls'), sprites.bac);
+  sandbox = createSandbox({ root: $('sandbox'), getGame: () => game, wallet, onCoins: () => ui.setCoins(wallet.coins) });
 
   ui.setGadgetIcons(sprites.gadgetIcons);
   input = createInput({

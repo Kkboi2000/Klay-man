@@ -3,7 +3,7 @@
 // arrows to bacteria, the boss, items and coins, seconds left on items and
 // coins, where the next bacteria, item, coin or boss is about to appear, the
 // boss's HP, and what the next lightning will strike.
-import { SPRITE_SCALE as S, SHOT, POT_SCALE, COINS, KLAYMAN, LOOKAHEAD, ITEM_FLIGHT, BOSS } from './config.js';
+import { SPRITE_SCALE as S, SHOT, POT_SCALE, COINS, KLAYMAN, LOOKAHEAD, ITEM_FLIGHT, BOSS, KINDS, KNOCK_TIME } from './config.js';
 import { SOIL, WORLD, CAMERA_BOUNDS as BOUNDS, TREE_SPOT, RING_SQUASH } from './world.js';
 import { KLAY, BAC, TREE_ART, BOSS_ART } from './sprites.js';
 import { SHADES_SPOTS } from './art.js';
@@ -15,6 +15,10 @@ import { Weather } from './weather.js';
 const FONT = '"Klay Digits", "Pixelify Sans", ui-rounded, system-ui, sans-serif';
 const DIRT = ['#4a2f17', '#6b4423', '#8a5a2b'];
 const GERM = ['#3e7a4a', '#5aa266', '#2c5a35'];
+const YELLOW = ['#ecc934', '#fcee8c', '#b0d628'];   // a yellow bacteria, and its germs (v27)
+const BLUE = ['#4888dc', '#8cc4fa', '#2c60b0'];
+const STEAM = ['#ffffff', '#e4eef2', '#c9d6dc'];  // a blue one's stamp, rising off the dirt
+const GERM_HEIGHT = 18;           // a germ flies at the height of a yellow one's eye
 const SPARK = ['#ffe9a8', '#ffd25a', '#ffffff'];
 const SPORE = ['#b06ed6', '#d9a6f0', '#7a3fa0'];
 const PETAL = ['#ff8593', '#d8263d', '#ffffff'];
@@ -74,6 +78,7 @@ export class Renderer {
   /** Forgets every effect in flight: a new game, or a new look on the setup page. */
   clearEffects() {
     this.particles = [];
+    this.steams = [];              // steam rising off dirt a blue bacteria stamped (v27)
     this.popups = [];
     this.rings = [];
     this.floaters = [];            // hearts rising from the sprout
@@ -182,7 +187,22 @@ export class Renderer {
           break;
         case 'crack': this.burst(e.x, e.y - 10, 6, DIRT, 70); break;
         case 'spawn': this.burst(e.x, e.y, 5, DIRT, 40); break;
-        case 'poison': this.burst(e.x, e.y - 22, 8, GERM, 50, -60); break;
+        case 'poison': this.burst(e.x, e.y - 22, 8, e.kind === 'yellow' ? YELLOW : GERM, 50, -60); break;
+        // ------------------------------------------- yellow and blue (v27)
+        case 'spit': this.burst(e.x, e.y - GERM_HEIGHT, 5, YELLOW, 50); break;
+        case 'germBlown': this.burst(e.x, e.y - GERM_HEIGHT, 6, ['#ffffff', ...YELLOW], 70); break;
+        case 'germBlocked': this.burst(e.x, e.y - GERM_HEIGHT, 8, [...YELLOW, ...COAT], 70); break;
+        case 'stomp':
+          this.burst(e.x - 8, e.y, 4, DIRT, 50, -20);
+          this.burst(e.x + 8, e.y, 4, DIRT, 50, -20);
+          for (const at of e.steam) this.steams.push({ x: at.x, y: at.y, t: 0, high: at.ball ? 34 : 28, seed: Math.random() * 10 });
+          break;
+        case 'blast': {
+          // The bazoo-klay: a puff of dirt out of the muzzle.
+          const len = Math.hypot(e.dir.x, e.dir.y) || 1;
+          this.burst(e.x + (e.dir.x / len) * 10, e.y - SHOT.height + (e.dir.y / len) * 10, 8, DIRT, 90);
+          break;
+        }
         case 'slowed': this.burst(e.x, e.y - 14, 6, COAT, 50, -30); break;
         case 'treeHurt':
           this.burst(TREE_SPOT.x, TREE_SPOT.y - 30, 8, ['#6aa84f', '#3f7a2e'], 70);
@@ -415,6 +435,8 @@ export class Renderer {
     for (const d of game.dirtballs) things.push({ y: d.y, draw: () => this.drawDirtball(d, game.frozen, game.inSeason('autumn')) });
     for (const item of game.items) things.push({ y: item.y, draw: () => this.drawItem(item) });
     for (const shot of game.shots) things.push({ y: shot.y, draw: () => this.drawShot(shot) });
+    for (const g of game.germs) things.push({ y: g.y, draw: () => this.drawGerm(g) });
+    for (const w of game.waves) things.push({ y: w.y + w.uy * w.r, draw: () => this.drawWave(w) });
     things.push({ y: game.klay.y, draw: () => this.drawKlayman(game) });
     const spray = game.gadgets.find((g) => g.id === 'spray' && g.active);
     if (spray) things.push({ y: TREE_SPOT.y + 6, draw: () => this.drawBottle(spray) });
@@ -429,6 +451,7 @@ export class Renderer {
     this.rain(dt);
     this.drawRings(dt);
     this.drawParticles(dt);
+    this.drawSteam(dt);
     this.drawFlyingLeaves(dt);
     this.drawSparkles(dt);
     this.drawFloaters(dt);
@@ -573,29 +596,123 @@ export class Renderer {
 
   /** `slowAll`: the fertilizer is working, so every crawler looks slowed. */
   drawBacteria(b, frozen, slowAll = false) {
-    const sp = this.sprites;
-    let sheet = sp.bac;
-    if (frozen && b.alive) sheet = sp.bacFrozen;
-    else if ((b.slowed || slowAll) && b.crawling) sheet = sp.bacSlow;
+    const look = this.sprites.kinds[b.kind] ?? this.sprites.kinds.green;
+    let sheet = look.sheet;
+    if (frozen && b.alive) sheet = look.frozen;
+    else if ((b.slowed || slowAll) && b.crawling) sheet = look.slow;
     const a = BAC.anchor;
 
     if (b.state === 'breaking') {
       const f = Math.min(4, Math.floor((b.fx / BREAK_TIME) * 5));
-      this.sprite(sp.bac, f * 32, BAC.splatY, 32, 32, b.x, b.y, a.x, a.y);
+      this.sprite(look.sheet, f * 32, BAC.splatY, 32, 32, b.x, b.y, a.x, a.y);
       return;
     }
     if (b.state === 'absorbed') {
       const k = 1 - Math.min(1, b.fx / ABSORB_TIME);
-      this.sprite(sp.bac, 0, 0, 32, 32, b.x, b.y, a.x, a.y, { scale: S * k, alpha: k });
+      this.sprite(look.sheet, 0, 0, 32, 32, b.x, b.y, a.x, a.y, { scale: S * k, alpha: k });
       return;
     }
-    this.shadow(b.x, b.y, 11);
+    // Off the ground: flung by the whirlwind (an arc, up and down), or a yellow one's bounce.
+    const flight = b.flung && b.knock > 0 ? Math.sin(Math.PI * (1 - b.knock / KNOCK_TIME)) * 22 : 0;
+    const hop = b.kind === 'yellow' && !frozen ? b.lift * 10 : 0;
+    const up = Math.round(flight + hop);
+    this.shadow(b.x, b.y, Math.max(6, 11 - up / 4));
     const rise = Math.min(1, b.t / 0.35);
-    const frame = Math.floor(b.t * 6) % 4;
-    this.sprite(sheet, frame * 32, BAC.crawlY(b.look), 32, 32, b.x, b.y, a.x, a.y, {
-      scale: S * (0.5 + rise * 0.5),
-      alpha: rise,
-    });
+    const frame = this.bacteriaFrame(b, frozen);
+    const at = { scale: S * (0.5 + rise * 0.5), alpha: rise };
+    this.sprite(sheet, frame * 32, BAC.crawlY(b.look), 32, 32, b.x, b.y - up, a.x, a.y, at);
+    // A yellow one charging a germ: it lights up, flickering faster, and the
+    // germ swells above its eye.
+    if (b.kind === 'yellow' && b.charging > 0 && b.crawling) {
+      const p = 1 - b.charging / KINDS.yellow.charge;
+      const flicker = this.calm ? 0.6 : 0.5 + 0.5 * Math.sin(this.time * (14 + 26 * p));
+      this.sprite(look.lit, frame * 32, BAC.crawlY(b.look), 32, 32, b.x, b.y - up, a.x, a.y, { ...at, alpha: 0.15 + 0.45 * p * flicker });
+      const germ = this.sprites.germ;
+      this.sprite(germ, 0, 0, germ.width, germ.height, b.x, b.y - up - 34, germ.width / 2, germ.height / 2, { scale: S * (0.4 + 0.6 * p) });
+    }
+  }
+
+  /** Which frame of its sheet a bacteria shows. Green: crawling. Yellow:
+   *  squashed on the soil, stretched going up, round at the top, puffed up
+   *  charging. Blue: its legs walking, or one foot up and stamping down. */
+  bacteriaFrame(b, frozen) {
+    if (b.kind === 'yellow') {
+      if (!b.crawling || frozen) return 0;
+      if (b.charging > 0) return 3;
+      if (b.lift < 0.2) return 1;
+      return b.hopT < 0.4 ? 2 : 0;
+    }
+    if (b.kind === 'blue') {
+      if (!b.crawling || frozen) return 0;
+      if (b.stamping > 0) return b.stamping > KINDS.blue.stamp / 2 ? 3 : 4;
+      return b.walking ? [0, 1, 0, 2][Math.floor(b.t * 7) % 4] : 0;
+    }
+    return Math.floor(b.t * 6) % 4;
+  }
+
+  /** A yellow germ in flight, with a short trail. */
+  drawGerm(g) {
+    const img = this.sprites.germ;
+    const { ctx } = this;
+    this.shadow(g.x, g.y, 4, 0.2);
+    const v = Math.hypot(g.vx, g.vy) || 1;
+    ctx.fillStyle = 'rgba(176, 214, 40, 0.45)';
+    for (let i = 1; i <= 3; i++) {
+      const k = (i * 6) / v;
+      const size = 6 - i;
+      ctx.fillRect(Math.round(g.x - g.vx * k) - size / 2, Math.round(g.y - GERM_HEIGHT - g.vy * k) - size / 2, size, size);
+    }
+    const wobble = this.calm ? 0 : Math.round(Math.sin(g.t * 30));
+    this.sprite(img, 0, 0, img.width, img.height, g.x, g.y - GERM_HEIGHT + wobble, img.width / 2, img.height / 2);
+  }
+
+  /** The bazoo-klay's wave: a band of dirt clods across its fan, rolling out
+   *  along the soil, thinning as it nears its range. */
+  drawWave(w) {
+    const { ctx } = this;
+    const fade = 1 - w.progress ** 2 * 0.7;
+    const base = Math.atan2(w.uy, w.ux);
+    const r = Math.max(6, w.r);
+    const steps = Math.max(6, Math.round((w.half * 2 * r) / 7));
+    for (let i = 0; i <= steps; i++) {
+      const a = base - w.half + (w.half * 2 * i) / steps;
+      for (const [back, size, alpha] of [[0, 4, 1], [7, 3, 0.75], [14, 2, 0.45], [21, 2, 0.2]]) {
+        const rr = r - back;
+        if (rr <= 4) continue;
+        const bob = this.calm ? 0 : Math.round(Math.sin(i * 1.7 + w.r * 0.08 + back) * 2);
+        const x = Math.round(w.x + Math.cos(a) * rr);
+        const y = Math.round(w.y + Math.sin(a) * rr - 6 + bob);
+        const px = size * S;
+        ctx.globalAlpha = fade * alpha;
+        ctx.fillStyle = '#2b1a0c';
+        ctx.fillRect(x - px / 2 - 1, y - px / 2 - 1, px + 2, px + 2);
+        ctx.fillStyle = DIRT[(i + back) % 3];
+        ctx.fillRect(x - px / 2, y - px / 2, px, px);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /** Steam off dirt a blue bacteria stamped: puffs rising from its foot to its top. */
+  drawSteam(dt) {
+    const { ctx } = this;
+    const LIFE = 0.9;
+    for (const s of this.steams) {
+      s.t += dt;
+      for (let i = 0; i < 4; i++) {
+        const t = s.t - i * 0.12;
+        if (t < 0 || t > LIFE - 0.2) continue;
+        const k = t / (LIFE - 0.2);
+        const x = Math.round(s.x + Math.sin(s.seed + i * 2.1 + k * 4) * 6 + (i - 1.5) * 4);
+        const y = Math.round(s.y - k * s.high);
+        const size = (2 + Math.round(k * 2)) * S;
+        ctx.globalAlpha = Math.max(0, 0.75 * (1 - k));
+        ctx.fillStyle = STEAM[i % STEAM.length];
+        ctx.fillRect(x - size / 2, y - size / 2, size, size);
+      }
+    }
+    ctx.globalAlpha = 1;
+    this.steams = this.steams.filter((s) => s.t < LIFE);
   }
 
   /** `autumn`: a fallen leaf sticks to it, somewhere random, and flies off
@@ -805,11 +922,12 @@ export class Renderer {
     const tools = game.gear.tools;
     const dig = game.gadgets.find((g) => g.id === 'shovel' && g.active);
     const hasGun = tools.includes('gun') && !dig;   // digging, he holds the shovel instead
+    const hasBazoo = tools.includes('bazoo') && !dig;
     const look = sp.lookFor(tools);
-    // With the dirt gun he doesn't wind up a throw: he aims and fires.
+    // With the dirt gun, or the bazoo-klay, he doesn't wind up a throw: he aims and fires.
     let kind = k.moving ? 'walk' : 'idle';
     let actionT = k.action ? k.action.t : 0;
-    if (k.action && !(hasGun && k.action.kind === 'attack')) kind = k.action.kind;
+    if (k.action && !((hasGun || hasBazoo) && k.action.kind === 'attack')) kind = k.action.kind;
     if (dig) {
       // Digging: arms out, leaning into it, across the whole dig.
       kind = 'push';
@@ -862,7 +980,8 @@ export class Renderer {
     if (pack) this.drawPack(k, row, col, flip, jitter, 'over');
     const green = k.greenness;
     if (green > 0) {
-      this.sprite(look.green, col * size, row * size, size, size, k.x + jitter, k.y, a.x, a.y, {
+      const tint = k.poisonKind === 'yellow' ? look.yellow : look.green;   // a yellow germ: yellow
+      this.sprite(tint, col * size, row * size, size, size, k.x + jitter, k.y, a.x, a.y, {
         flip,
         alpha: green * 0.55, // "turn green a bit"
       });
@@ -871,6 +990,7 @@ export class Renderer {
       if (alpha > 0) this.sprite(sheet, col * size, row * size, size, size, k.x + jitter, k.y, a.x, a.y, { flip, alpha });
     }
     if (gun && k.facing !== 'back') gun();
+    if (hasBazoo) this.drawBazoo(k, row, col, flip, jitter);
     if (dig) this.drawShovel(k, dig);
     if (tools.includes('gloves') && k.action?.kind === 'attack') this.drawStreaks(k);
     ctx.restore();
@@ -939,6 +1059,41 @@ export class Renderer {
     if (k.facing === 'front' && layer === 'over') {
       ctx.fillStyle = '#b8761a';                 // the straps, over his shoulders
       for (const x of [spot.x0 + 1, spot.x1 - 1]) ctx.fillRect((x + ox) * S, (spot.y0 + oy) * S, S, 3 * S);
+    }
+    ctx.restore();
+  }
+
+  /** The bazoo-klay on his shoulder (v27), whichever way he faces. On each
+   *  shot it kicks back, flashes at the muzzle, and (from the side) blows a
+   *  puff out of its back end. */
+  drawBazoo(k, row, col, flip, jitter) {
+    const art = this.sprites.bazoo[k.facing];
+    const spot = this.sprites.packSpots[row][col];
+    const firing = k.action?.kind === 'attack' ? k.action.t : Infinity;
+    const kick = firing < 0.12 ? 1 : 0;
+    const from = { side: (spot.x0 + spot.x1 + 1) / 2, front: spot.x0, back: spot.x1 }[k.facing];
+    const back = { side: [-kick, 0], front: [0, -kick], back: [0, kick] }[k.facing];
+    const fx = from + art.at.x + back[0] - KLAY.anchor.x;
+    const fy = spot.y0 + art.at.y + back[1] - KLAY.anchor.y;
+    const { ctx } = this;
+    ctx.save();
+    ctx.translate(Math.round(k.x + jitter), Math.round(k.y));
+    if (flip) ctx.scale(-1, 1);
+    ctx.drawImage(art.img, fx * S, fy * S, art.img.width * S, art.img.height * S);
+    if (firing < 0.08) {
+      const out = { side: [1, 0], front: [0, 0], back: [0, -1] }[k.facing];
+      const big = k.facing === 'front' ? 14 : 10;
+      const mx = (fx + art.muzzle.x + out[0] * 2) * S;
+      const my = (fy + art.muzzle.y + out[1] * 2) * S;
+      ctx.fillStyle = GOLD;
+      ctx.fillRect(mx - big / 2, my - big / 2, big, big);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(mx - big / 4, my - big / 4, big / 2, big / 2);
+      if (art.rear) {
+        ctx.fillStyle = 'rgba(201, 191, 178, 0.8)';
+        ctx.fillRect((fx + art.rear.x) * S - 10, (fy + art.rear.y) * S - 5, 8, 8);
+        ctx.fillRect((fx + art.rear.x) * S - 16, (fy + art.rear.y) * S - 2, 6, 6);
+      }
     }
     ctx.restore();
   }
@@ -1281,6 +1436,7 @@ export class Renderer {
       ctx.drawImage(img, frame * art.w, 0, art.w, art.h, x, y, art.w * S, art.h * S);
     };
     draw(sheet);
+    if (boss.red > 0 && sheet === sp.sheet) draw(sp.red, boss.red);
     if (boss.flash > 0) draw(sp.hit, boss.flash / 0.12);
     ctx.restore();
   }

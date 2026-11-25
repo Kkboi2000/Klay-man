@@ -3,7 +3,7 @@
 // and everything you own between games.
 import { GADGETS, ONCE, SEASONS, SEASON_LEVEL_UP, SLOTS, SPROUTS, TIMER, TOOLS, TREE } from './config.js';
 
-export const TOOL_IDS = ['backpack', 'shoes', 'gloves', 'coat', 'glasses', 'gun'];
+export const TOOL_IDS = ['backpack', 'shoes', 'gloves', 'coat', 'glasses', 'gun', 'bazoo'];
 export const SPROUT_IDS = ['sprout', 'daisy', 'sunflower', 'rose', 'corn', 'lilies', 'mushroom'];
 export const GADGET_IDS = ['leaf', 'spray', 'fertilizer', 'shovel', 'booster'];
 export const SEASON_IDS = ['summer', 'winter', 'spring', 'autumn', 'rainy'];
@@ -26,7 +26,8 @@ export const CATALOG = {
   gloves: { name: 'Gloves', says: 'Throw 15% faster and 15% farther.' },
   coat: { name: 'Coat', says: 'Bacteria can’t get into Klayman. One that touches him slows down 30% for 5 seconds.' },
   glasses: { name: 'Glasses', says: 'Points to bacteria, items and coins, times items and coins, counts what’s left, and shows what appears next and where, and what lightning will strike.' },
-  gun: { name: 'Dirt gun', says: 'Locks on to the closest bacteria, boss or dirtball. Throws, range and walking 5% up.' },
+  gun: { name: 'Dirt gun', says: 'Locks on to the closest bacteria or boss. Throws, range and walking 5% up.' },
+  bazoo: { name: 'Bazoo-klay', says: 'A dirt bazooka on his shoulder. Every shot is a 40° wave of dirt: three hits make a dirtball, and clean bacteria get knocked back.' },
   sprout: { name: 'Sprout', says: '3 hearts, up to 7 with water.' },
   daisy: { name: 'Daisy', says: 'Every 30 seconds a coin pops out of the flower: 1K, sometimes 5K, rarely 10K.' },
   sunflower: { name: 'Sunflower', says: 'Every 30 seconds a glowing special item pops out of the flower, from level 1.' },
@@ -34,7 +35,7 @@ export const CATALOG = {
   corn: { name: 'Corn', says: '6 hearts, up to 11. Every 40 seconds its leaves close and keep bacteria out for 15 seconds.' },
   lilies: { name: 'Lilies', says: 'Every 40 seconds it closes for 15 seconds. Bacteria lose sight of it and wander.' },
   mushroom: { name: 'Mushroom', says: 'Spores push bacteria and dirtballs back, and give bacteria a layer of dirt. Heals half a heart every 30 seconds. Grows to 9 hearts.' },
-  leaf: { name: 'Leaf', says: 'Three leaves spin round Klayman. Their wind keeps bacteria away for 5 seconds.' },
+  leaf: { name: 'Whirlwind', says: 'A whirlwind round Klayman: its first gust flings bacteria back and sets dirtballs rolling, then it keeps bacteria away for 5 seconds.' },
   spray: { name: 'Mist spray', says: 'Sprays the sprout twice: half a heart back.' },
   fertilizer: { name: 'Fertilizer', says: 'Every bacteria crawls 70% slower for 5 seconds.' },
   shovel: { name: 'Shovel', says: 'Klayman digs and throws dirt all round him: every bacteria near him gets two layers of dirt.' },
@@ -43,7 +44,7 @@ export const CATALOG = {
   winter: { name: 'Winter', says: 'A little blue. Every bacteria crawls 15% slower.' },
   spring: { name: 'Spring', says: 'A breeze now and then, and stars twinkle round the sprout. Its powers come round 15% sooner.' },
   autumn: { name: 'Autumn', says: 'In the shade of big trees. Dirtballs take twice as long to crack open; dirt wears off bacteria 50% slower.' },
-  rainy: { name: 'Rainy', says: 'A light rain. Every minute lightning strikes the bacteria nearest Klayman, or sends a dirtball rolling at one.' },
+  rainy: { name: 'Rainy', says: 'A light rain. Every 36 seconds lightning strikes the bacteria nearest Klayman, or sends a dirtball rolling at one.' },
   toolSlot: { name: '2nd tool slot', says: 'Wear two tools at once.' },
   sproutSlot: { name: '2nd sprout slot', says: 'Pick a backup sprout. When the first is lost, carry on with it.' },
   gadgetSlot: { name: '2nd gadget slot', says: 'Take two gadgets into a game.' },
@@ -123,6 +124,7 @@ export function gearFor({ tools = [], sprout = 'sprout', seasons = [], level = 1
     fireRate: times('fireRate'),
     range: times('range'),
     lockOn: worn.includes('gun'),
+    bazoo: worn.includes('bazoo'),   // his shots are waves of dirt
     passSprout: worn.includes('shoes'),
     immune: worn.includes('coat'),
     glasses: worn.includes('glasses'),

@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game, NO_INPUT } from './game.js';
 import { BOSS, COINS, ITEMS, SCORE } from './config.js';
-import { Boss, bossHp, bossSpawnEvery, isBossLevel } from './boss.js';
+import { Boss, bossHp, bossRed, bossSpawnEvery, isBossLevel } from './boss.js';
 import { SOIL, dist, insideSoil } from './world.js';
 
 const STEP = 1 / 60;
@@ -38,7 +38,7 @@ test('bosses come at levels 5, 10, 15, 20 ...', () => {
 });
 
 test('a boss has level x 10 HP', () => {
-  assert.deepEqual([5, 10, 15, 20, 35].map(bossHp), [50, 100, 150, 200, 350]);
+  assert.deepEqual([5, 10, 15, 20, 30, 35, 60].map(bossHp), [50, 100, 150, 200, 300, 300, 300], 'no more after level 30 (v27)');
 });
 
 test('it sends out a bacteria every 2.5s at 10, 1.875s at 15, 1.25s at 20, 1s from 25 on (3.125s at 5)', () => {
@@ -247,18 +247,12 @@ test('while a boss is out, thrown dirt flies past dirtballs; a push still breaks
   assert.notEqual(game.lock, ball, 'the gun doesn’t lock on to it');
   run(game, 0.6);
   assert.equal(ball.state, 'idle', 'the dirt flew past');
-  assert.equal(game.shotsBreakBalls, false);
   // Pushed into the boss, it still breaks, and hurts it.
   const push = game.addDirtball(boss.x, boss.y + 90);
   push.push({ x: 0, y: -1 });
   run(game, 0.4);
   assert.ok(push.dead || push.state === 'breaking');
   assert.ok(boss.hp <= boss.maxHp - BOSS.ballDamage);
-  // Once the boss is gone, dirt breaks dirtballs again.
-  game.hitBoss(boss.hp, boss);
-  run(game, BOSS.tired + BOSS.burrow + 0.1);
-  assert.equal(game.bossTime, false);
-  assert.equal(game.shotsBreakBalls, true);
 });
 
 test('the first boss comes at level 5, with 50 HP', () => {
@@ -266,4 +260,10 @@ test('the first boss comes at level 5, with 50 HP', () => {
   const boss = raise(game);
   assert.equal(boss.maxHp, 50);
   assert.equal(boss.spawnEvery, 3.125);
+});
+
+test('a boss is a little redder every level, all red from level 40 (v27)', () => {
+  assert.deepEqual([5, 20, 39, 40, 55].map(bossRed), [0.125, 0.5, 0.975, 1, 1]);
+  const game = bossGame(25);
+  assert.equal(raise(game).red, 25 / 40);
 });

@@ -568,7 +568,7 @@ test('prices match the brief', () => {
   assert.deepEqual(
     Object.fromEntries(Object.entries({ ...TOOLS, ...SPROUTS, ...GADGETS, ...SEASONS, ...SLOTS, ...ONCE }).map(([k, v]) => [k, v.price])),
     {
-      backpack: 19, shoes: 29, gloves: 29, coat: 49, glasses: 69, gun: 99,
+      backpack: 19, shoes: 29, gloves: 29, coat: 49, glasses: 69, gun: 99, bazoo: 299,
       sprout: 0, daisy: 99, sunflower: 149, rose: 199, corn: 249, lilies: 249, mushroom: 299,
       leaf: 39, spray: 39, fertilizer: 39, shovel: 39, booster: 39,
       summer: 169, winter: 169, spring: 169, autumn: 169, rainy: 169,
@@ -621,7 +621,6 @@ test('a game can start at a later level', () => {
   const game = new Game({ rng: () => 0.5 });
   game.reset(undefined, 7);
   assert.equal(game.level, 7);
-  assert.equal(game.skillUnlocked, true);
   assert.equal(game.itemsUnlocked, true);
   assert.equal(game.levelSize(7), game.toSpawn);
 });
@@ -995,4 +994,27 @@ test('medicine (the bag until v22): 5.5 seconds, throwing and walking 27.5% up, 
   run(game, 5.1);
   assert.equal(game.medicine, 0, 'over after 5.5 seconds');
   assert.equal(game.fireRate, 1);
+});
+
+// ------------------------------------------------------ whirlwind (v27)
+
+test('whirlwind (v27, it was the leaf): its first gust flings bacteria 7 units further out, through the air, and rolls dirtballs away', () => {
+  assert.equal(CATALOG.leaf.name, 'Whirlwind');
+  assert.equal(GADGETS.leaf.fling, 7 * UNIT);
+  const game = quietGame(withGadgets('leaf'));
+  const k = game.klay;
+  const near = game.addBacteria(k.x + 60, k.y);
+  const far = game.addBacteria(k.x + 400, k.y);
+  near.speed = far.speed = 0;
+  const ball = game.addDirtball(k.x, k.y - 80);
+  game.useGadget(0);
+  assert.equal(near.flung, true, 'flies');
+  assert.ok(near.knock > 0);
+  assert.equal(far.knock, 0, 'only inside the whirlwind');
+  assert.equal(ball.state, 'rolling', 'the dirtball rolls');
+  assert.ok(ball.vy < 0, 'away from Klayman');
+  const x0 = near.x;
+  game.update(0.4);
+  assert.ok(near.x - x0 >= 7 * UNIT - 1, `thrown ${Math.round(near.x - x0)} out`);
+  assert.equal(near.flung, false, 'and lands');
 });

@@ -7,8 +7,13 @@ import { BOSS } from './config.js';
 /** Levels 5, 10, 15, ... end with a boss. */
 export const isBossLevel = (n) => n >= BOSS.firstLevel && (n - BOSS.firstLevel) % BOSS.every === 0;
 
-/** A boss's HP at level `n`: 50 at level 5, 100 at 10, 150 at 15, ... */
-export const bossHp = (n) => n * BOSS.hpPerLevel;
+/** A boss's HP at level `n`: 50 at level 5, 100 at 10, 150 at 15, ... 300
+ *  at 30, and no more after (v27). */
+export const bossHp = (n) => Math.min(n, BOSS.hpUntil) * BOSS.hpPerLevel;
+
+/** How red a boss is at level `n`, 0 to 1: a little more every level, all
+ *  red from level 40 (v27). */
+export const bossRed = (n) => Math.min(1, Math.max(0, n / BOSS.redAt));
 
 /** Seconds between the bacteria a boss sends out at level `n`: 2.5 at 10,
  *  a step less every boss level after (a step more before), never under the minimum. */
@@ -19,7 +24,7 @@ export function bossSpawnEvery(n) {
 }
 
 export class Boss {
-  constructor(x, y, { hp, spawnEvery }) {
+  constructor(x, y, { hp, spawnEvery, red = 0 }) {
     this.x = x;                  // where its feet are, like every bacteria
     this.y = y;
     this.hp = hp;
@@ -30,6 +35,7 @@ export class Boss {
     this.fx = 0;                 // seconds in the current state
     this.t = 0;                  // animation clock
     this.flash = 0;              // seconds left of the flash from a hit
+    this.red = red;              // how red it's drawn, 0 to 1 (bossRed)
   }
 
   /** Still fighting: it can be hit and locked on to. */

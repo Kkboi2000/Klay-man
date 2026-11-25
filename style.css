@@ -1124,6 +1124,15 @@ body {
 .admin-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
 .admin-leave { justify-self: start; color: rgba(255, 244, 227, 0.75); }
 
+/* Admin mode's sandbox, on the pause screen (v27): the same dashed box, wider,
+   and the screen scrolls from the top so all of it can be reached. */
+.sandbox { width: 100%; text-align: left; }
+.sandbox-rows { display: grid; gap: 0.7rem; }
+.sandbox .admin-btn { min-height: 2.2rem; padding: 0.25em 0.65em; font-size: 0.9rem; }
+.sandbox .admin-btn[hidden] { display: none; }
+#paused.has-sandbox { place-items: start center; touch-action: pan-x pan-y; }
+#paused.has-sandbox .screen-body { width: min(40rem, 100%); }
+
 .admin-note { color: var(--gold); font-size: 0.95rem; }
 .admin-note:empty { display: none; }
 

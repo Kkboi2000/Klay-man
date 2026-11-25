@@ -24,7 +24,7 @@ Every file sits in one folder, with no subfolders, so uploading is simple.
 ### Updating
 
 Upload the changed files the same way. Also open `sw.js` and bump `VERSION`
-(`klayman-v26` → `klayman-v27`): phones keep an offline copy, and this is how
+(`klayman-v27` → `klayman-v28`): phones keep an offline copy, and this is how
 they know to fetch the new one.
 
 v25 renamed `titleballs.js` to `setupballs.js`. Uploading never deletes, so
@@ -129,7 +129,8 @@ so you see it at work before you pay (even when you can’t afford it yet).
 | Gloves | 29K | Throws 15% faster and 15% farther, with three pixel streaks off the hand |
 | Coat | 49K | Bacteria can’t get into Klayman; one that touches him crawls 30% slower for 5 s |
 | Glasses | 69K | A light-blue visor: arrows to bacteria, the boss, items and coins off-screen; seconds left on items and coins; bacteria left this level; a ring wherever bacteria, an item, a coin or a boss will appear in the next 3 s (with a see-through picture of which item, or the coin); the boss’s HP; the seconds until the sprout’s next power (above the sprout); the seconds until each gadget is ready; and in the rainy season, a ring and a bolt on what lightning will strike, 2 s before it does |
-| Dirt gun | 99K | Locks on to the closest thing it can hit (red brackets): a bacteria, the boss, or from level 7 a dirtball. Keeps Klayman facing it; throws, range and walking 5% up |
+| Dirt gun | 99K | Locks on to the closest thing it can hit (red brackets): a bacteria or the boss (never a dirtball: dirt flies past them). Keeps Klayman facing it; throws, range and walking 5% up |
+| Bazoo-klay | 299K | v27. A dirt bazooka on his shoulder (seen from every side; it kicks, flashes and puffs out the back). Every shot is a wave of dirt fanning out 40°, 10% shorter and 15% slower than a throw, as often as a throw. Everything the wave passes over is hit once: three hits make a dirtball, and a clean bacteria is knocked back 3 units (18). One already in dirt isn't knocked back, and dirtballs aren't touched. It hits a boss like a throw |
 
 | Sprout | Price | What it does |
 | --- | --- | --- |
@@ -143,7 +144,7 @@ so you see it at work before you pay (even when you can’t afford it yet).
 
 | Gadget | Price | What it does |
 | --- | --- | --- |
-| Leaf | 39K | Three leaves spin out round Klayman (150, the brief’s 25 units); their wind pushes bacteria out and keeps them out for 5 s. Then 15 s to recharge |
+| Whirlwind | 39K | (Was the leaf; its id in the code is still `leaf`, so saves keep it.) Its first gust flings every bacteria inside it 7 units (42) further out, through the air, and sets every dirtball inside it rolling away. Then three leaves spin out round Klayman (150, the brief’s 25 units); their wind keeps bacteria out, and blows yellow germs away, for 5 s. Then 15 s to recharge |
 | Mist spray | 39K | A bottle by the sprout sprays it twice in 0.75 s: half a heart back. Then 15 s to recharge |
 | Fertilizer | 39K | Every bacteria crawls 70% slower for 5 s. Then 15 s to recharge |
 | Shovel | 39K | Klayman stops and digs for 0.75 s, the shovel swinging above his head; light-brown dirt flies over a ring 252 round him (42 units: v22's 60, 30% smaller), and every bacteria in it gets two more layers of dirt (one already dirty enough becomes a dirtball). Dirtballs don’t mind. Then 15 s to recharge |
@@ -160,7 +161,7 @@ computer, **G** uses the 1st gadget and **H** the 2nd.
 | Winter | 169K | The pot is a little blue. Every bacteria crawls 15% slower |
 | Spring | 169K | A breeze blows across now and then, with petals in it, and tiny stars twinkle as they fly round the sprout. Every sprout power (coins, items, healing, spores, growing, closing) comes round 15% sooner (its wait is 85% as long: a rose heals every 17 s, not 20); how long it lasts doesn't change |
 | Autumn | 169K | Big trees round the pot shade its edges, and leaves drift down; a fallen leaf sticks to every dirtball, somewhere random, and flutters up and away when the ball is pushed. Dirtballs take 2.5 times as long to crack open (the setup page says twice, on purpose, like the booster), and dirt takes 50% longer to wear off a bacteria |
-| Rainy | 169K | A light rain falls. Every minute lightning strikes whatever is nearest Klayman, so you see it. A bacteria dies on the spot (100 points); a dirtball rolls straight at the closest bacteria, or, with none about, into the pot's rim. It picks its target 2 s early, and the glasses mark it; if that one is beaten first, the next nearest is marked instead |
+| Rainy | 169K | A light rain falls. Every 36 s (v27: 40% sooner than the minute it was) lightning strikes whatever is nearest Klayman, so you see it. A bacteria dies on the spot (100 points); a dirtball rolls straight at the closest bacteria, or, with none about, into the pot's rim. It picks its target 2 s early, and the glasses mark it; if that one is beaten first, the next nearest is marked instead |
 
 **Every season gets 1% better each level**, compounding: the sun and the
 lightning come 1% sooner, winter's bacteria are 1% slower still, spring's
@@ -212,6 +213,24 @@ for 5.5 s: he throws and walks 27.5% faster and his dirt counts 1.5 times
 45% (it was 10 s and 50%); it never changed how far he throws. The numbers
 are in `config.js` (`ITEMS`).
 
+## Yellow and blue bacteria (v27)
+
+Two more kinds join the green ones. Like any bacteria, dirt them into a
+dirtball and push it; a dirtball keeps its kind, so if it cracks open, what
+climbs out is that kind again. Neither ever goes into the sprout, and
+neither gets inside Klayman. The numbers are in `config.js` (`KINDS`); "10
+units" is 60, as everywhere (`UNIT`).
+
+| Kind | Comes | What it does |
+| --- | --- | --- |
+| Yellow | 10% of a level's bacteria from level 20; of a boss's from level 25; in timer runs of 3 and 5 minutes | One eye, no legs: it bounces after Klayman and stops within 10 units of him. Then it lights up and charges a germ for 1 s, standing still, and spits it at where he stands: one every 5 s. A germ that reaches him poisons him like a bacteria inside him does, but yellow, 20% slower still and 20% longer. Step aside and it misses; the lab coat keeps it out, and the whirlwind's wind blows it away |
+| Blue | 15% of a level's bacteria from level 10; of a boss's from level 35 | Two long legs, glasses: it never comes within 90 of the sprout. It walks to the nearest bacteria in dirt, or dirtball, and every 5 s stamps its feet: everything dirty within 10 units steams, a bacteria loses a layer of dirt, and a dirtball comes 2.5 s nearer cracking open (a layer's worth) |
+
+A level's share is exact, not luck: of level 20's 43 bacteria, 4 are yellow
+and 6 blue, shuffled in among the green ones. Where there's no end to them (a
+timer run, a boss), they're dealt 20 at a time the same way. Blue ones don't
+come in timer mode.
+
 ## Boss bacteria
 
 Levels 5, 10, 15, 20 and on end with a boss: a bacteria four times the size,
@@ -222,10 +241,11 @@ Klayman stands in) and the boss climbs out. It never moves, and Klayman can’t
 walk through it. It sends a bacteria out of its side every 3.125 s at level 5,
 2.5 s at 10, 1.875 s at 15, 1.25 s at 20, and 1 s from 25 on.
 
-It has level × 10 HP (50 at level 5, 100 at 10...). A throw takes 1 (1.5
-with medicine, 2.5 with the booster) and a rolling dirtball 5. While a boss is out, thrown dirt flies
-past dirtballs instead of breaking them (and the dirt gun leaves them be):
-they’re for pushing into the boss. Only the glasses show its HP: a bar,
+It has level × 10 HP (50 at level 5, 100 at 10...), up to level 30's 300; it
+grows no further after (v27). It's a little redder every level, and all red
+from level 40. From level 25 some of what it sends out is yellow, and from 35
+blue (see above). A throw takes 1 (1.5 with medicine, 2.5 with the booster)
+and a rolling dirtball 5. Only the glasses show its HP: a bar,
 green, yellow from half, red from a fifth, with what’s left out of its full HP.
 Worn out, it sags and sweats, burrows back into the ground, and a 10K coin pops
 out where it stood (and 1,000 points). The level is cleared once it’s gone and
@@ -241,11 +261,26 @@ unlocked and you start with 9,999K. The setup page then shows an admin panel:
 
 - **+1,000K**, **Unlock all**, and **Lock all** (to try buying again).
 - **Start at level** 1, 3, 5, 7, 10, 15, 20 or 25: level 3 brings special
-  items, level 7 the dirtball-breaking skill, and 5, 10, 15, 20 and 25 a boss.
+  items, 10 blue bacteria, 20 yellow ones, and 5, 10, 15, 20 and 25 a boss.
 - **Leave admin mode** goes back to your own save, exactly as you left it.
   Coins, purchases and best score in admin mode never touch it.
 
 Admin mode stays on (even after closing the app) until you leave it.
+
+**The sandbox** (v27): in admin mode, the pause screen has a sandbox that
+changes the game in play, at once (`sandbox.js`). Resume to see it:
+
+- **Mode:** survival jumps a level down, up, or 5 up; a timer run's clock goes
+  30 s either way, or straight to 0:05. **Bacteria keep coming** turns the
+  game's own spawning off and on (the boss's too).
+- **Plant:** any sprout, planted fresh.
+- **Tools:** any of them, as many at once as you like.
+- **Gadgets:** any two (there are two buttons); a third swaps out the first.
+- **Seasons:** any of them, as many at once as you like, mixed.
+- **Bacteria:** one green, yellow or blue, five mixed, or clear the pot.
+- **Sprout hearts:** half a heart down or up, full, and one more or less it can hold.
+- **Coins:** drop a 1K, 5K or 10K coin near Klayman, or put 100K in the wallet.
+- **Items:** drop a red plus, medicine, a water drop or a sandclock near Klayman.
 
 ## Controls
 
@@ -268,8 +303,8 @@ Klayman aims all the way round, not just four ways.
 
 The dirt gun aims for him, on whichever platform: it wins over the K stick
 and the mouse. A push only works when Klayman is touching the dirtball, and
-it rolls exactly the way he aims, at any angle. From level 7, dirt thrown at a
-dirtball breaks it.
+it rolls exactly the way he aims, at any angle. Thrown dirt never breaks a
+dirtball (until v26 it did from level 7): it's always pushed.
 
 Bacteria crawl 3% slower than in v18 and every level spawns them 6% less often
 (`BACTERIA.speed`, `LEVELS.spawnRate`). A dirtball takes 10% less dirt than in
@@ -292,7 +327,9 @@ coins off-screen. (Since v24 there's no arrow to the sprout: it never moves.)
 
 | File | What it does |
 | --- | --- |
-| `klayman.js`, `bacteria.js`, `dirtball.js`, `dirtshot.js` | Ported from your `.gd` scripts |
+| `klayman.js`, `bacteria.js`, `dirtball.js`, `dirtshot.js` | Ported from your `.gd` scripts (`bacteria.js` also has the yellow and blue kinds, v27) |
+| `germ.js`, `dirtwave.js` | A yellow bacteria's germ, and the bazoo-klay's wave of dirt (v27) |
+| `sandbox.js` | Admin mode's sandbox on the pause screen (v27) |
 | `items.js` | The four special items: red plus, medicine, water drop and sandclock (a sunflower’s fly out of it, glowing), and coins (a daisy’s and a boss’s fly out too; the backpack pulls them in) |
 | `boss.js` | The boss bacteria: where it stands, HP, rising, tiring and burrowing |
 | `boss.png`, `make-boss.py` | The boss's frames (four fighting, two worn out), drawn by the script: edit and run it (`pip install pillow`) |
@@ -313,7 +350,7 @@ coins off-screen. (Since v24 there's no arrow to the sprout: it never moves.)
 | `sw.js`, `manifest.webmanifest` | Offline play and home-screen install |
 | `klay-digits.woff2`, `klay-digits-bold.woff2` | The numbers 0–9, drawn for this game so 2 and 5 never read as 8 and S |
 | `make-digits.py` | Builds those two files: edit a digit’s pixels there and run it (`pip install fonttools brotli`) |
-| `game.test.js`, `gear.test.js`, `boss.test.js`, `season.test.js`, `timer.test.js`, `orientation.test.js`, `sound.test.js` | Rule checks: run `npm test` (needs Node 18+) |
+| `game.test.js`, `gear.test.js`, `boss.test.js`, `season.test.js`, `timer.test.js`, `kinds.test.js`, `sandbox.test.js`, `orientation.test.js`, `sound.test.js` | Rule checks: run `npm test` (needs Node 18+) |
 
 The sound effects were trimmed to remove the silence at the start of each
 file, so they play the moment something happens, and every effect plays at

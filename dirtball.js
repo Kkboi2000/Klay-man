@@ -6,7 +6,8 @@ import { DIRTBALL, KNOCK_TIME } from './config.js';
 export const DIRTBALL_BREAK_TIME = 0.4;
 
 export class Dirtball {
-  constructor(x, y) {
+  constructor(x, y, kind = 'green') {
+    this.kind = kind;            // the bacteria inside (v27): what climbs out if it cracks open
     this.x = x;
     this.y = y;
     this.state = 'idle';         // idle | rolling | breaking
@@ -22,8 +23,8 @@ export class Dirtball {
   }
 
   get solid() { return this.state === 'idle'; }
-  /** The dirt gun can lock on to it (dirt only breaks it from level 7: the game decides). */
-  get lockable() { return this.solid; }
+  /** Thrown dirt flies past a dirtball (v27): the dirt gun never locks on to one. */
+  get lockable() { return false; }
 
   /** Sets it rolling along `dir`, at any angle (dirtball.gd snapped it to
    *  the strongest axis; v22 doesn't). */
@@ -45,6 +46,13 @@ export class Dirtball {
     this.kx = (dx / d) * v;
     this.ky = (dy / d) * v;
     this.knock = KNOCK_TIME;
+  }
+
+  /** A blue bacteria's stamp: `seconds` off its hold, so it cracks open sooner. */
+  wear(seconds) {
+    if (this.state !== 'idle') return;
+    this.hold -= seconds;
+    if (this.hold <= 0) this.cracked = true;
   }
 
   breakApart() {

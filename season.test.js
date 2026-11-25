@@ -161,7 +161,7 @@ test('a mixed game does both: winter and rainy slow bacteria and strike them; sp
   assert.equal(game.inSeason('rainy') && game.inSeason('winter') && !game.inSeason('summer'), true);
   const b = game.addBacteria(game.tree.x + 250, game.tree.y);
   b.speed = 0;
-  run(game, 60.1);
+  run(game, SEASONS.rainy.storm.every + 0.1);
   assert.equal(b.alive, false, 'and rainy’s lightning');
   const bright = quietGame(['spring', 'summer'], { sprouts: ['rose'] });
   assert.ok(Math.abs(bright.gear.heal.every - 20 * 0.85) < 1e-9, 'spring still speeds the sprout');
@@ -274,12 +274,13 @@ test('autumn: dirt takes 50% longer to wear off a bacteria', () => {
 
 // ------------------------------------------------------------------- rainy
 
-test('rainy: every minute lightning kills a bacteria on the spot', () => {
+test('rainy: every 36 seconds (v27: 40% sooner than a minute) lightning kills a bacteria on the spot', () => {
+  assert.equal(SEASONS.rainy.storm.every, 36);
   const game = quietGame('rainy');
   const b = game.addBacteria(game.tree.x + 250, game.tree.y);
   b.speed = 0;
-  run(game, 59.9);
-  assert.equal(b.alive, true, 'the storm keeps its minute');
+  run(game, 35.9);
+  assert.equal(b.alive, true, 'the storm keeps its time');
   game.drainEvents();
   run(game, 0.2);
   const events = game.drainEvents();
@@ -405,7 +406,7 @@ test('every season gets 1% better each level, compounding', () => {
     assert.ok(near(seasonAt('spring', n).sproutWait, less(0.85, n)), `spring ${n}: shorter waits`);
     assert.ok(near(seasonAt('autumn', n).crackHold, more(2.5, n)), `autumn ${n}: dirtballs hold longer`);
     assert.ok(near(seasonAt('autumn', n).decay, more(1.5, n)), `autumn ${n}: dirt wears off slower`);
-    assert.ok(near(seasonAt('rainy', n).storm.every, less(60, n)), `rainy ${n}: lightning sooner`);
+    assert.ok(near(seasonAt('rainy', n).storm.every, less(36, n)), `rainy ${n}: lightning sooner`);
   }
   assert.equal(seasonAt('summer', 7).sun.grow, 0.5, 'the sun still grows half a heart');
   assert.equal(seasonAt('summer', 7).sun.max, 2, 'up to 2 more, as before');

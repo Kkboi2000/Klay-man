@@ -223,13 +223,13 @@
               <li>Hit a bacteria with dirt five times to turn it into a dirtball.</li>
               <li>Tap anything in Klayman’s or the plant’s pages to see it at work in the window, bought or not. Tap again to buy it.</li>
               <li>Klayman throws the way he walks. On a phone, drag K to aim, or just press it to aim at the closest bacteria. On a computer, he throws where the mouse points.</li>
-              <li>Walk right up to a dirtball and press K to roll it into other bacteria, whichever way you aim. Auto throw pushes too.</li>
+              <li>Walk right up to a dirtball and press K to roll it into other bacteria, whichever way you aim. Auto throw pushes too. Thrown dirt never breaks a dirtball: push it.</li>
+              <li>From level 10, blue bacteria (long legs, glasses) stamp the dirt off bacteria and dirtballs near them. From level 20, yellow ones (one eye) bounce after Klayman and spit a germ at him: watch for the glow, and step aside.</li>
               <li>When the sprout is lost, you can revive it once a game for 49K.</li>
               <li>Walk over coins to pick them up. Spend them here.</li>
               <li>From level 3, special items appear near the sprout.</li>
-              <li>From level 7, dirt thrown at a dirtball from afar breaks it.</li>
               <li>Pick a mode first. Survival goes on level after level. Timer: keep the sprout till the clock runs out, as bacteria pour out of the pot’s corners, faster every 20 seconds. Win a run to open the next.</li>
-              <li>Levels 5, 10, 15 and on end with a boss bacteria. Wear it down with dirt, and push dirtballs into it, for a 10K coin. While it’s out, thrown dirt doesn’t break dirtballs.</li>
+              <li>Levels 5, 10, 15 and on end with a boss bacteria. Wear it down with dirt, and push dirtballs into it, for a 10K coin.</li>
               <li>A gadget’s button, top right, fills up as it recharges. Tap it (G on a computer) when it’s full.</li>
               <li>A season (under Plant) changes the weather over the pot, and what bacteria, dirtballs and the sprout do. Never the boss. With the 2nd season slot, mix two.</li>
             </ul>
@@ -291,6 +291,11 @@
             <button type="button" role="radio" data-orient="portrait" aria-checked="false">Portrait</button>
           </div>
         </div>
+        <!-- Admin mode only (v27): change the game in play (sandbox.js). -->
+        <section id="sandbox" class="admin sandbox" hidden aria-labelledby="sandbox-name">
+          <h3 id="sandbox-name" class="admin-name">Sandbox <span class="shelf-note">admin mode: changes the game in play, at once</span></h3>
+          <div class="sandbox-rows"></div>
+        </section>
       </div>
     </section>
 
