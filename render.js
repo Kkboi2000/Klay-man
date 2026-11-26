@@ -1547,38 +1547,40 @@ export class Renderer {
   }
 
   /** The radio (v29): rings of static spread out of Klayman, every one
-   *  wobbling, crackling and breaking up as it goes. `t`: seconds it's been
-   *  on; `left`: seconds it has left (the rings stop coming at the end). */
+   *  wobbling, crackling and breaking up as it goes. Drawn in blocks on a
+   *  pixel grid, in two tones, fading in steps: pixel art, like the rest.
+   *  `t`: seconds it's been on; `left`: seconds it has left. */
   drawStatic(k, t, left) {
     const { ctx } = this;
     const EVERY = 0.3;            // a new ring this often...
     const LIFE = 1.2;             // ...each spreading out this long
+    const P = 2 * S;              // one block: two of the art's pixels
+    const snap = (v) => Math.round(v / P) * P;
     ctx.save();
     for (let i = Math.max(0, Math.floor((t - LIFE) / EVERY)); i * EVERY <= t; i++) {
       const age = t - i * EVERY;
       if (age > LIFE || i * EVERY > t + left - LIFE * 0.3 + 5) continue;
       const k01 = age / LIFE;
       const r = 18 + age * 190;
-      const n = Math.max(48, Math.round(r / 1.2));
-      ctx.globalAlpha = Math.max(0, 0.8 * (1 - k01));
-      ctx.lineWidth = 2;
-      ctx.lineJoin = 'round';
-      ctx.strokeStyle = i % 2 ? '#e8f6ff' : '#bfe2f2';
-      ctx.beginPath();
-      let drawing = false;
-      for (let j = 0; j <= n; j++) {
+      // Fades in three steps rather than smoothly.
+      ctx.globalAlpha = [0.9, 0.6, 0.3][Math.min(2, Math.floor(k01 * 3))];
+      // Enough points round the ring that neighbouring blocks touch.
+      const n = Math.ceil((2 * Math.PI * (r + 10)) / (P * 0.5));
+      let last = '';
+      for (let j = 0; j < n; j++) {
         const a = (j / n) * Math.PI * 2;
         // Turbulent: two wobbles at odd rates, and breaks that come and go.
         const wob = this.calm ? 0 : 7 * Math.sin(a * 7 + i * 2.3 + t * 11) + 3 * Math.sin(a * 13 - t * 17 + i);
-        const gap = !this.calm && Math.sin(a * 4 + t * 9 + i * 4) > 0.6;
-        const x = k.x + Math.cos(a) * (r + wob);
-        const y = k.y - 10 + Math.sin(a) * (r + wob) * RING_SQUASH;
-        if (gap) { drawing = false; continue; }
-        if (drawing) ctx.lineTo(x, y);
-        else ctx.moveTo(x, y);
-        drawing = true;
+        if (!this.calm && Math.sin(a * 4 + t * 9 + i * 4) > 0.6) continue;
+        const x = snap(k.x + Math.cos(a) * (r + wob));
+        const y = snap(k.y - 10 + Math.sin(a) * (r + wob) * RING_SQUASH);
+        const at = `${x},${y}`;
+        if (at === last) continue;    // a block once, so it doesn't darken where points crowd
+        last = at;
+        // Dashes of two tones round the ring, like static.
+        ctx.fillStyle = Math.floor((j / n) * 28 + i) % 2 ? '#e8f6ff' : '#8fb8cc';
+        ctx.fillRect(x - P / 2, y - P / 2, P, P);
       }
-      ctx.stroke();
     }
     ctx.restore();
   }
