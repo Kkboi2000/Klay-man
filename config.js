@@ -135,6 +135,10 @@ export const KINDS = {
     dirt: 1,                   // ...a layer of dirt off one dirty bacteria in reach (v29: one at a time)...
     hold: 2.5,                 // ...or a layer's worth (decayTime) off a dirtball's hold
     keepOff: 90,               // it never comes closer to the sprout than this
+    // v30: it gets about the orange way, bouncing, but 2.5 times slower: a
+    // bounce takes 2.5 times as long, and goes as far as an orange one's.
+    hop: 0.55 * 2.5,
+    pace: 1 / 2.5,
     jump: 0.7,                 // the stamp: it jumps up, lands (the stamp itself)...
     land: 0.42,                // ...this far in, and bounces once
     // v29: as it lands it shoots a light-blue shot at one bit of dirt, the
@@ -255,7 +259,8 @@ export const SPROUTS = {
     heal: { every: 30, amount: 0.5 },
   },
   // Cactus (v29): the mushroom's growing and healing, but no spores. Instead,
-  // every 6 to 12 seconds (at random) it shoots a thorn at the nearest
+  // every 15 to 30 seconds (at random; v30: 2.5 times slower than v29's 6 to
+  // 12) it shoots a thorn at the nearest
   // bacteria (crawling or in dirt) or dirtball: a crawling bacteria dies on
   // the spot; one in dirt, or a dirtball, breaks. And with a cactus in the
   // pot, no orange or blue bacteria come at all, not even from a boss.

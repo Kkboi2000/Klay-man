@@ -24,7 +24,7 @@ Every file sits in one folder, with no subfolders, so uploading is simple.
 ### Updating
 
 Upload the changed files the same way. Also open `sw.js` and bump `VERSION`
-(`klayman-v29` → `klayman-v30`): phones keep an offline copy, and this is how
+(`klayman-v31` → `klayman-v32`): phones keep an offline copy, and this is how
 they know to fetch the new one.
 
 v25 renamed `titleballs.js` to `setupballs.js`. Uploading never deletes, so
@@ -145,7 +145,7 @@ so you see it at work before you pay (even when you can’t afford it yet).
 | Corn | 249K | 6 hearts, up to 11; every 40 s its leaves snap shut for 15 s (it darkens) and bacteria can’t get in |
 | Lilies | 249K | Every 40 s its petals roll up into a bud for 15 s; bacteria lose sight of it and wander |
 | Mushroom | 299K | Every 25 s spores push nearby bacteria and dirtballs 60 back; every bacteria in the ring gets one more layer of dirt (one on its third becomes a dirtball) and is slowed; heals half a heart every 30 s; grows 1 heart every 50 s, up to 9 |
-| Cactus | 299K | v29. Grows 1 heart every 50 s up to 9, and heals half a heart every 30 s, like the mushroom, but no spores. Instead, every 6 to 12 s (at random) it shoots a thorn at the nearest bacteria or dirtball in the pot: a crawling bacteria dies on the spot, and one in dirt, or a dirtball, breaks (points and coin chance as usual). With a cactus in the pot, no orange or blue bacteria come at all, not even from a boss |
+| Cactus | 299K | v29. Grows 1 heart every 50 s up to 9, and heals half a heart every 30 s, like the mushroom, but no spores. Instead, every 15 to 30 s (at random; v30: 2.5 times slower than v29's 6 to 12) it shoots a thorn at the nearest bacteria or dirtball in the pot: a crawling bacteria dies on the spot, and one in dirt, or a dirtball, breaks (points and coin chance as usual). With a cactus in the pot, no orange or blue bacteria come at all, not even from a boss |
 
 | Gadget | Price | What it does |
 | --- | --- | --- |
@@ -231,7 +231,7 @@ units" is 60, as everywhere (`UNIT`).
 | Kind | Comes | What it does |
 | --- | --- | --- |
 | Orange | 10% of a level's bacteria from level 20; of a boss's from level 25; in timer runs of 3, 5 and 7 minutes | (Yellow until v28.) One eye, no legs: it bounces after Klayman and stops within 20 units (120) of him (v28: twice v27's 10). Then it lights up and charges a germ for 1 s, standing still, and spits it at where he stands: one every 5 s. Its germ flies 192 (v28: twice as far) at 225 a second (v28: 50% faster). A germ that reaches him poisons him like a bacteria inside him does, but orange, 20% slower still and 20% longer. Step aside and it misses; the lab coat keeps it out, and the whirlwind's wind blows it away |
-| Blue | 15% of a level's bacteria from level 10; of a boss's from level 35; in the 5-minute run's last minute and the 7-minute run's last 3 (v29) | v29: Krit's drawing, a blue blob with spiky dark hair, heavy brows and two big fangs; it waddles. It never comes within 90 of the sprout. It goes for the nearest bacteria in dirt, or dirtball, and every 1.67 s jumps up, lands with a stamp, bounces once, and as it lands shoots a light-blue shot at the nearest dirt within 40 units (240): one at a time (v29). When the shot gets there, steam rises, and a bacteria loses a layer of dirt, or a dirtball comes 2.5 s nearer cracking open (a layer's worth) |
+| Blue | 15% of a level's bacteria from level 10; of a boss's from level 35; in the 5-minute run's last minute and the 7-minute run's last 3 (v29) | v30: Krit's drawing, made the orange one's size: a blue blob with spiky dark hair, heavy brows and two fangs jutting up. It bounces the orange way, 2.5 times slower (each bounce takes 2.5 times as long and goes as far), its hair swaying at the top of a bounce, flung up as it lands and swept down as it rises. It never comes within 90 of the sprout. It goes for the nearest bacteria in dirt, or dirtball, and every 1.67 s jumps up, lands with a stamp, bounces once, and as it lands shoots a light-blue shot at the nearest dirt within 40 units (240): one at a time (v29). When the shot gets there, steam rises, and a bacteria loses a layer of dirt, or a dirtball comes 2.5 s nearer cracking open (a layer's worth) |
 
 A level's share is exact, not luck: of level 20's 43 bacteria, 4 are orange
 and 6 blue, shuffled in among the green ones. Where there's no end to them (a

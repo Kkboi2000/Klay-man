@@ -631,7 +631,7 @@ export class Renderer {
     // Off the ground: flung by the whirlwind (an arc, up and down), an
     // orange one's bounce, or a blue one's jump.
     const flight = b.flung && b.knock > 0 ? Math.sin(Math.PI * (1 - b.knock / KNOCK_TIME)) * 22 : 0;
-    const hop = frozen || !b.lift ? 0 : b.lift * (b.kind === 'blue' ? 20 : 10);
+    const hop = frozen || !b.lift ? 0 : b.lift * 10;
     const up = Math.round(flight + hop);
     this.shadow(b.x, b.y, Math.max(6, 11 - up / 4));
     const rise = Math.min(1, b.t / 0.35);
@@ -651,7 +651,7 @@ export class Renderer {
 
   /** Which frame of its sheet a bacteria shows. Green: crawling. Orange:
    *  squashed on the soil, stretched going up, round at the top, puffed up
-   *  charging. Blue: waddling side to side, or its jump. */
+   *  charging. Blue: the same bounce, slower, its hair moving; or its jump. */
   bacteriaFrame(b, frozen) {
     if (b.kind === 'orange') {
       if (!b.crawling || frozen) return 0;
@@ -660,6 +660,8 @@ export class Renderer {
       return b.hopT < 0.4 ? 2 : 0;
     }
     if (b.kind === 'blue') {
+      // Frames: round (hair up), round (hair swaying left, right), squashed
+      // (hair flung up), stretched (hair swept down).
       if (!b.crawling || frozen) return 0;
       if (b.jumping) {
         // Squashed as it springs, lands and lands again; stretched in the air.
@@ -667,7 +669,9 @@ export class Renderer {
         const t = b.jump;
         return t < 0.07 || Math.abs(t - land) < 0.06 || t > jump - 0.06 ? 3 : 4;
       }
-      return b.waddling ? [0, 1, 0, 2][Math.floor(b.t * 6) % 4] : 0;
+      if (b.lift < 0.2) return 3;
+      if (b.hopT < 0.4) return 4;
+      return [0, 1, 0, 2][Math.floor(b.t * 5) % 4];     // at the top: its hair sways
     }
     return Math.floor(b.t * 6) % 4;
   }

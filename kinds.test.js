@@ -153,7 +153,7 @@ test('a dirtball keeps its kind: what climbs out is orange again', () => {
 
 // ------------------------------------------------------------------ blue
 
-test('blue (v28): it waddles to dirt, never near the sprout, and jumps to stamp a layer off when it lands; 3 times as often as v27, from 4 times as far', () => {
+test('blue (v28): it bounces to dirt, never near the sprout, and jumps to stamp a layer off when it lands; 3 times as often as v27, from 4 times as far', () => {
   assert.equal(KINDS.blue.reach, 40 * UNIT);
   assert.ok(Math.abs(KINDS.blue.every - 5 / 3) < 1e-9);
   const game = quietGame();
@@ -164,7 +164,7 @@ test('blue (v28): it waddles to dirt, never near the sprout, and jumps to stamp 
   dirty.addDirt(3);
   const b = game.addBacteria(SOIL.cx - 150, SOIL.cy + 250, 'blue');
   assert.ok(b instanceof Stomper);
-  b.speed = 60;
+  b.speed = 60 * 2.5;                      // it gets about 2.5 times slower (v30)
   game.drainEvents();
   let closest = Infinity;
   let jumped = null;
@@ -350,10 +350,10 @@ test('cactus (v29): 299K, up to 9 hearts, heals and grows like the mushroom, no 
   assert.equal(game.gear.growEvery, 50);
 });
 
-test('cactus: every 6 to 12 s a thorn at the nearest: a crawling bacteria dies; one in dirt, or a dirtball, breaks', () => {
+test('cactus: every 15 to 30 s (v30) a thorn at the nearest: a crawling bacteria dies; one in dirt, or a dirtball, breaks', () => {
   const game = quietGame({ sprouts: ['cactus'] });
   game.klay.x = SOIL.cx + 260; game.klay.y = SOIL.cy + 100;
-  assert.ok(game.thornTimer >= 6 && game.thornTimer <= 12);
+  assert.ok(game.thornTimer >= 15 && game.thornTimer <= 30);
   const crawler = game.addBacteria(game.tree.x - 120, game.tree.y - 80);
   const dirty = game.addBacteria(game.tree.x + 150, game.tree.y - 60);
   const ball = game.addDirtball(game.tree.x - 60, game.tree.y + 200);
@@ -362,13 +362,13 @@ test('cactus: every 6 to 12 s a thorn at the nearest: a crawling bacteria dies; 
   dirty.addDirt(2);
   game.drainEvents();
   const left = () => [crawler.alive, dirty.alive, ball.solid].filter(Boolean).length;
-  run(game, 12.5);
+  run(game, 30.5);
   assert.ok(game.drainEvents().some((e) => e.type === 'thorn'), 'it shot');
   assert.equal(left(), 2, 'one at a time');
   assert.equal(crawler.alive, false, 'the nearest went first, on the spot');
-  run(game, 12.5);
+  run(game, 30.5);
   assert.equal(left(), 1);
-  run(game, 12.5);
+  run(game, 30.5);
   assert.equal(left(), 0, 'in dirt: broken; the dirtball too');
 });
 
@@ -447,4 +447,32 @@ test('AI: it pushes the nearest dirtball into the nearest bacteria', () => {
   game.useGadget(0);
   run(game, 4.4);
   assert.ok(ball.state === 'rolling' || ball.dead || !prey.alive, 'pushed');
+});
+
+test('blue (v30): it bounces like an orange one, 2.5 times slower: each bounce 2.5 times as long, as far', () => {
+  assert.ok(Math.abs(KINDS.blue.hop - KINDS.orange.hop * 2.5) < 1e-9);
+  const travel = (kind) => {
+    const game = quietGame();
+    game.klay.x = SOIL.cx + 260; game.klay.y = SOIL.cy + 200;
+    const b = game.addBacteria(SOIL.cx - 250, SOIL.cy - 150, kind);
+    if (kind === 'blue') game.addDirtball(SOIL.cx + 260, SOIL.cy + 200);   // something to head for, straight, like the orange one's Klayman
+    b.hopT = 0;
+    b.speed = 40;
+    b.cooldown = 99;
+    const x0 = b.x, y0 = b.y;
+    let up = false;
+    let hops = 0;
+    for (let t = 0; t < KINDS.blue.hop * 2; t += STEP) {
+      game.update(STEP);
+      const air = b.lift > 0.05;
+      if (air && !up) hops++;
+      up = air;
+    }
+    return { moved: Math.hypot(b.x - x0, b.y - y0), hops };
+  };
+  const orange = travel('orange');
+  const blue = travel('blue');
+  assert.ok(Math.abs(blue.moved * 2.5 / orange.moved - 1) < 0.15, `blue went ${Math.round(blue.moved)}, orange ${Math.round(orange.moved)}`);
+  assert.equal(blue.hops, 2, 'two bounces in two of its bounce-times');
+  assert.ok(orange.hops >= 4, 'the orange one bounced 2.5 times as often');
 });

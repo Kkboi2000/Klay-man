@@ -120,7 +120,7 @@ export const BAC = {
 // and its splat recoloured.
 export const KIND_FRAMES = {
   orange: ['round', 'squash', 'stretch', 'charge'],
-  blue: ['stand', 'waddleL', 'waddleR', 'crouch', 'air'],
+  blue: ['round', 'swayL', 'swayR', 'squash', 'stretch'],
 };
 const DIRT = { dark: [66, 37, 14], mid: [112, 73, 43], main: [131, 95, 67] };
 // How much of a bacteria (from its feet up) each layer of dirt covers.

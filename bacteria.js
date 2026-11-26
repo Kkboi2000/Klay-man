@@ -249,31 +249,34 @@ export class Spitter extends Bacteria {
   }
 }
 
-/** Blue (v27; v28: a rounded box with boar's fangs, no legs). It waddles to
- *  the nearest dirt (`target`: a dirty bacteria or a dirtball, or null: it
- *  wanders), never near the sprout (`avoid`), and stops in reach. The game
- *  does the stamping: `cooldown` till the next; `jump`, the seconds into a
- *  jump (0 on the ground): up, down (the stamp), and one small bounce. */
+/** Blue (v27; v30: Krit's drawing, the orange's size). It bounces the
+ *  orange way, 2.5 times slower, to the nearest dirt (`target`: a dirty
+ *  bacteria or a dirtball, or null: it wanders), never near the sprout
+ *  (`avoid`), and stops in reach (bouncing on the spot). The game does the
+ *  stamping: `cooldown` till the next; `jump`, the seconds into a jump (0
+ *  on the ground): up, down (the stamp, and its shot), and one small bounce. */
 export class Stomper extends Bacteria {
   constructor(x, y, speed) {
     super(x, y, speed);
     this.kind = 'blue';
     this.cooldown = 2;             // a moment after it's out before the first stamp
     this.jump = 0;
-    this.waddling = false;
+    this.hopT = Math.random();     // where in a bounce it is (0 to 1)
   }
 
   get invades() { return false; }
 
   get jumping() { return this.jump > 0; }
 
-  /** How high it is, 0 (on the soil) to 1: the jump, then a bounce a third as high. */
+  /** How high it is, 0 (on the soil) to 1: in a bounce, or its jump to
+   *  stamp (twice as high), then a bounce a third as high. */
   get lift() {
-    if (!this.jumping || !this.crawling) return 0;
+    if (!this.crawling) return 0;
+    if (!this.jumping) return Math.sin(this.hopT * Math.PI);
     const { jump, land } = KINDS.blue;
     const t = this.jump;
-    if (t < land) return Math.sin((Math.PI * t) / land);
-    return 0.3 * Math.sin((Math.PI * (t - land)) / (jump - land));
+    if (t < land) return 2 * Math.sin((Math.PI * t) / land);
+    return 0.6 * Math.sin((Math.PI * (t - land)) / (jump - land));
   }
 
   addDirt(amount = 1) {
@@ -282,17 +285,13 @@ export class Stomper extends Bacteria {
   }
 
   move(dt, speed, target, avoid) {
-    const { keepOff, reach } = KINDS.blue;
-    if (this.jumping) {
-      this.waddling = false;
-      return;
-    }
-    if (!target) {
-      this.waddling = true;
-      this.wander(dt, speed, avoid, keepOff);
-      return;
-    }
-    this.waddling = approach(this, dt, speed, target, reach * 0.7, avoid, keepOff);
+    const { keepOff, reach, hop, pace } = KINDS.blue;
+    if (this.jumping) return;
+    this.hopT = (this.hopT + dt / hop) % 1;
+    // Like an orange one, it only gets anywhere in the air.
+    const air = 2 * Math.sin(this.hopT * Math.PI) * pace;
+    if (!target) this.wander(dt, speed * air, avoid, keepOff);
+    else approach(this, dt, speed * air, target, reach * 0.7, avoid, keepOff);
   }
 }
 
