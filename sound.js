@@ -95,6 +95,14 @@ const SYNTHS = {
     const env = Math.exp(-(t - n * 0.05) * 16) * (n < 3 ? 1 : Math.exp(-(t - 0.15) * 6));
     return 0.16 * Math.sin(2 * Math.PI * notes[n] * t) * env + 0.05 * square(notes[n] * 2, t) * env;
   }],
+  // A radio between stations (v29): hiss and crackle, with a wobbling whine under it.
+  static: [0.9, (t) => {
+    const env = Math.min(1, t / 0.04) * Math.min(1, (0.9 - t) / 0.3);
+    const crackle = Math.sin(t * 91) * Math.sin(t * 37) > 0.25 ? 1 : 0.3;
+    const hiss = (Math.random() * 2 - 1) * crackle;
+    const whine = Math.sin(2 * Math.PI * (650 + 280 * Math.sin(t * 17)) * t);
+    return env * (0.34 * hiss + 0.07 * whine);
+  }],
   // Three rising notes: bought it.
   buy: [0.42, (t) => {
     const notes = [659, 831, 988];

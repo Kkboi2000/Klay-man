@@ -540,7 +540,7 @@ test('level skips: pick one for the next game; it is spent when used', () => {
 });
 
 test('the setup page sells level skips but not Revive', () => {
-  assert.deepEqual(SKIP_IDS, ['skip3', 'skip7', 'skip10']);
+  assert.deepEqual(SKIP_IDS, ['skip3', 'skip7', 'skip10', 'skip15']);
   assert.equal(CATALOG.coat.name, 'Coat');
 });
 
@@ -569,11 +569,11 @@ test('prices match the brief', () => {
     Object.fromEntries(Object.entries({ ...TOOLS, ...SPROUTS, ...GADGETS, ...SEASONS, ...SLOTS, ...ONCE }).map(([k, v]) => [k, v.price])),
     {
       backpack: 19, shoes: 29, gloves: 29, coat: 49, glasses: 69, gun: 99, bazoo: 299,
-      sprout: 0, daisy: 99, sunflower: 149, rose: 199, corn: 249, lilies: 249, mushroom: 299,
-      leaf: 39, spray: 39, fertilizer: 39, shovel: 39, booster: 39,
+      sprout: 0, daisy: 99, sunflower: 149, rose: 199, corn: 249, lilies: 249, mushroom: 299, cactus: 299,
+      leaf: 39, spray: 39, fertilizer: 39, shovel: 39, booster: 39, radio: 39, ai: 39,
       summer: 169, winter: 169, spring: 169, autumn: 169, rainy: 169,
       toolSlot: 199, sproutSlot: 399, gadgetSlot: 99, seasonSlot: 299,
-      skip3: 29, skip7: 74, skip10: 99, revive: 49,
+      skip3: 29, skip7: 74, skip10: 99, skip15: 149, revive: 49,
     },
   );
   assert.equal(formatK(1250), '1,250K');
@@ -714,7 +714,7 @@ const withGadgets = (...gadgets) => ({ gadgets });
 const press = (i) => ({ ...NO_INPUT, gadget: i });
 
 test('gadgets cost 39K; the 2nd gadget slot 99K; the 2nd tool slot 199K; the 2nd sprout slot 399K', () => {
-  assert.deepEqual(GADGET_IDS.map((id) => GADGETS[id].price), [39, 39, 39, 39, 39]);
+  assert.ok(GADGET_IDS.every((id) => GADGETS[id].price === 39));
   assert.equal(SLOTS.gadgetSlot.price, 99);
   assert.equal(SLOTS.toolSlot.price, 199);
   assert.equal(SLOTS.sproutSlot.price, 399);

@@ -117,7 +117,7 @@ export const UNIT = 6;
 // other: a dirtball keeps its kind, and what climbs out of it is that kind.
 export const KINDS = {
   orange: {
-    share: 0.10, from: 20, bossFrom: 25, runs: ['t3', 't5'],
+    share: 0.10, from: 20, bossFrom: 25, runs: ['t3', 't5', 't7'],
     reach: 10 * UNIT * 2,      // spits at Klayman from this close (v28: twice v27's 10 units)
     every: 5,                  // a germ every 5 seconds...
     charge: 1,                 // ...the last of them spent charging it up, standing still
@@ -132,11 +132,14 @@ export const KINDS = {
     share: 0.15, from: 10, bossFrom: 35, runs: [],
     reach: 10 * UNIT * 4,      // stamps on dirt this far off (v28: 4 times v27's 10 units)...
     every: 5 / 3,              // ...every 1.67 seconds (v28: 3 times as often as v27's 5)...
-    dirt: 1,                   // ...a layer of dirt off every dirty bacteria in reach...
-    hold: 2.5,                 // ...and a layer's worth (decayTime) off every dirtball's hold
+    dirt: 1,                   // ...a layer of dirt off one dirty bacteria in reach (v29: one at a time)...
+    hold: 2.5,                 // ...or a layer's worth (decayTime) off a dirtball's hold
     keepOff: 90,               // it never comes closer to the sprout than this
     jump: 0.7,                 // the stamp: it jumps up, lands (the stamp itself)...
     land: 0.42,                // ...this far in, and bounces once
+    // v29: as it lands it shoots a light-blue shot at one bit of dirt, the
+    // nearest in reach; the dirt comes off when the shot gets there.
+    zap: { speed: 330 },
   },
 };
 
@@ -251,6 +254,19 @@ export const SPROUTS = {
     maxLives: 9,             // ...up to 9
     heal: { every: 30, amount: 0.5 },
   },
+  // Cactus (v29): the mushroom's growing and healing, but no spores. Instead,
+  // every 6 to 12 seconds (at random) it shoots a thorn at the nearest
+  // bacteria (crawling or in dirt) or dirtball: a crawling bacteria dies on
+  // the spot; one in dirt, or a dirtball, breaks. And with a cactus in the
+  // pot, no orange or blue bacteria come at all, not even from a boss.
+  cactus: {
+    price: 299,
+    thorns: { min: 6, max: 12, speed: 520 },
+    growEvery: 50,
+    maxLives: 9,
+    heal: { every: 30, amount: 0.5 },
+    greenOnly: true,
+  },
 };
 
 // Gadgets: bought once; one per game (two with the gadget slot). Used with
@@ -305,6 +321,28 @@ export const GADGETS = {
     time: 5,                 // ...for 5 seconds
     cooldown: COOLDOWN,
   },
+  // Radio (v29): static crackles out of Klayman, and for 5 seconds every
+  // bacteria does the opposite: green ones crawl away from the sprout, orange
+  // ones from Klayman (and spit nothing), blue ones from the dirt (and stamp
+  // nothing).
+  radio: {
+    price: 39,
+    time: 5,
+    cooldown: COOLDOWN,
+  },
+  // AI (v29): a see-through, light-blue digital Klayman blinks up beside him
+  // like a neon sign, throws plain dirt at the nearest bacteria and pushes
+  // the nearest dirtballs into them, then blinks out. It has none of his
+  // tools, but walks and throws 1.5 times as fast as he does right now. It's
+  // there 5 seconds: 0.75 blinking up, 3.5 at work, 0.75 blinking out.
+  ai: {
+    price: 39,
+    time: 5,
+    blink: 0.75,
+    speed: 1.5,
+    fireRate: 1.5,
+    cooldown: COOLDOWN,
+  },
 };
 
 // Seasons: the weather over the pot. Bought once (169K each); one per game
@@ -355,6 +393,7 @@ export const ONCE = {
   skip3: { price: 29, level: 3 },
   skip7: { price: 74, level: 7 },
   skip10: { price: 99, level: 10 },
+  skip15: { price: 149, level: 15 },  // v29
   revive: { price: 49 },     // bought on the summary when the sprout is lost
 };
 
@@ -370,7 +409,8 @@ export const TIMER = {
   runs: {
     t1: { secs: 60, prize: 49 },
     t3: { secs: 180, prize: 179 },
-    t5: { secs: 300, prize: 289 },
+    t5: { secs: 300, prize: 289, bluesAt: 60 },          // v29: blue bacteria come in its last minute
+    t7: { secs: 420, prize: 369, bluesAt: 180, restAt: 60 }, // v29: blue in its last 3 minutes; the sprout's powers stop in its last
   },
   surgeEvery: 20,            // every 20 seconds...
   surge: 0.25,               // ...25% more often, and 25% faster

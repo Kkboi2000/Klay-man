@@ -360,11 +360,11 @@ export function createSetup({ wallet, sprites, input, sound, admin, startLevel, 
     for (const [id, { row, says, tag }] of runRows) {
       const open = wallet.runOpen(id);
       const on = open && pick.run === id;
-      const prize = formatK(TIMER.runs[id].prize);
+      // No prize here (v29): next to the shop's prices it read like a price.
       row.dataset.state = on ? 'on' : open ? 'open' : 'locked';
       row.setAttribute('aria-checked', String(on));
-      tag.textContent = on ? 'On' : open ? prize : 'Locked';
-      says.textContent = open ? `Pays ${prize} every time you win it.` : `Opens when you win ${runName(before(id))}. Pays ${prize}.`;
+      tag.textContent = on ? 'On' : open ? '' : 'Locked';
+      says.textContent = open ? `Keep the sprout for ${runName(id)}.` : `Opens when you win ${runName(before(id))}.`;
     }
   }
 

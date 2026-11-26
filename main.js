@@ -38,6 +38,7 @@ let adminLevel = 1;              // admin mode can start a game further in
 // The mode picked on the setup page: none each time the app opens, so it's
 // picked on purpose; then kept until the app closes. `run`: timer mode's run.
 const pick = { mode: null, run: 't1' };
+let bannerHeld = 0;              // until when a timer run's big banner stays up over a "Faster!" (v29)
 const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ------------------------------------------------------------- best score
@@ -324,6 +325,19 @@ function handleEvents(events) {
       case 'germBlocked':
       case 'germBlown': sound.play('hit', { volume: 0.25, rate: 1.6 }); break;
       case 'stomp': sound.play('hit', { volume: 0.4, rate: 0.45 }); break;
+      case 'zap': sound.play('throw', { volume: 0.25, rate: jitter(2.2, 0.08) }); break;
+      case 'zapHit': sound.play('hit', { volume: 0.2, rate: 1.8 }); break;
+      case 'thorn': sound.play('throw', { volume: 0.3, rate: jitter(1.9, 0.05) }); break;
+      // Timer runs (v29): blue ones come late in the long runs; the 7-minute run's last minute.
+      // These fall on a speed-up; their banner stays up over its "Faster!".
+      case 'bluesCome':
+        ui.banner('Blue bacteria!', 'They take the dirt off. And faster!', 1.8);
+        bannerHeld = performance.now() + 1800;
+        break;
+      case 'sproutRests':
+        ui.banner('The sprout is tired', 'No more powers till the end.', 1.8);
+        bannerHeld = performance.now() + 1800;
+        break;
       case 'crack': sound.play('hit', { volume: 0.45, rate: 0.6 }); break;
       case 'poison':
         sound.play('hit', { volume: 0.6, rate: 0.55 });
@@ -368,6 +382,8 @@ function handleEvents(events) {
         if (e.id === 'fertilizer') sound.play('break', { volume: 0.4, rate: 1.4 });
         if (e.id === 'shovel') sound.play('throw', { volume: 0.45, rate: 0.8 });
         if (e.id === 'booster') sound.play('buy', { volume: 0.55, rate: 1.6 });
+        if (e.id === 'radio') sound.play('static', { volume: 0.8 });
+        if (e.id === 'ai') sound.play('bling', { volume: 0.5, rate: 0.8 });
         break;
       case 'boosterCrash': sound.play('hit', { volume: 0.5, rate: 0.5 }); break;
       case 'dig':
@@ -386,7 +402,7 @@ function handleEvents(events) {
       // Timer mode.
       case 'runStarts': ui.banner(runName(e.run), 'Keep the sprout till the clock runs out.', 3); break;
       case 'surge':
-        ui.banner('Faster!', '', 1);
+        if (performance.now() > bannerHeld) ui.banner('Faster!', '', 1);
         sound.play('hit', { volume: 0.5, rate: 0.5 });
         sound.buzz(40);
         break;

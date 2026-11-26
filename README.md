@@ -24,7 +24,7 @@ Every file sits in one folder, with no subfolders, so uploading is simple.
 ### Updating
 
 Upload the changed files the same way. Also open `sw.js` and bump `VERSION`
-(`klayman-v28` → `klayman-v29`): phones keep an offline copy, and this is how
+(`klayman-v29` → `klayman-v30`): phones keep an offline copy, and this is how
 they know to fetch the new one.
 
 v25 renamed `titleballs.js` to `setupballs.js`. Uploading never deletes, so
@@ -68,7 +68,7 @@ delete `titleballs.js` from the repository by hand (nothing uses it now).
    game. Otherwise **Play again** or go back to **Setup**. Pause has
    **Setup** too.
 
-**Sound** and **Music** each have their own switch, on the title page, the
+**SFX** (the sound effects; it was called Sound until v29) and **Music** each have their own switch, on the title page, the
 setup page and the pause screen. Music is off until you switch it on, and
 both are remembered between visits. Since v25 the music rests for a second
 after it ends before it starts again.
@@ -101,7 +101,11 @@ through a sandclock (which still holds the bacteria back).
 | --- | --- | --- |
 | 1 minute | 49K | from the start |
 | 3 minutes | 179K | once 1 minute is won |
-| 5 minutes | 289K | once 3 minutes is won |
+| 5 minutes | 289K | once 3 minutes is won; blue bacteria come in its last minute (v29) |
+| 7 minutes | 369K | v29: once 5 minutes is won; blue bacteria come in its last 3 minutes, and in its last minute the sprout's powers stop (no healing, growing, thorns, spores, closing, or a daisy's coins and a sunflower's items) |
+
+The setup page doesn't show the prizes (v29): next to the shop's prices,
+they read like something to pay. The summary says what was won.
 
 When time's up with the sprout still there, every bacteria left pops, the
 sprout lights up, and the summary pays the prize. A run pays every time it's
@@ -141,6 +145,7 @@ so you see it at work before you pay (even when you can’t afford it yet).
 | Corn | 249K | 6 hearts, up to 11; every 40 s its leaves snap shut for 15 s (it darkens) and bacteria can’t get in |
 | Lilies | 249K | Every 40 s its petals roll up into a bud for 15 s; bacteria lose sight of it and wander |
 | Mushroom | 299K | Every 25 s spores push nearby bacteria and dirtballs 60 back; every bacteria in the ring gets one more layer of dirt (one on its third becomes a dirtball) and is slowed; heals half a heart every 30 s; grows 1 heart every 50 s, up to 9 |
+| Cactus | 299K | v29. Grows 1 heart every 50 s up to 9, and heals half a heart every 30 s, like the mushroom, but no spores. Instead, every 6 to 12 s (at random) it shoots a thorn at the nearest bacteria or dirtball in the pot: a crawling bacteria dies on the spot, and one in dirt, or a dirtball, breaks (points and coin chance as usual). With a cactus in the pot, no orange or blue bacteria come at all, not even from a boss |
 
 | Gadget | Price | What it does |
 | --- | --- | --- |
@@ -149,6 +154,8 @@ so you see it at work before you pay (even when you can’t afford it yet).
 | Fertilizer | 39K | Every bacteria crawls 70% slower for 5 s. Then 15 s to recharge |
 | Shovel | 39K | Klayman stops and digs for 0.75 s, the shovel swinging above his head; light-brown dirt flies over a ring 252 round him (42 units: v22's 60, 30% smaller), and every bacteria in it gets two more layers of dirt (one already dirty enough becomes a dirtball). Dirtballs don’t mind. Then 15 s to recharge |
 | Booster | 39K | For 4 s Klayman turns red, a little bigger and glowing: he throws 1.875 times as fast (v28: 25% slower than v27's 2.5) and 2.5 times as far, walks 2.5 times as fast, and his dirt counts 2.5 times (two throws to a dirtball; 2.5 on a boss too). Then he turns grey for 3 s (v28: 50% longer than v27's 2): all four drop to half. Then 15 s to recharge. It stacks with gloves and medicine (booster and medicine together: still two throws to a dirtball). It was the hypodermic syringe; one bought before keeps working |
+| Radio | 39K | v29. Static crackles out of Klayman (a noise, and broken wavy rings spreading out), and for 5 s every bacteria does the opposite: green ones crawl away from the sprout, orange ones away from Klayman (spitting nothing), blue ones away from the dirt (shooting nothing). Then 15 s to recharge |
+| AI | 39K | v29. A see-through, light-blue digital Klayman flickers up beside him like a neon sign (0.75 s), works for 3.5 s, and flickers out (0.75 s). It throws plain dirt at the nearest bacteria and walks round behind the nearest dirtball to push it into the nearest bacteria. It has none of Klayman's tools (no gun, bazooka, gloves, medicine or booster on its dirt: one layer a hit), but walks and throws 1.5 times as fast as Klayman does right then. Bacteria ignore it. Then 15 s to recharge |
 
 In a game, a gadget’s button sits in the top-right corner, under the hearts
 and the pause button. It fills up as the gadget recharges and turns
@@ -188,7 +195,7 @@ picks them (2 s).
 
 | Level skip | Price | What it does |
 | --- | --- | --- |
-| Skip to level 3 / 7 / 10 | 29K / 74K / 99K | The next game starts there. Tap it to pick or unpick it; it’s spent when the game starts |
+| Skip to level 3 / 7 / 10 / 15 | 29K / 74K / 99K / 149K (15: v29) | The next game starts there. Tap it to pick or unpick it; it’s spent when the game starts |
 
 Level skips drop down under **Survival** on the setup page (v26). You hold one of each level skip at a time, and can buy it again after using
 it. Tools, sprouts, gadgets, seasons and slots are yours for good.
@@ -223,13 +230,13 @@ units" is 60, as everywhere (`UNIT`).
 
 | Kind | Comes | What it does |
 | --- | --- | --- |
-| Orange | 10% of a level's bacteria from level 20; of a boss's from level 25; in timer runs of 3 and 5 minutes | (Yellow until v28.) One eye, no legs: it bounces after Klayman and stops within 20 units (120) of him (v28: twice v27's 10). Then it lights up and charges a germ for 1 s, standing still, and spits it at where he stands: one every 5 s. Its germ flies 192 (v28: twice as far) at 225 a second (v28: 50% faster). A germ that reaches him poisons him like a bacteria inside him does, but orange, 20% slower still and 20% longer. Step aside and it misses; the lab coat keeps it out, and the whirlwind's wind blows it away |
-| Blue | 15% of a level's bacteria from level 10; of a boss's from level 35 | v28: a rounded box with a boar's snout and two big fangs jutting up from its jaw, no legs (v27's had long legs and glasses). It never comes within 90 of the sprout. It waddles to the nearest bacteria in dirt, or dirtball, and every 1.67 s (v28: 3 times as often as v27's 5) jumps up, lands with a stamp, and bounces once: as it lands, everything dirty within 40 units (240; v28: 4 times v27's 10) steams, a bacteria loses a layer of dirt, and a dirtball comes 2.5 s nearer cracking open (a layer's worth) |
+| Orange | 10% of a level's bacteria from level 20; of a boss's from level 25; in timer runs of 3, 5 and 7 minutes | (Yellow until v28.) One eye, no legs: it bounces after Klayman and stops within 20 units (120) of him (v28: twice v27's 10). Then it lights up and charges a germ for 1 s, standing still, and spits it at where he stands: one every 5 s. Its germ flies 192 (v28: twice as far) at 225 a second (v28: 50% faster). A germ that reaches him poisons him like a bacteria inside him does, but orange, 20% slower still and 20% longer. Step aside and it misses; the lab coat keeps it out, and the whirlwind's wind blows it away |
+| Blue | 15% of a level's bacteria from level 10; of a boss's from level 35; in the 5-minute run's last minute and the 7-minute run's last 3 (v29) | v29: Krit's drawing, a blue blob with spiky dark hair, heavy brows and two big fangs; it waddles. It never comes within 90 of the sprout. It goes for the nearest bacteria in dirt, or dirtball, and every 1.67 s jumps up, lands with a stamp, bounces once, and as it lands shoots a light-blue shot at the nearest dirt within 40 units (240): one at a time (v29). When the shot gets there, steam rises, and a bacteria loses a layer of dirt, or a dirtball comes 2.5 s nearer cracking open (a layer's worth) |
 
 A level's share is exact, not luck: of level 20's 43 bacteria, 4 are orange
 and 6 blue, shuffled in among the green ones. Where there's no end to them (a
-timer run, a boss), they're dealt 20 at a time the same way. Blue ones don't
-come in timer mode.
+timer run, a boss), they're dealt 20 at a time the same way. With a cactus
+in the pot, no orange or blue ones come at all (v29).
 
 ## Boss bacteria
 
@@ -328,7 +335,8 @@ coins off-screen. (Since v24 there's no arrow to the sprout: it never moves.)
 | File | What it does |
 | --- | --- |
 | `klayman.js`, `bacteria.js`, `dirtball.js`, `dirtshot.js` | Ported from your `.gd` scripts (`bacteria.js` also has the orange and blue kinds, v27) |
-| `germ.js`, `dirtwave.js` | An orange bacteria's germ, and the bazoo-klay's wave of dirt (v27) |
+| `germ.js`, `dirtwave.js` | An orange bacteria's germ, a blue one's light-blue shot and a cactus's thorn (v29), and the bazoo-klay's wave of dirt (v27) |
+| `aiklay.js` | The AI gadget's digital Klayman (v29) |
 | `sandbox.js` | Admin mode's sandbox on the pause screen (v27) |
 | `items.js` | The four special items: red plus, medicine, water drop and sandclock (a sunflower’s fly out of it, glowing), and coins (a daisy’s and a boss’s fly out too; the backpack pulls them in) |
 | `boss.js` | The boss bacteria: where it stands, HP, rising, tiring and burrowing |

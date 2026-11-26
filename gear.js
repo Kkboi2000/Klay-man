@@ -4,15 +4,15 @@
 import { GADGETS, ONCE, SEASONS, SEASON_LEVEL_UP, SLOTS, SPROUTS, TIMER, TOOLS, TREE } from './config.js';
 
 export const TOOL_IDS = ['backpack', 'shoes', 'gloves', 'coat', 'glasses', 'gun', 'bazoo'];
-export const SPROUT_IDS = ['sprout', 'daisy', 'sunflower', 'rose', 'corn', 'lilies', 'mushroom'];
-export const GADGET_IDS = ['leaf', 'spray', 'fertilizer', 'shovel', 'booster'];
+export const SPROUT_IDS = ['sprout', 'daisy', 'sunflower', 'rose', 'corn', 'lilies', 'mushroom', 'cactus'];
+export const GADGET_IDS = ['leaf', 'spray', 'fertilizer', 'shovel', 'booster', 'radio', 'ai'];
 export const SEASON_IDS = ['summer', 'winter', 'spring', 'autumn', 'rainy'];
 export const SLOT_IDS = ['toolSlot', 'sproutSlot', 'gadgetSlot', 'seasonSlot'];
-export const ONCE_IDS = ['skip3', 'skip7', 'skip10', 'revive'];
+export const ONCE_IDS = ['skip3', 'skip7', 'skip10', 'skip15', 'revive'];
 // Sold on the setup page. Revive isn't: it's offered on the summary when the sprout is lost.
-export const SKIP_IDS = ['skip3', 'skip7', 'skip10'];
+export const SKIP_IDS = ['skip3', 'skip7', 'skip10', 'skip15'];
 // Timer mode's runs (v26), shortest first: each opens once the one before is won.
-export const RUN_IDS = ['t1', 't3', 't5'];
+export const RUN_IDS = ['t1', 't3', 't5', 't7'];
 
 /** "1 minute", "3 minutes". */
 export const runName = (id) => {
@@ -34,11 +34,14 @@ export const CATALOG = {
   rose: { name: 'Rose', says: 'Starts with 4 hearts. Heals 1 heart every 20 seconds.' },
   corn: { name: 'Corn', says: '6 hearts, up to 11. Every 40 seconds its leaves close and keep bacteria out for 15 seconds.' },
   lilies: { name: 'Lilies', says: 'Every 40 seconds it closes for 15 seconds. Bacteria lose sight of it and wander.' },
+  cactus: { name: 'Cactus', says: 'Now and then shoots a thorn at the nearest bacteria or dirtball: it dies, or breaks. No orange or blue bacteria come. Heals half a heart every 30 seconds. Grows to 9 hearts.' },
   mushroom: { name: 'Mushroom', says: 'Spores push bacteria and dirtballs back, and give bacteria a layer of dirt. Heals half a heart every 30 seconds. Grows to 9 hearts.' },
   leaf: { name: 'Whirlwind', says: 'A whirlwind round Klayman: its first gust flings bacteria back and sets dirtballs rolling, then it keeps bacteria away for 5 seconds.' },
   spray: { name: 'Mist spray', says: 'Sprays the sprout twice: half a heart back.' },
   fertilizer: { name: 'Fertilizer', says: 'Every bacteria crawls 70% slower for 5 seconds.' },
   shovel: { name: 'Shovel', says: 'Klayman digs and throws dirt all round him: every bacteria near him gets two layers of dirt.' },
+  radio: { name: 'Radio', says: 'Static crackles out of Klayman: for 5 seconds every bacteria does the opposite. Green ones crawl off from the sprout, orange ones from Klayman, blue ones from the dirt.' },
+  ai: { name: 'AI', says: 'A light-blue digital Klayman blinks up for 5 seconds: it throws dirt at the nearest bacteria and pushes dirtballs into them, 1.5 times as fast as Klayman. None of his tools.' },
   booster: { name: 'Booster', says: 'For 4 seconds Klayman throws faster and twice as far, walks twice as fast, and his dirt counts double. Then 3 seconds at half of all four.' },
   summer: { name: 'Summer', says: 'Brighter, and the sprout wears shades. Every 50 seconds the sun shines on it: it grows half a heart, up to 2 more.' },
   winter: { name: 'Winter', says: 'A little blue. Every bacteria crawls 15% slower.' },
@@ -52,6 +55,7 @@ export const CATALOG = {
   skip3: { name: 'Skip to level 3', says: 'Start a game at level 3. Used once.' },
   skip7: { name: 'Skip to level 7', says: 'Start a game at level 7. Used once.' },
   skip10: { name: 'Skip to level 10', says: 'Start a game at level 10. Used once.' },
+  skip15: { name: 'Skip to level 15', says: 'Start a game at level 15. Used once.' },
   revive: { name: 'Revive', says: 'Bring a lost sprout back with half its hearts.' },
 };
 
@@ -140,6 +144,9 @@ export function gearFor({ tools = [], sprout = 'sprout', seasons = [], level = 1
     growEvery: ss.growEvery ? ss.growEvery * wait : null,
     shield: sooner(ss.shield, wait),
     hide: sooner(ss.hide, wait),
+    // Cactus (v29): its thorns (spring brings them sooner too), and no orange or blue bacteria.
+    thorns: ss.thorns ? { ...ss.thorns, min: ss.thorns.min * wait, max: ss.thorns.max * wait } : null,
+    greenOnly: Boolean(ss.greenOnly),
   });
 }
 

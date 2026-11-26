@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game, NO_INPUT, dealKinds } from './game.js';
-import { BACTERIA, KINDS, KLAYMAN, POISON, TREE, UNIT } from './config.js';
+import { BACTERIA, GADGETS, KINDS, KLAYMAN, POISON, TREE, UNIT } from './config.js';
 import { Spitter, Stomper } from './bacteria.js';
 import { SOIL, dist } from './world.js';
 
@@ -168,7 +168,7 @@ test('blue (v28): it waddles to dirt, never near the sprout, and jumps to stamp 
   game.drainEvents();
   let closest = Infinity;
   let jumped = null;
-  for (let t = 0; t < 4 && dirty.dirt === 3; t += STEP) {
+  for (let t = 0; t < 5 && dirty.dirt === 3; t += STEP) {
     game.update(STEP);
     closest = Math.min(closest, dist(b, game.tree));
     if (b.jumping && jumped === null) jumped = t;
@@ -178,9 +178,9 @@ test('blue (v28): it waddles to dirt, never near the sprout, and jumps to stamp 
   assert.ok(dist(b, dirty) > 10 * UNIT * 2, 'from well off');
   const events = game.drainEvents();
   assert.ok(events.some((e) => e.type === 'jump'), 'it jumped...');
-  const stomp = events.find((e) => e.type === 'stomp');
-  assert.ok(stomp, '...and landed on it');
-  assert.equal(stomp.steam.length, 1, 'steam off what it stamped');
+  assert.ok(events.some((e) => e.type === 'stomp'), '...landed...');
+  assert.ok(events.some((e) => e.type === 'zap'), '...and shot at the dirt');
+  assert.ok(events.some((e) => e.type === 'zapHit'), 'the shot got there: steam');
   assert.equal(dirty.dirt, 2, 'one layer off');
   run(game, KINDS.blue.every + 0.05);
   assert.equal(dirty.dirt, 1, 'and another 1.67 seconds on');
@@ -198,16 +198,19 @@ test('blue: the stamp comes as it lands, not as it leaves the ground; then a bou
   assert.ok(Math.abs(ball.hold - (hold - STEP)) < 1e-6, 'nothing yet');
   run(game, KINDS.blue.land - 0.05);
   assert.ok(b.lift > 0, 'in the air');
+  assert.equal(game.zaps.length, 0, 'no shot yet');
   run(game, 0.1);
-  assert.ok(ball.hold < hold - KINDS.blue.hold, 'landed: a layer’s worth off the hold');
+  assert.equal(game.zaps.length + (ball.hold < hold - KINDS.blue.hold ? 1 : 0), 1, 'landed: a shot at the dirtball');
   assert.ok(b.jumping && b.lift > 0, 'and the bounce');
+  run(game, 0.2);
+  assert.ok(ball.hold < hold - KINDS.blue.hold, 'the shot got there: a layer’s worth off the hold');
   run(game, KINDS.blue.jump);
   assert.equal(b.jumping, false, 'down for good');
   const g = game.addBacteria(b.x + 20, b.y + 20);
   g.addDirt(1);
   b.cooldown = 0;
-  run(game, KINDS.blue.land + 0.05);
-  assert.equal(g.state, 'crawl', 'stamped clean');
+  run(game, KINDS.blue.land + 0.3);
+  assert.equal(g.state, 'crawl', 'shot clean');
   assert.equal(b.invades, false);
 });
 
@@ -319,4 +322,129 @@ test('bazoo-klay (v28): it shoots half as often as a throw', () => {
   const plain = shots([]);
   const bazoo = shots(['bazoo']);
   assert.ok(Math.abs(bazoo / plain - 0.5) < 0.1, `${bazoo} against ${plain}`);
+});
+
+test('blue (v29): one bit of dirt at a time, the nearest', () => {
+  const game = quietGame();
+  game.klay.x = SOIL.cx + 260; game.klay.y = SOIL.cy;
+  const b = game.addBacteria(SOIL.cx - 150, SOIL.cy - 100, 'blue');
+  b.speed = 0;
+  const near = game.addBacteria(b.x + 60, b.y);
+  const far = game.addBacteria(b.x - 120, b.y + 30);
+  for (const o of [near, far]) { o.speed = 0; o.decayTime = Infinity; o.addDirt(2); }
+  b.cooldown = 0;
+  run(game, KINDS.blue.land + 0.4);
+  assert.equal(near.dirt, 1, 'the nearer one');
+  assert.equal(far.dirt, 2, 'not both at once');
+});
+
+// ---------------------------------------------------------------- cactus (v29)
+
+test('cactus (v29): 299K, up to 9 hearts, heals and grows like the mushroom, no spores', () => {
+  const game = quietGame({ sprouts: ['cactus'] });
+  assert.equal(game.gear.sprout, 'cactus');
+  assert.equal(game.gear.spores, null, 'no spores');
+  assert.equal(game.heartCap >= 9 || game.gear.maxLives === 9, true);
+  assert.equal(game.gear.maxLives, 9);
+  assert.deepEqual(game.gear.heal, { every: 30, amount: 0.5 });
+  assert.equal(game.gear.growEvery, 50);
+});
+
+test('cactus: every 6 to 12 s a thorn at the nearest: a crawling bacteria dies; one in dirt, or a dirtball, breaks', () => {
+  const game = quietGame({ sprouts: ['cactus'] });
+  game.klay.x = SOIL.cx + 260; game.klay.y = SOIL.cy + 100;
+  assert.ok(game.thornTimer >= 6 && game.thornTimer <= 12);
+  const crawler = game.addBacteria(game.tree.x - 120, game.tree.y - 80);
+  const dirty = game.addBacteria(game.tree.x + 150, game.tree.y - 60);
+  const ball = game.addDirtball(game.tree.x - 60, game.tree.y + 200);
+  ball.hold = Infinity;                      // it would crack open by itself otherwise
+  for (const b of [crawler, dirty]) { b.speed = 0; b.decayTime = Infinity; }
+  dirty.addDirt(2);
+  game.drainEvents();
+  const left = () => [crawler.alive, dirty.alive, ball.solid].filter(Boolean).length;
+  run(game, 12.5);
+  assert.ok(game.drainEvents().some((e) => e.type === 'thorn'), 'it shot');
+  assert.equal(left(), 2, 'one at a time');
+  assert.equal(crawler.alive, false, 'the nearest went first, on the spot');
+  run(game, 12.5);
+  assert.equal(left(), 1);
+  run(game, 12.5);
+  assert.equal(left(), 0, 'in dirt: broken; the dirtball too');
+});
+
+test('cactus: no orange or blue bacteria at all, not even from a boss', () => {
+  const game = new Game({ rng: () => 0.5, loadout: { sprouts: ['cactus'] } });
+  game.reset({ sprouts: ['cactus'] }, 35);
+  const level = Array.from({ length: 80 }, () => game.nextKind());
+  const boss = Array.from({ length: 40 }, () => game.nextBossKind());
+  assert.ok([...level, ...boss].every((k) => k === 'green'));
+  const plain = new Game({ rng: () => 0.5 });
+  plain.reset(undefined, 35);
+  assert.ok(Array.from({ length: 40 }, () => plain.nextBossKind()).some((k) => k !== 'green'), 'without it, they come');
+});
+
+// ---------------------------------------------------------------- radio and AI (v29)
+
+test('radio (v29): for 5 seconds every bacteria does the opposite', () => {
+  const game = quietGame({ gadgets: ['radio'] });
+  const k = game.klay;
+  k.x = SOIL.cx + 200; k.y = SOIL.cy + 120;
+  const green = game.addBacteria(game.tree.x - 160, game.tree.y);
+  const orange = game.addBacteria(k.x - 60, k.y - 60, 'orange');
+  const dirty = game.addBacteria(SOIL.cx - 250, SOIL.cy + 150);
+  dirty.speed = 0; dirty.decayTime = Infinity; dirty.addDirt(2);
+  const blue = game.addBacteria(dirty.x + 100, dirty.y - 40, 'blue');
+  for (const b of [green, orange, blue]) b.speed = 40;
+  const before = [dist(green, game.tree), dist(orange, k), dist(blue, dirty)];
+  assert.equal(game.useGadget(0), true);
+  assert.equal(game.jammed, true);
+  run(game, 2);
+  const after = [dist(green, game.tree), dist(orange, k), dist(blue, dirty)];
+  assert.ok(after[0] > before[0] + 30, 'green: away from the sprout');
+  assert.ok(after[1] > before[1] + 30, 'orange: away from Klayman');
+  assert.ok(after[2] > before[2] + 30, 'blue: away from the dirt');
+  assert.equal(game.germs.length + game.zaps.length, 0, 'nothing spat, nothing shot');
+  assert.equal(dirty.dirt, 2);
+  run(game, 3.1);
+  assert.equal(game.jammed, false, 'five seconds');
+  assert.equal(GADGETS.radio.cooldown, 15);
+});
+
+test('AI (v29): it blinks up for 0.75 s, works 3.5 s, blinks out 0.75 s; plain dirt, 1.5 times as fast as Klayman now', () => {
+  const game = quietGame({ gadgets: ['ai'], tools: ['gloves', 'gun', 'bazoo'] });
+  const k = game.klay;
+  k.x = SOIL.cx - 200; k.y = SOIL.cy + 150;
+  const b = game.addBacteria(k.x + 120, k.y - 120);
+  b.speed = 0; b.decayTime = Infinity;
+  game.useGadget(0);
+  assert.ok(game.ai, 'out');
+  run(game, 0.7);
+  assert.equal(game.shots.filter((s) => s.ai).length, 0, 'still blinking up');
+  game.drainEvents();
+  const times = [];
+  for (let t = 0; t < 3.5; t += STEP) {
+    game.update(STEP);
+    for (const e of game.drainEvents()) if (e.type === 'throw' && e.ai) times.push(t);
+  }
+  assert.equal(times.length, 5, 'five throws of plain dirt: one layer each, whatever he wears');
+  assert.equal(game.dirtballs.length, 1, 'and it’s a dirtball');
+  assert.equal(game.waves.length, 0, 'none of his tools: no bazoo-klay waves from it');
+  const gap = (times[4] - times[0]) / 4;
+  const want = KLAYMAN.attackCooldown / (game.fireRate * GADGETS.ai.fireRate);
+  assert.ok(Math.abs(gap - want) < 0.03, `a throw every ${gap.toFixed(3)} s, against ${want.toFixed(3)}`);
+  run(game, 0.9);
+  assert.equal(game.ai, null, 'gone after 5 s');
+});
+
+test('AI: it pushes the nearest dirtball into the nearest bacteria', () => {
+  const game = quietGame({ gadgets: ['ai'] });
+  const k = game.klay;
+  k.x = SOIL.cx + 200; k.y = SOIL.cy + 150;
+  const ball = game.addDirtball(k.x - 120, k.y - 40);
+  ball.hold = Infinity;
+  const prey = game.addBacteria(ball.x - 200, ball.y - 20);
+  prey.speed = 0;
+  game.useGadget(0);
+  run(game, 4.4);
+  assert.ok(ball.state === 'rolling' || ball.dead || !prey.alive, 'pushed');
 });

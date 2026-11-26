@@ -54,6 +54,21 @@ function tinted(img, color) {
   return c;
 }
 
+/** Just the dark outline of a sheet, in `color` (the AI Klayman's lit edge, v29). */
+function outlineOf(img, color) {
+  const c = makeCanvas(img.width, img.height);
+  const g = c.getContext('2d');
+  g.drawImage(img, 0, 0);
+  const data = g.getImageData(0, 0, c.width, c.height);
+  const d = data.data;
+  const [r, gg, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] && d[i] + d[i + 1] + d[i + 2] < 120) { d[i] = r; d[i + 1] = gg; d[i + 2] = b; d[i + 3] = 255; } else d[i + 3] = 0;
+  }
+  g.putImageData(data, 0, 0);
+  return c;
+}
+
 /** Turns rows of characters into a tiny pixel-art canvas, `height` tall. */
 export function pixelArt(rows, palette, height = rows.length) {
   const c = makeCanvas(rows[0].length, height);
@@ -584,6 +599,9 @@ export async function loadSprites() {
   return {
     bg,
     klay,
+    // The AI gadget's Klayman (v29): light blue, and its outline lit.
+    neon: tinted(klay, 'rgba(110, 220, 255, 0.62)'),   // his face still shows through
+    neonEdge: outlineOf(klay, '#e4faff'),
     lookFor,
     gunSpots: gunSpots(info),
     gun: gunFrom(GUN_ART),

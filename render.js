@@ -17,7 +17,9 @@ const DIRT = ['#4a2f17', '#6b4423', '#8a5a2b'];
 const GERM = ['#3e7a4a', '#5aa266', '#2c5a35'];
 const ORANGE = ['#f28a2a', '#ffc47e', '#ff9a3c'];   // an orange bacteria, and its germs (v27; yellow till v28)
 const BLUE = ['#4888dc', '#8cc4fa', '#2c60b0'];
-const STEAM = ['#ffffff', '#e4eef2', '#c9d6dc'];  // a blue one's stamp, rising off the dirt
+const STEAM = ['#ffffff', '#e4eef2', '#c9d6dc'];  // a blue one's shot landing, rising off the dirt
+const ZAP = ['#bfefff', '#7fd8ff', '#ffffff'];    // a blue one's light-blue shot (v29)
+const ZAP_HEIGHT = 16;            // it flies at the height of a blue one's mouth
 const GERM_HEIGHT = 18;           // a germ flies at the height of an orange one's eye
 const SPARK = ['#ffe9a8', '#ffd25a', '#ffffff'];
 const SPORE = ['#b06ed6', '#d9a6f0', '#7a3fa0'];
@@ -36,7 +38,8 @@ const RUSH = ['#ff5a4a', '#ffb070', '#ffe9a8'];   // the booster: red sparks
 const DULL = ['#8a8a8a', '#b0b0b0'];              // ...and grey once it wears off
 const BIG = 1.2;                  // how much bigger the booster makes him
 // What the glasses call each of a sprout's powers, above the sprout.
-const POWER_WORDS = { coin: 'coin', item: 'item', closes: 'closes', opens: 'opens', spores: 'spores', heal: 'heal', grow: 'grow', sun: 'sun' };
+const POWER_WORDS = { coin: 'coin', item: 'item', closes: 'closes', opens: 'opens', spores: 'spores', heal: 'heal', grow: 'grow', sun: 'sun', thorn: 'thorn' };
+const THORN = ['#cfe39a', '#fff4e3', '#668543'];  // a cactus's thorn (v29)
 const ROLL = 0.5;                 // seconds a corn or lily takes to close up or open
 const VISOR = '#7fdcff';          // everything the glasses show
 const VISOR_INK = '#0c2b3a';
@@ -197,7 +200,13 @@ export class Renderer {
           this.burst(e.x - 10, e.y, 5, DIRT, 60, -20);
           this.burst(e.x + 10, e.y, 5, DIRT, 60, -20);
           this.shake = Math.max(this.shake, 0.08);
-          for (const at of e.steam) this.steams.push({ x: at.x, y: at.y, t: 0, high: at.ball ? 34 : 28, seed: Math.random() * 10 });
+          break;
+        case 'zap': this.burst(e.x, e.y - ZAP_HEIGHT, 6, ZAP, 70); break;      // v29: a blue one's light-blue shot
+        case 'thorn': this.burst(e.x, e.y - 40, 6, THORN, 60); break;           // v29: a cactus shoots
+        case 'thornHit': this.burst(e.x, e.y - 12, 6, THORN, 70); break;
+        case 'zapHit':
+          this.burst(e.x, e.y - 14, 6, ZAP, 60);
+          this.steams.push({ x: e.x, y: e.y, t: 0, high: e.ball ? 34 : 28, seed: Math.random() * 10 });
           break;
         case 'blast': {
           // The bazoo-klay: a puff of dirt out of the muzzle.
@@ -426,6 +435,8 @@ export class Renderer {
     if (game.bossPlan) this.drawRumble(game);
     const wind = game.windReach;
     if (wind > 0) this.drawGust(game.klay, wind);
+    const radio = game.gadgets.find((g) => g.id === 'radio' && g.active);
+    if (radio) this.drawStatic(game.klay, radio.t, radio.on);
 
     const slowAll = game.fertilized;
     const things = [];
@@ -438,6 +449,9 @@ export class Renderer {
     for (const item of game.items) things.push({ y: item.y, draw: () => this.drawItem(item) });
     for (const shot of game.shots) things.push({ y: shot.y, draw: () => this.drawShot(shot) });
     for (const g of game.germs) things.push({ y: g.y, draw: () => this.drawGerm(g) });
+    for (const z of game.zaps) things.push({ y: z.y, draw: () => this.drawZap(z) });
+    for (const t of game.thorns) things.push({ y: t.y, draw: () => this.drawThorn(t) });
+    if (game.ai) things.push({ y: game.ai.y, draw: () => this.drawAi(game.ai) });
     for (const w of game.waves) things.push({ y: w.y + w.uy * w.r, draw: () => this.drawWave(w) });
     things.push({ y: game.klay.y, draw: () => this.drawKlayman(game) });
     const spray = game.gadgets.find((g) => g.id === 'spray' && g.active);
@@ -672,6 +686,47 @@ export class Renderer {
     }
     const wobble = this.calm ? 0 : Math.round(Math.sin(g.t * 30));
     this.sprite(img, 0, 0, img.width, img.height, g.x, g.y - GERM_HEIGHT + wobble, img.width / 2, img.height / 2);
+  }
+
+  /** A cactus's thorn (v29): a short pale needle, pointing the way it flies,
+   *  coming down from the cactus's height as it goes. */
+  drawThorn(t) {
+    const { ctx } = this;
+    const ux = t.vx ?? 1;
+    const uy = t.vy ?? 0;
+    const y = t.y - 22;
+    ctx.fillStyle = '#2b1a0c';
+    for (let i = 0; i < 6; i++) ctx.fillRect(Math.round(t.x - ux * i * 3) - 3, Math.round(y - uy * i * 3) - 3, 6, 6);
+    for (let i = 0; i < 6; i++) {
+      ctx.fillStyle = i === 0 ? THORN[1] : THORN[0];
+      ctx.fillRect(Math.round(t.x - ux * i * 3) - 2, Math.round(y - uy * i * 3) - 2, 4, 4);
+    }
+  }
+
+  /** A blue bacteria's light-blue shot (v29): a glowing spark with a short
+   *  trail, flickering. */
+  drawZap(z) {
+    const { ctx } = this;
+    const t = z.target;
+    const dx = t.x - z.x;
+    const dy = t.y - z.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const y = z.y - ZAP_HEIGHT;
+    for (let i = 3; i >= 1; i--) {
+      ctx.globalAlpha = 0.5 - i * 0.12;
+      ctx.fillStyle = ZAP[1];
+      const s = 6 - i;
+      ctx.fillRect(Math.round(z.x - (dx / d) * i * 7) - s / 2, Math.round(y - (dy / d) * i * 7) - s / 2, s, s);
+    }
+    const flick = this.calm ? 1 : 0.75 + 0.25 * Math.sin(z.t * 60);
+    ctx.globalAlpha = 0.45 * flick;
+    ctx.fillStyle = ZAP[1];
+    ctx.fillRect(Math.round(z.x) - 6, Math.round(y) - 6, 12, 12);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = ZAP[0];
+    ctx.fillRect(Math.round(z.x) - 4, Math.round(y) - 4, 8, 8);
+    ctx.fillStyle = ZAP[2];
+    ctx.fillRect(Math.round(z.x) - 2, Math.round(y) - 2, 4, 4);
   }
 
   /** The bazoo-klay's wave: a band of dirt clods across its fan, rolling out
@@ -1489,6 +1544,73 @@ export class Renderer {
         vx: -Math.sin(a) * 120, vy: Math.cos(a) * 120 * RING_SQUASH, life: 0, max: 0.35, color: '#ffffff', size: 2, gravity: 0,
       });
     }
+  }
+
+  /** The radio (v29): rings of static spread out of Klayman, every one
+   *  wobbling, crackling and breaking up as it goes. `t`: seconds it's been
+   *  on; `left`: seconds it has left (the rings stop coming at the end). */
+  drawStatic(k, t, left) {
+    const { ctx } = this;
+    const EVERY = 0.3;            // a new ring this often...
+    const LIFE = 1.2;             // ...each spreading out this long
+    ctx.save();
+    for (let i = Math.max(0, Math.floor((t - LIFE) / EVERY)); i * EVERY <= t; i++) {
+      const age = t - i * EVERY;
+      if (age > LIFE || i * EVERY > t + left - LIFE * 0.3 + 5) continue;
+      const k01 = age / LIFE;
+      const r = 18 + age * 190;
+      const n = Math.max(48, Math.round(r / 1.2));
+      ctx.globalAlpha = Math.max(0, 0.8 * (1 - k01));
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = i % 2 ? '#e8f6ff' : '#bfe2f2';
+      ctx.beginPath();
+      let drawing = false;
+      for (let j = 0; j <= n; j++) {
+        const a = (j / n) * Math.PI * 2;
+        // Turbulent: two wobbles at odd rates, and breaks that come and go.
+        const wob = this.calm ? 0 : 7 * Math.sin(a * 7 + i * 2.3 + t * 11) + 3 * Math.sin(a * 13 - t * 17 + i);
+        const gap = !this.calm && Math.sin(a * 4 + t * 9 + i * 4) > 0.6;
+        const x = k.x + Math.cos(a) * (r + wob);
+        const y = k.y - 10 + Math.sin(a) * (r + wob) * RING_SQUASH;
+        if (gap) { drawing = false; continue; }
+        if (drawing) ctx.lineTo(x, y);
+        else ctx.moveTo(x, y);
+        drawing = true;
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /** The AI gadget's Klayman (v29): see-through, light blue and glowing,
+   *  like a neon sign. It flickers on as it blinks up, holds with a faint
+   *  hum, and flickers off as it blinks out. */
+  drawAi(ai) {
+    const sp = this.sprites;
+    const { blink, time } = ai.spec;
+    // A neon tube catching: off and on, mostly on by the end (and that, backwards, going out).
+    const FLICKER = [0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1];
+    const step = (s) => FLICKER[Math.min(FLICKER.length - 1, Math.floor((s / blink) * FLICKER.length))];
+    let on = 1;
+    if (ai.t < blink) on = step(ai.t);
+    else if (ai.t > time - blink) on = step(time - ai.t);
+    if (!on && !this.calm) return;
+    const kind = ai.action ? ai.action.kind : ai.moving ? 'walk' : 'idle';
+    const clock = kind === 'idle' ? this.time : ai.walkT;
+    const { col, row } = KLAY.frame(kind, ai.facing, clock, ai.action ? ai.action.t : 0);
+    const size = KLAY.size;
+    const a = KLAY.anchor;
+    const hum = this.calm ? 1 : 0.9 + 0.1 * Math.sin(this.time * 40);
+    const flip = ai.facing === 'side' && ai.flip;
+    const { ctx } = this;
+    ctx.save();
+    ctx.shadowColor = '#7fdcff';
+    ctx.shadowBlur = 14;
+    this.sprite(sp.neon, col * size, row * size, size, size, ai.x, ai.y, a.x, a.y, { flip, alpha: 0.6 * hum });
+    // Its outline, lit like a neon tube, glowing.
+    this.sprite(sp.neonEdge, col * size, row * size, size, size, ai.x, ai.y, a.x, a.y, { flip, alpha: 0.95 * hum });
+    ctx.restore();
   }
 
   /** Three leaves spinning round Klayman, each sorted in with everything

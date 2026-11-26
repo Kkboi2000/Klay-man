@@ -17,7 +17,7 @@ export const clock = (secs) => {
 const HURRY = 10;                  // a run's last seconds: the clock turns gold
 
 /** The same setting shown in several places: a switch on the setup page
- *  ("On"), a button on the title and pause screens ("Sound on"). */
+ *  ("On"), a button on the title and pause screens ("SFX on"). */
 function showSwitch(buttons, name, on) {
   for (const b of buttons) {
     if (b.getAttribute('role') === 'switch') {
@@ -261,7 +261,7 @@ export function createUI() {
       first.setAttribute('data-autofocus', '');
     },
 
-    setSound(muted) { showSwitch(el.soundButtons, 'Sound', !muted); },
+    setSound(muted) { showSwitch(el.soundButtons, 'SFX', !muted); },
     /** How a game is shown: the setup page's and the pause screen's two buttons. */
     setOrientation(way) {
       for (const b of document.querySelectorAll('[data-orient]')) b.setAttribute('aria-checked', String(b.dataset.orient === way));

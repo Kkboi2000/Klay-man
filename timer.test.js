@@ -34,34 +34,35 @@ const nearCorner = (p) => Math.min(...CORNERS.map((c) => dist(p, c)));
 
 // ------------------------------------------------------------------ runs
 
-test('three runs: 1, 3 and 5 minutes, for 49K, 179K and 289K', () => {
-  assert.deepEqual(RUN_IDS, ['t1', 't3', 't5']);
-  assert.deepEqual(RUN_IDS.map((id) => [TIMER.runs[id].secs, TIMER.runs[id].prize]), [[60, 49], [180, 179], [300, 289]]);
-  assert.deepEqual(RUN_IDS.map(runName), ['1 minute', '3 minutes', '5 minutes']);
+test('four runs: 1, 3, 5 and (v29) 7 minutes, for 49K, 179K, 289K and 369K', () => {
+  assert.deepEqual(RUN_IDS, ['t1', 't3', 't5', 't7']);
+  assert.deepEqual(RUN_IDS.map((id) => [TIMER.runs[id].secs, TIMER.runs[id].prize]), [[60, 49], [180, 179], [300, 289], [420, 369]]);
+  assert.deepEqual(RUN_IDS.map(runName), ['1 minute', '3 minutes', '5 minutes', '7 minutes']);
 });
 
 test('3 and 5 minutes open only once the run before is won; every win pays', () => {
   const storage = memory();
   const w = new Wallet(storage);
-  assert.deepEqual(RUN_IDS.map((id) => w.runOpen(id)), [true, false, false], 'only 1 minute to start with');
+  assert.deepEqual(RUN_IDS.map((id) => w.runOpen(id)), [true, false, false, false], 'only 1 minute to start with');
   assert.deepEqual(w.winRun('t1'), { prize: 49, opened: 't3' });
   assert.equal(w.coins, 49);
-  assert.deepEqual(RUN_IDS.map((id) => w.runOpen(id)), [true, true, false]);
+  assert.deepEqual(RUN_IDS.map((id) => w.runOpen(id)), [true, true, false, false]);
   assert.deepEqual(w.winRun('t1'), { prize: 49, opened: null }, 'won again: paid again, nothing new to open');
   assert.deepEqual(w.winRun('t3'), { prize: 179, opened: 't5' });
-  assert.deepEqual(w.winRun('t5'), { prize: 289, opened: null }, 'the last run opens nothing');
-  assert.equal(w.coins, 49 * 2 + 179 + 289);
+  assert.deepEqual(w.winRun('t5'), { prize: 289, opened: 't7' });
+  assert.deepEqual(w.winRun('t7'), { prize: 369, opened: null }, 'the last run opens nothing');
+  assert.equal(w.coins, 49 * 2 + 179 + 289 + 369);
   const again = new Wallet(storage);
-  assert.deepEqual(RUN_IDS.map((id) => again.runOpen(id)), [true, true, true], 'remembered');
+  assert.deepEqual(RUN_IDS.map((id) => again.runOpen(id)), [true, true, true, true], 'remembered');
 });
 
 test('admin mode opens every run; Lock all closes them; the real save is untouched', () => {
   const storage = memory();
   const w = new Wallet(storage);
   w.open(ADMIN_SAVE);
-  assert.deepEqual(RUN_IDS.map((id) => w.runOpen(id)), [true, true, true]);
+  assert.deepEqual(RUN_IDS.map((id) => w.runOpen(id)), [true, true, true, true]);
   w.lockAll();
-  assert.deepEqual(RUN_IDS.map((id) => w.runOpen(id)), [true, false, false]);
+  assert.deepEqual(RUN_IDS.map((id) => w.runOpen(id)), [true, false, false, false]);
   w.open(SAVE);
   assert.equal(w.runOpen('t3'), false);
 });
@@ -162,4 +163,41 @@ test('survival is as it was: no clock, no surge', () => {
   assert.equal(game.won, false);
   assert.equal(game.itemsUnlocked, false, 'items from level 3, as ever');
   assert.equal(sturdyRun().itemsUnlocked, true, 'a run has them from the start');
+});
+
+test('v29: blue bacteria come in the 5-minute run’s last minute, and the 7-minute run’s last 3', () => {
+  for (const [id, at] of [['t5', 60], ['t7', 180]]) {
+    const game = sturdyRun(id);
+    run(game, LEVELS.bannerTime + 0.1);
+    game.run.left = at + 2;
+    const kinds = () => Array.from({ length: 40 }, () => game.nextKind());
+    assert.ok(!kinds().includes('blue'), `${id}: none before`);
+    game.drainEvents();
+    run(game, 2.1);
+    assert.ok(game.drainEvents().some((e) => e.type === 'bluesCome'), `${id}: they come`);
+    assert.ok(kinds().includes('blue'), `${id}: blue ones from then on`);
+  }
+  const short = sturdyRun('t3');
+  run(short, LEVELS.bannerTime + 0.1);
+  short.run.left = 5;
+  assert.ok(!Array.from({ length: 40 }, () => short.nextKind()).includes('blue'), 't3: never');
+});
+
+test('v29: in the 7-minute run’s last minute, the sprout’s powers stop', () => {
+  const game = new Game({ rng: () => 0.5, loadout: { sprouts: ['rose'] } });
+  game.reset({ sprouts: ['rose'] }, 1, 't7');
+  game.lives = 1;
+  game.maxLives = 10000;
+  game.klay.x = SOIL.cx; game.klay.y = SOIL.cy + 150;
+  game.held = true;
+  run(game, LEVELS.bannerTime + 0.1);
+  game.run.left = 61;
+  run(game, 1.1);
+  assert.equal(game.resting, true);
+  const lives = game.lives;
+  run(game, 45);
+  assert.equal(game.lives, lives, 'no healing');
+  const early = new Game({ rng: () => 0.5, loadout: { sprouts: ['rose'] } });
+  early.reset({ sprouts: ['rose'] }, 1, 't5');
+  assert.equal(early.resting, false, 'only the 7-minute run');
 });

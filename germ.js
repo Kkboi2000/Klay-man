@@ -25,3 +25,65 @@ export class Germ {
     if (this.travelled > this.range || !insideSoil(this.x, this.y, -6)) this.dead = true;
   }
 }
+
+/** A blue bacteria's light-blue shot (v29): it flies at one bit of dirt (a
+ *  bacteria in dirt, or a dirtball), following it, and `landed` once it's
+ *  there. The game takes the dirt off; it's gone if the dirt is first. */
+export class Zap {
+  constructor(x, y, target) {
+    this.x = x;
+    this.y = y;
+    this.target = target;
+    this.t = 0;
+    this.landed = false;
+    this.dead = false;
+  }
+
+  update(dt) {
+    this.t += dt;
+    const dx = this.target.x - this.x;
+    const dy = this.target.y - this.y;
+    const d = Math.hypot(dx, dy);
+    const step = KINDS.blue.zap.speed * dt;
+    if (d <= step + 4) {
+      this.x = this.target.x;
+      this.y = this.target.y;
+      this.landed = true;
+      return;
+    }
+    this.x += (dx / d) * step;
+    this.y += (dy / d) * step;
+  }
+}
+
+/** A cactus's thorn (v29): it flies from the cactus at one bacteria or
+ *  dirtball, following it, and `landed` once it's there. */
+export class Thorn {
+  constructor(x, y, target, speed) {
+    this.x = x;
+    this.y = y;
+    this.target = target;
+    this.speed = speed;
+    this.t = 0;
+    this.landed = false;
+    this.dead = false;
+  }
+
+  update(dt) {
+    this.t += dt;
+    const dx = this.target.x - this.x;
+    const dy = this.target.y - this.y;
+    const d = Math.hypot(dx, dy);
+    const step = this.speed * dt;
+    this.vx = dx / (d || 1);
+    this.vy = dy / (d || 1);
+    if (d <= step + 4) {
+      this.x = this.target.x;
+      this.y = this.target.y;
+      this.landed = true;
+      return;
+    }
+    this.x += this.vx * step;
+    this.y += this.vy * step;
+  }
+}

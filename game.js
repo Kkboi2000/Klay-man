@@ -8,8 +8,9 @@ import {
 } from './world.js';
 import { Klayman } from './klayman.js';
 import { makeBacteria } from './bacteria.js';
-import { Germ } from './germ.js';
+import { Germ, Thorn, Zap } from './germ.js';
 import { DirtWave } from './dirtwave.js';
+import { AiKlay } from './aiklay.js';
 import { Dirtball } from './dirtball.js';
 import { DirtShot } from './dirtshot.js';
 import { Boss, bossHp, bossRed, bossSpawnEvery, isBossLevel } from './boss.js';
@@ -58,6 +59,14 @@ export function dealKinds(count, shares, rng) {
 const sharesWhere = (open) => Object.fromEntries(
   Object.entries(KINDS).filter(([, k]) => open(k)).map(([kind, k]) => [kind, k.share]),
 );
+
+/** A point straight away from `from`, far past `b`: where it heads with the radio on. */
+function awayFrom(b, from) {
+  const dx = b.x - from.x;
+  const dy = b.y - from.y;
+  const d = Math.hypot(dx, dy) || 1;
+  return { x: b.x + (dx / d) * 400, y: b.y + (dy / d) * 400 };
+}
 
 // A deck is dealt this many at a time where there's no end to the bacteria (a timer run, a boss).
 const DECK = 20;
@@ -130,6 +139,9 @@ export class Game {
     this.dirtballs = [];
     this.shots = [];
     this.germs = [];               // orange bacteria's germs, flying at Klayman
+    this.zaps = [];                // blue bacteria's light-blue shots, flying at dirt
+    this.thorns = [];              // a cactus's thorns (v29)
+    this.ai = null;                // the AI gadget's digital Klayman, while it's out (v29)
     this.waves = [];               // the bazoo-klay's waves of dirt
     this.coins = [];
     this.gadgets = this.loadout.gadgets.map((id) => new Gadget(id));
@@ -167,6 +179,7 @@ export class Game {
     this.shieldTimer = g.shield?.every;
     this.shield = 0;               // corn: seconds left with its leaves closed
     this.hideTimer = g.hide?.every;
+    this.thornTimer = g.thorns ? this.thornWait() : null;
     this.hidden = 0;               // lilies: seconds left closed
     this.sunTimer = this.weather.sun?.every;
     this.sunGrown = 0;             // summer: hearts the sun has grown this sprout
@@ -243,11 +256,13 @@ export class Game {
   get sproutClocks() {
     const g = this.gear;
     const out = [];
+    if (this.resting) return out;  // the 7-minute run's last minute: no powers to count down
     if (this.flowerCoins) out.push({ power: 'coin', secs: this.flowerCoins.timer });
     if (this.flowerItems) out.push({ power: 'item', secs: this.flowerItems.timer });
     if (g.shield) out.push(this.shield > 0 ? { power: 'opens', secs: this.shield } : { power: 'closes', secs: this.shieldTimer });
     if (g.hide) out.push(this.hidden > 0 ? { power: 'opens', secs: this.hidden } : { power: 'closes', secs: this.hideTimer });
     if (g.spores) out.push({ power: 'spores', secs: this.sporeTimer });
+    if (g.thorns) out.push({ power: 'thorn', secs: this.thornTimer });
     if (g.heal) out.push({ power: 'heal', secs: this.healTimer });
     if (g.growEvery && this.maxLives + 1 <= this.heartCap) out.push({ power: 'grow', secs: this.growTimer });
     const sun = this.weather.sun;
@@ -287,7 +302,7 @@ export class Game {
 
   /** Where special items come from right now: the pot (from level 3) and a sunflower. */
   get itemSources() {
-    return [this.itemsUnlocked ? this.potItems : null, this.flowerItems].filter(Boolean);
+    return [this.itemsUnlocked ? this.potItems : null, this.resting ? null : this.flowerItems].filter(Boolean);
   }
 
   /** How far the leaf's wind reaches round Klayman now (0 when it's not blowing). */
@@ -299,6 +314,9 @@ export class Game {
 
   /** The fertilizer is working. */
   get fertilized() { return this.gadgets.some((g) => g.id === 'fertilizer' && g.active); }
+
+  /** The radio is on (v29): every bacteria does the opposite. */
+  get jammed() { return this.gadgets.some((g) => g.id === 'radio' && g.active); }
 
   /** Every bacteria's speed, now: slower while the fertilizer works, and in
    *  winter; faster as a timer run goes on. */
@@ -357,9 +375,23 @@ export class Game {
   /** The share of each kind among this game's own bacteria: from level 10
    *  blue, from 20 orange; in a timer run, the kinds that come in it. */
   kindShares() {
-    return this.timed
-      ? sharesWhere((k) => k.runs.includes(this.run.id))
-      : sharesWhere((k) => this.level >= k.from);
+    if (!this.timed) return sharesWhere((k) => this.level >= k.from);
+    const shares = sharesWhere((k) => k.runs.includes(this.run.id));
+    if (this.bluesOut) shares.blue = KINDS.blue.share;   // v29: late in the long runs
+    return shares;
+  }
+
+  /** A long run's blue bacteria are out: its last minute (5 minutes), or
+   *  last 3 (7 minutes). */
+  get bluesOut() {
+    const at = this.timed && TIMER.runs[this.run.id].bluesAt;
+    return Boolean(at) && this.run.left <= at;
+  }
+
+  /** The 7-minute run's last minute: the sprout's powers stop (v29). */
+  get resting() {
+    const at = this.timed && TIMER.runs[this.run.id].restAt;
+    return Boolean(at) && this.run.left <= at && !this.won;
   }
 
   /** ...and among what a boss sends out: orange from level 25, blue from 35. */
@@ -369,12 +401,14 @@ export class Game {
    *  starts; with no end to them, they're dealt DECK at a time. */
   nextKind() {
     if (!this.kindDeck.length && this.timed) this.kindDeck = dealKinds(DECK, this.kindShares(), this.rng);
-    return this.kindDeck.pop() ?? 'green';
+    const kind = this.kindDeck.pop() ?? 'green';
+    return this.gear.greenOnly ? 'green' : kind;   // a cactus in the pot: only green ones (v29)
   }
 
   nextBossKind() {
     if (!this.bossDeck.length) this.bossDeck = dealKinds(DECK, this.bossShares(), this.rng);
-    return this.bossDeck.pop();
+    const kind = this.bossDeck.pop();
+    return this.gear.greenOnly ? 'green' : kind;
   }
 
   addBacteria(x, y, kind = 'green') {
@@ -398,9 +432,15 @@ export class Game {
     return best;
   }
 
-  /** Orange ones charge up a germ once Klayman's in reach, and spit it. */
-  spit(b, dt) {
+  /** Orange ones charge up a germ once Klayman's in reach, and spit it.
+   *  With the radio on (`quiet`), they don't. */
+  spit(b, dt, quiet = false) {
     const { reach, every, charge } = KINDS.orange;
+    if (quiet) {
+      b.charging = 0;
+      b.cooldown = Math.max(0, b.cooldown - dt);
+      return;
+    }
     if (b.charging > 0) {
       b.charging -= dt;
       if (b.charging <= 0) {
@@ -426,7 +466,7 @@ export class Game {
 
   /** Blue ones jump to stamp the dirt off whatever's dirty in reach, every
    *  so often: up, and when they land, the stamp; then one small bounce. */
-  stomp(b, dt) {
+  stomp(b, dt, quiet = false) {
     const { reach, every, jump, land } = KINDS.blue;
     b.cooldown = Math.max(0, b.cooldown - dt);       // counts from one jump to the next
     if (b.jumping) {
@@ -436,7 +476,7 @@ export class Game {
       if (b.jump >= jump) b.jump = 0;
       return;
     }
-    if (b.cooldown > 0 || !this.dirtAround(b, reach).length) return;
+    if (quiet || b.cooldown > 0 || !this.dirtAround(b, reach).length) return;   // the radio: no new jumps
     b.cooldown = every;
     b.jump = 1e-6;
     this.emit('jump', { x: b.x, y: b.y });
@@ -450,17 +490,34 @@ export class Game {
     ];
   }
 
-  /** A blue one lands: a layer of dirt off every dirty bacteria in reach,
-   *  and a layer's worth off every dirtball's hold. Steam rises off each. */
+  /** A blue one lands, and shoots a light-blue shot at the nearest dirt in
+   *  reach: one at a time (v29). */
   stampDown(b) {
-    const { reach, dirt, hold } = KINDS.blue;
-    const hit = this.dirtAround(b, reach);
-    for (const t of hit) {
+    this.emit('stomp', { x: b.x, y: b.y });
+    const dirt = this.dirtAround(b, KINDS.blue.reach);
+    if (!dirt.length) return;
+    const target = dirt.reduce((a, c) => (dist(c, b) < dist(a, b) ? c : a));
+    this.zaps.push(new Zap(b.x, b.y, target));
+    this.emit('zap', { x: b.x, y: b.y });
+  }
+
+  /** The light-blue shots fly; one that gets there takes a layer of dirt off
+   *  its bacteria, or a layer's worth off its dirtball's hold. Steam rises. */
+  updateZaps(dt) {
+    if (this.frozen) return;
+    const { dirt, hold } = KINDS.blue;
+    for (const z of this.zaps) {
+      const t = z.target;
+      const still = t instanceof Dirtball ? t.solid : t.state === 'dirty';
+      if (!still) { z.dead = true; continue; }
+      z.update(dt);
+      if (!z.landed) continue;
+      z.dead = true;
       if (t instanceof Dirtball) t.wear(hold);
       else t.shed(dirt);
+      this.emit('zapHit', { x: t.x, y: t.y, ball: t instanceof Dirtball });
     }
-    const steam = hit.map((t) => ({ x: t.x, y: t.y, ball: t instanceof Dirtball }));
-    this.emit('stomp', { x: b.x, y: b.y, steam });
+    this.zaps = this.zaps.filter((z) => !z.dead);
   }
 
   /** The germs fly; one that reaches Klayman poisons him, orange (the lab
@@ -552,6 +609,21 @@ export class Game {
       this.spawnEvery = TIMER_SPAWN / this.surge;    // the next one waits the new, shorter time
       this.emit('surge', { surge: this.surge });
     }
+    // (After the surge: these moments fall on one, and their banner should win.)
+    // v29: in the long runs, blue bacteria come from a point on; the deck
+    // is dealt again then, so they come at once. In the 7-minute run's last
+    // minute, the sprout's powers stop.
+    const { bluesAt, restAt } = TIMER.runs[run.id];
+    const was = run.left + dt;
+    if (bluesAt && was > bluesAt && run.left <= bluesAt) {
+      this.kindDeck = [];
+      this.emit('bluesCome', { left: run.left });
+    }
+    if (restAt && was > restAt && run.left <= restAt) {
+      this.shield = 0;
+      this.hidden = 0;
+      this.emit('sproutRests', { left: run.left });
+    }
     if (this.frozen || this.held) return;
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0) {
@@ -642,6 +714,8 @@ export class Game {
     this.bacteria = [];
     this.dirtballs = [];
     this.germs = [];
+    this.zaps = [];
+    this.thorns = [];
     this.waves = [];
     this.upcoming = [];
     this.stormTargets = [];
@@ -812,11 +886,14 @@ export class Game {
     this.updateGadgets(dt, input.gadget ?? -1);
     this.lock = this.gear.lockOn ? this.lockTarget(this.klay) : null;
     this.klay.update(dt, input, this);
+    this.updateAi(dt);
     this.updateShots(dt);
     this.updateWaves(dt);
     this.updateBacteria(dt);
     if (this.over) return;
     this.updateGerms(dt);
+    this.updateZaps(dt);
+    this.updateThorns(dt);
     this.updateDirtballs(dt);
     this.updateBoss(dt);
     this.updateItems(dt);
@@ -836,7 +913,7 @@ export class Game {
         if (dist(b, s) < BACTERIA.radius + SHOT.radius) {
           s.dead = true;
           this.emit('hit', { x: b.x, y: b.y });
-          if (b.addDirt(this.dirtPower)) this.turnIntoDirtball(b);
+          if (b.addDirt(s.power ?? this.dirtPower)) this.turnIntoDirtball(b);
           break;
         }
       }
@@ -844,7 +921,7 @@ export class Game {
       // Dirt splats on the boss; while it's still fighting, it wears it down.
       if (boss?.solid && boss.touches(s, SHOT.radius)) {
         s.dead = true;
-        if (boss.alive) this.hitBoss(BOSS.shotDamage * this.dirtPower, s);
+        if (boss.alive) this.hitBoss(BOSS.shotDamage * (s.power ?? this.dirtPower), s);
         else this.emit('hit', { x: s.x, y: s.y });
       }
       // Dirt flies past dirtballs: they're only ever pushed (v27).
@@ -893,15 +970,18 @@ export class Game {
     const wind = this.windReach;
     // A closed lily can't be seen: bacteria wander instead of heading for it.
     const target = this.hidden > 0 ? null : this.tree;
+    const jam = this.jammed;
     for (const b of this.bacteria) {
-      // Green ones head for the sprout; orange ones for Klayman; blue ones for dirt.
-      const goal = b.kind === 'orange' ? this.klay : b.kind === 'blue' ? this.dirtNear(b) : target;
+      // Green ones head for the sprout; orange ones for Klayman; blue ones
+      // for dirt. With the radio on, each heads straight away from it.
+      let goal = b.kind === 'orange' ? this.klay : b.kind === 'blue' ? this.dirtNear(b) : target;
+      if (jam && goal) goal = awayFrom(b, goal);
       b.update(dt, goal, frozen, this.tree, pace);
       // The whirlwind's wind: nothing gets through to Klayman.
       if (wind > 0 && b.alive) this.blowAway(b, wind);
       if (!b.crawling || frozen) continue;
-      if (b.kind === 'orange') this.spit(b, dt);
-      else if (b.kind === 'blue') this.stomp(b, dt);
+      if (b.kind === 'orange') this.spit(b, dt, jam);
+      else if (b.kind === 'blue') this.stomp(b, dt, jam);
       if (!b.invades) {
         // The lab coat still slows them at a touch.
         if (this.gear.immune && dist(b, this.klay) < BACTERIA.radius + KLAYMAN.radius - 4
@@ -1124,7 +1204,7 @@ export class Game {
       this.nextCoin = null;
     }
     // A daisy: a coin pops out of the flower, from level 1.
-    const daisy = this.flowerCoins;
+    const daisy = this.resting ? null : this.flowerCoins;
     if (daisy) {
       daisy.timer -= dt;
       if (!daisy.next && daisy.timer <= LOOKAHEAD) daisy.next = this.planFlowerCoin();
@@ -1164,6 +1244,13 @@ export class Game {
     if (this.over || !g?.use()) return false;
     const at = g.id === 'spray' ? this.tree : this.klay;
     if (g.id === 'leaf') this.whirl(g.spec);
+    if (g.id === 'ai') {
+      // Beside him, on the side away from the pot's edge.
+      const side = this.klay.x < SOIL.cx ? 1 : -1;
+      const spot = { x: this.klay.x + side * 40, y: this.klay.y + 6 };
+      keepOnSoil(spot, KLAYMAN.radius);
+      this.ai = new AiKlay(spot.x, spot.y);
+    }
     this.emit('gadget', { id: g.id, index: i, x: at.x, y: at.y });
     return true;
   }
@@ -1235,6 +1322,7 @@ export class Game {
       this.hidden = Math.max(0, this.hidden - dt);
       if (this.hidden === 0) this.emit('unhide', at);
     }
+    if (this.resting) return;      // the 7-minute run's last minute: no powers
 
     if (g.heal) {
       this.healTimer -= dt;
@@ -1273,6 +1361,10 @@ export class Game {
         this.emit('shield', at);
       }
     }
+    if (g.thorns) {
+      this.thornTimer -= dt;
+      if (this.thornTimer <= 0) this.shootThorn();
+    }
     if (g.hide) {
       this.hideTimer -= dt;
       if (this.hideTimer <= 0) {
@@ -1281,6 +1373,68 @@ export class Game {
         this.emit('hide', at);
       }
     }
+  }
+
+  /** The AI gadget's Klayman: 1.5 times as fast as the real one is right now. */
+  updateAi(dt) {
+    const ai = this.ai;
+    if (!ai) return;
+    const { speed, fireRate } = GADGETS.ai;
+    ai.update(dt, this, { speed: KLAYMAN.speed * this.walkSpeed * speed, fireRate: this.fireRate * fireRate });
+    if (ai.gone) this.ai = null;
+  }
+
+  /** The AI Klayman throws: plain dirt, as far as a plain throw, one layer a hit. */
+  aiThrow(ai, dir) {
+    const shot = new DirtShot(ai.x, ai.y, dir, { range: SHOT.range });
+    shot.power = 1;
+    shot.ai = true;
+    this.shots.push(shot);
+    this.emit('throw', { x: ai.x, y: ai.y, ai: true });
+  }
+
+  /** Seconds until a cactus's next thorn: somewhere between its min and max. */
+  thornWait() {
+    const { min, max } = this.gear.thorns;
+    return min + this.rng() * (max - min);
+  }
+
+  /** A cactus shoots a thorn at the nearest bacteria (crawling or in dirt) or
+   *  dirtball. With none about, it looks again in a second. */
+  shootThorn() {
+    const prey = this.nearestOf([...this.bacteria.filter((b) => b.alive), ...this.dirtballs.filter((d) => d.solid)], this.tree);
+    if (!prey) {
+      this.thornTimer = 1;
+      return;
+    }
+    this.thornTimer = this.thornWait();
+    const from = { x: this.tree.x, y: this.tree.y - 2 };
+    this.thorns.push(new Thorn(from.x, from.y, prey, this.gear.thorns.speed));
+    this.emit('thorn', from);
+  }
+
+  /** The thorns fly; one that gets there kills a crawling bacteria on the
+   *  spot, and breaks one in dirt, or a dirtball. If its prey is gone first,
+   *  so is it. */
+  updateThorns(dt) {
+    for (const t of this.thorns) {
+      const prey = t.target;
+      if (prey instanceof Dirtball ? !prey.solid : !prey.alive) { t.dead = true; continue; }
+      t.update(dt);
+      if (!t.landed) continue;
+      t.dead = true;
+      if (prey instanceof Dirtball) {
+        this.breakDirtball(prey);
+      } else {
+        const dirty = prey.state === 'dirty';
+        prey.breakApart();
+        this.addScore(dirty ? SCORE.dirtball : SCORE.smash, prey);
+        this.emit(dirty ? 'break' : 'smash', { x: prey.x, y: prey.y });
+        this.killed(prey);
+      }
+      this.emit('thornHit', { x: prey.x, y: prey.y });
+    }
+    this.thorns = this.thorns.filter((t) => !t.dead);
   }
 
   /** A mushroom's spores: inside the ring, dirtballs slide away, and every
