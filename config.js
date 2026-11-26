@@ -261,7 +261,7 @@ export const SPROUTS = {
   // pot, no orange or blue bacteria come at all, not even from a boss.
   cactus: {
     price: 299,
-    thorns: { min: 6, max: 12, speed: 520 },
+    thorns: { min: 6 * 2.5, max: 12 * 2.5, speed: 520 },
     growEvery: 50,
     maxLives: 9,
     heal: { every: 30, amount: 0.5 },
